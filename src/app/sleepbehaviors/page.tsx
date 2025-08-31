@@ -197,33 +197,21 @@ export default function SleepBehaviors() {
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-emerald-500/10 via-teal-500/5 to-cyan-500/10 blur-xl" />
-              <div className="relative">
-                <h3 className="text-lg font-medium mb-4">Quick Actions</h3>
-                <div className="space-y-3">
-                  <Link
-                    href="/sensors"
-                    className="block w-full py-2 px-4 rounded-lg border border-white/20 bg-white/10 text-white text-sm hover:bg-white/15 transition-colors duration-200 text-center"
-                  >
-                    View Sensors
-                  </Link>
-                  <Link
-                    href="/assessments"
-                    className="block w-full py-2 px-4 rounded-lg border border-white/20 bg-white/10 text-white text-sm hover:bg-white/15 transition-colors duration-200 text-center"
-                  >
-                    Run Assessment
-                  </Link>
-                  <Link
-                    href="/reminders"
-                    className="block w-full py-2 px-4 rounded-lg border border-white/20 bg-white/10 text-white text-sm hover:bg-white/15 transition-colors duration-200 text-center"
-                  >
-                    Set Reminders
-                  </Link>
-                </div>
-              </div>
-            </div>
+                         {/* Quick Actions */}
+             <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-emerald-500/10 via-teal-500/5 to-cyan-500/10 blur-xl" />
+               <div className="relative">
+                 <h3 className="text-lg font-medium mb-4">Quick Actions</h3>
+                 <div className="space-y-3">
+                   <Link
+                     href="/sensors"
+                     className="block w-full py-2 px-4 rounded-lg border border-white/20 bg-white/10 text-white text-sm hover:bg-white/15 transition-colors duration-200 text-center"
+                   >
+                     View Sensors
+                   </Link>
+                 </div>
+               </div>
+             </div>
           </div>
         </div>
 
