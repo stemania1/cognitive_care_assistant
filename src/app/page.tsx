@@ -1,45 +1,17 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import HomeCards from "./components/HomeCards";
 
 export default function Home() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const router = useRouter();
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
-
-    try {
-      // TODO: Implement actual authentication logic here
-      // For now, we'll simulate a successful sign-in
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Redirect to dashboard after successful sign-in
-      router.push("/dashboard");
-    } catch (err) {
-      setError("Invalid email or password. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
       {/* Background gradients */}
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
       <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
 
-      <main className="relative mx-auto max-w-md px-6 sm:px-8 py-12 sm:py-20">
-        {/* Logo and Title */}
-        <div className="flex flex-col items-center text-center gap-6 mb-10">
+      <main className="relative mx-auto max-w-5xl px-6 sm:px-10 py-12 sm:py-20">
+        {/* Hero */}
+        <div className="flex flex-col items-center text-center gap-6 mb-10 sm:mb-14">
           <div className="relative">
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/30 via-purple-500/20 to-cyan-500/30 blur-xl" />
             <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-4">
@@ -49,108 +21,58 @@ export default function Home() {
                 width={96}
                 height={96}
                 priority
-                className="h-16 w-16 sm:h-20 sm:w-20 object-contain drop-shadow"
+                className="h-16 w-16 sm:h-24 sm:w-24 object-contain drop-shadow"
               />
             </div>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Welcome Back
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-fuchsia-500 to-cyan-400">
+            Cognitive Care
           </h1>
-          <p className="text-gray-300 text-sm">
-            Sign in to access your Cognitive Care Assistant
-          </p>
         </div>
 
-        {/* Sign In Form */}
-        <div className="relative">
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/10 via-purple-500/5 to-cyan-500/10 blur-xl" />
-          <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6 sm:p-8">
-            <form onSubmit={handleSignIn} className="space-y-6">
-              {error && (
-                <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-red-400 text-sm">
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-gray-200">
-                  Email Address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 rounded-lg border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all duration-200"
-                  placeholder="Enter your email"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-200">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 rounded-lg border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all duration-200"
-                  placeholder="Enter your password"
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="rounded border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur text-purple-500 focus:ring-purple-500/50 focus:ring-offset-0"
-                  />
-                  <span className="text-gray-300">Remember me</span>
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-purple-400 hover:text-purple-300 transition-colors duration-200"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500 text-white font-medium hover:from-purple-600 hover:via-fuchsia-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 focus:ring-offset-black transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Signing in...</span>
-                  </div>
-                ) : (
-                  "Sign In"
-                )}
-              </button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-gray-400 text-sm">
-                Don't have an account?{" "}
-                <Link
-                  href="/signup"
-                  className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200"
-                >
-                  Sign up
-                </Link>
-              </p>
-            </div>
-          </div>
-        </div>
-
-
+        {/* Options */}
+        <HomeCards />
       </main>
+
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 flex flex-col gap-4">
+        {/* Settings Button */}
+        <Link href="/settings" className="group">
+          <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-purple-500/30 via-fuchsia-500/25 to-cyan-500/30 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
+          <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-5 w-5 opacity-90"
+              aria-hidden="true"
+            >
+              <path d="M11.983 8.5a3.5 3.5 0 1 0 .034 7 3.5 3.5 0 0 0-.034-7Zm9.017 3.5a8.99 8.99 0 0 0-.15-1.6l2.082-1.595a.75.75 0 0 0 .177-.964l-1.973-3.416a.75.75 0 0 0-.91-.33l-2.45.9a9.08 9.08 0 0 0-1.39-.807l-.37-2.57A.75.75 0 0 0 14.3.5h-4.6a.75.75 0 0 0-.742.648l-.37 2.57c-.49.213-.953.487-1.39.807l-2.45-.9a.75.75 0 0 0-.91.33L1.27 7.34a.75.75 0 0 0 .177.964l2.082 1.595A8.99 8.99 0 0 0 3.38 12a8.99 8.99 0 0 0 .15 1.6L1.448 15.195a.75.75 0 0 0-.177.964l1.973 3.416a.75.75 0 0 0 .91.33l2.45-.9c.437.32.9.594 1.39.807l.37 2.57a.75.75 0 0 0 .742.648h4.6a.75.75 0 0 0 .742-.648l.37-2.57c.49-.213.953-.487 1.39-.807l2.45.9a.75.75 0 0 0 .91-.33l1.973-3.416a.75.75 0 0 0-.177-.964L21.85 13.6c.1-.52.15-1.06.15-1.6Z" />
+            </svg>
+            <span className="sr-only">Settings</span>
+          </span>
+        </Link>
+
+        {/* Sign Out Button */}
+        <Link href="/signout" className="group">
+          <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-red-500/30 via-pink-500/25 to-rose-500/30 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
+          <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-5 w-5 opacity-90"
+              aria-hidden="true"
+            >
+              <path d="M16.5 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM21 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM15.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM9.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM3.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25z" />
+            </svg>
+            <span className="sr-only">Sign Out</span>
+          </span>
+        </Link>
+      </div>
     </div>
   );
 }
+// Card rendering moved to client component: src/app/components/HomeCards.tsx
+

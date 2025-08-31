@@ -1,24 +1,525 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
-export default function SensorsPage() {
+interface ThermalData {
+  timestamp: number;
+  data: number[][]; // 8x8 grid for AMG8833
+}
+
+export default function Sensors() {
+  const [thermalData, setThermalData] = useState<ThermalData | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState("Disconnected");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // AMG8833 specifications
+  const GRID_SIZE = 8;
+  const MIN_TEMP = 20; // Celsius
+  const MAX_TEMP = 80; // Celsius
+
+  useEffect(() => {
+    connectWebSocket();
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      // Clean up demo interval
+      if ((window as any).demoInterval) {
+        clearInterval((window as any).demoInterval);
+        (window as any).demoInterval = null;
+      }
+    };
+  }, []);
+
+  const connectWebSocket = () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Try WebSocket first
+      const ws = new WebSocket("ws://localhost:8091");
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setIsConnected(true);
+        setConnectionStatus("Connected");
+        setError(null);
+        setIsLoading(false);
+        console.log("WebSocket connected to port 8091");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data: ThermalData = JSON.parse(event.data);
+          setThermalData(data);
+        } catch (err) {
+          console.error("Error parsing thermal data:", err);
+        }
+      };
+
+      ws.onclose = () => {
+        setIsConnected(false);
+        setConnectionStatus("Disconnected");
+        setIsLoading(false);
+        console.log("WebSocket disconnected");
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setError("Failed to connect via WebSocket. Trying HTTP fallback...");
+        
+        // Fallback to HTTP polling
+        startHttpPolling();
+      };
+
+    } catch (err) {
+      console.error("Connection error:", err);
+      setError("Connection failed. Trying HTTP fallback...");
+      startHttpPolling();
+    }
+  };
+
+  const startDemoMode = () => {
+    setIsLoading(true);
+    setError(null);
+    
+    // Generate demo data
+    const demoData: ThermalData = {
+      timestamp: Date.now(),
+      data: generateDemoThermalData()
+    };
+    
+    setThermalData(demoData);
+    setIsConnected(true);
+    setConnectionStatus("Demo Mode");
+    setIsLoading(false);
+    
+    // Update demo data every 2 seconds
+    const interval = setInterval(() => {
+      const newDemoData: ThermalData = {
+        timestamp: Date.now(),
+        data: generateDemoThermalData()
+      };
+      setThermalData(newDemoData);
+    }, 2000);
+    
+    // Store interval for cleanup
+    (window as any).demoInterval = interval;
+  };
+
+  const generateDemoThermalData = (): number[][] => {
+    const baseTemp = 25.0;
+    const grid = [];
+    
+    for (let y = 0; y < GRID_SIZE; y++) {
+      const row = [];
+      for (let x = 0; x < GRID_SIZE; x++) {
+        // Create a realistic thermal pattern
+        const center_x = 4;
+        const center_y = 4;
+        const distance = Math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2);
+        
+        // Simulate a heat source in the center
+        let temp = baseTemp;
+        if (distance < 2) {
+          temp = baseTemp + 15 + (Math.random() - 0.5) * 4;
+        } else if (distance < 4) {
+          temp = baseTemp + 8 + (Math.random() - 0.5) * 3;
+        } else {
+          temp = baseTemp + (Math.random() - 0.5) * 2;
+        }
+        
+        row.push(Number(temp.toFixed(1)));
+      }
+      grid.push(row);
+    }
+    
+    return grid;
+  };
+
+  const stopDemoMode = () => {
+    if ((window as any).demoInterval) {
+      clearInterval((window as any).demoInterval);
+      (window as any).demoInterval = null;
+    }
+    setIsConnected(false);
+    setConnectionStatus("Disconnected");
+    setThermalData(null);
+  };
+
+  const startHttpPolling = () => {
+    setIsLoading(true);
+    const pollData = async () => {
+      try {
+        const response = await fetch("http://localhost:8091/thermal-data");
+        if (response.ok) {
+          const data: ThermalData = await response.json();
+          setThermalData(data);
+          setIsConnected(true);
+          setConnectionStatus("Connected (HTTP)");
+          setError(null);
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (err) {
+        setError("Failed to connect to thermal sensor. Please check if the Raspberry Pi is running and accessible on port 8091.");
+        setIsConnected(false);
+        setConnectionStatus("Connection Failed");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Poll every 2 seconds
+    pollData();
+    const interval = setInterval(pollData, 2000);
+    
+    return () => clearInterval(interval);
+  };
+
+  const drawHeatmap = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !thermalData) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const cellWidth = canvasWidth / GRID_SIZE;
+    const cellHeight = canvasHeight / GRID_SIZE;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Draw grid cells
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const temp = thermalData.data[y][x];
+        const normalizedTemp = Math.max(0, Math.min(1, (temp - MIN_TEMP) / (MAX_TEMP - MIN_TEMP)));
+        
+        // Color gradient from blue (cold) to red (hot)
+        const hue = (1 - normalizedTemp) * 240; // 240 (blue) to 0 (red)
+        const saturation = 80;
+        const lightness = 50 + normalizedTemp * 30;
+        
+        ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+        ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+        
+        // Draw temperature value
+        ctx.fillStyle = temp > (MIN_TEMP + MAX_TEMP) / 2 ? "white" : "black";
+        ctx.font = "10px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          `${temp.toFixed(1)}°C`,
+          x * cellWidth + cellWidth / 2,
+          y * cellHeight + cellHeight / 2 + 3
+        );
+      }
+    }
+
+    // Draw grid lines
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    ctx.lineWidth = 1;
+    
+    for (let i = 0; i <= GRID_SIZE; i++) {
+      // Vertical lines
+      ctx.beginPath();
+      ctx.moveTo(i * cellWidth, 0);
+      ctx.lineTo(i * cellWidth, canvasHeight);
+      ctx.stroke();
+      
+      // Horizontal lines
+      ctx.beginPath();
+      ctx.moveTo(0, i * cellHeight);
+      ctx.lineTo(canvasWidth, i * cellHeight);
+      ctx.stroke();
+    }
+  };
+
+  useEffect(() => {
+    if (thermalData) {
+      drawHeatmap();
+    }
+  }, [thermalData]);
+
+  const getTemperatureStats = () => {
+    if (!thermalData) return null;
+
+    const allTemps = thermalData.data.flat();
+    const minTemp = Math.min(...allTemps);
+    const maxTemp = Math.max(...allTemps);
+    const avgTemp = allTemps.reduce((sum, temp) => sum + temp, 0) / allTemps.length;
+
+    return { minTemp, maxTemp, avgTemp };
+  };
+
+  const getStatusColor = () => {
+    if (isConnected) return "text-emerald-400";
+    if (isLoading) return "text-amber-400";
+    return "text-red-400";
+  };
+
+  const getStatusIcon = () => {
+    if (isConnected) return "🟢";
+    if (isLoading) return "🟡";
+    return "🔴";
+  };
+
   return (
-    <>
-      <main className="min-h-screen p-8 sm:p-16 grid place-items-center">
-        <div className="w-full max-w-2xl">
-          <h1 className="text-2xl sm:text-3xl font-semibold mb-2">Thermal Camera • Sleep Patterns</h1>
-          <p className="opacity-80">Track nightly sleep patterns using thermal data.</p>
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+      {/* Background gradients */}
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
+      <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
+
+      <main className="relative mx-auto max-w-6xl px-6 sm:px-8 py-12 sm:py-20">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center space-x-2 text-gray-400 hover:text-white transition-colors duration-200"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-5 w-5"
+            >
+              <path d="M7.828 11H20v2H7.828l5.364 5.364-1.414 1.414L4 12l7.778-7.778 1.414 1.414L7.828 11z" />
+            </svg>
+            <span>Back to Dashboard</span>
+          </Link>
+        </div>
+
+        {/* Title and Status */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-4">
+            Thermal Sensor Monitor
+          </h1>
+          <p className="text-gray-300 text-lg mb-6">
+            Real-time thermal imaging from AMG8833 sensor
+          </p>
+          
+          {/* Connection Status */}
+          <div className="inline-flex items-center space-x-3 px-4 py-2 rounded-lg bg-white/10 backdrop-blur border border-white/20">
+            <span className="text-2xl">{getStatusIcon()}</span>
+            <span className={`font-medium ${getStatusColor()}`}>
+              {connectionStatus}
+            </span>
+            {isLoading && (
+              <div className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+            )}
+          </div>
+        </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-center space-x-3">
+              <span className="text-amber-400 text-xl">💡</span>
+              <div>
+                <p className="text-amber-400 font-medium">Connection Notice</p>
+                <p className="text-amber-300 text-sm">{error}</p>
+                <p className="text-amber-200 text-xs mt-2">
+                  💡 Try Demo Mode to test the interface, or set up your Raspberry Pi sensor server.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Heatmap Visualization */}
+          <div className="lg:col-span-2">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-sky-500/5 to-blue-500/10 blur-xl" />
+              <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-white">Thermal Heatmap</h2>
+                  <div className="text-sm text-gray-400">
+                    {thermalData ? new Date(thermalData.timestamp).toLocaleTimeString() : "No data"}
+                  </div>
+                </div>
+                
+                {/* Canvas Container */}
+                <div className="flex justify-center">
+                  <div className="relative">
+                    <canvas
+                      ref={canvasRef}
+                      width={400}
+                      height={400}
+                      className="border border-white/20 rounded-lg bg-black/20"
+                    />
+                    
+                    {/* Temperature Scale */}
+                    <div className="mt-4 flex items-center justify-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                        <span className="text-sm text-gray-300">Cold ({MIN_TEMP}°C)</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-green-500 rounded"></div>
+                        <span className="text-sm text-gray-300">Warm</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-red-500 rounded"></div>
+                        <span className="text-sm text-gray-300">Hot ({MAX_TEMP}°C)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sensor Info and Controls */}
+          <div className="space-y-6">
+            {/* Sensor Specifications */}
+            <div className="relative">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-emerald-500/10 via-teal-500/5 to-green-500/10 blur-xl" />
+              <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <span className="text-emerald-400 mr-2">🔬</span>
+                  Sensor Info
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Model:</span>
+                    <span className="text-white">AMG8833</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Resolution:</span>
+                    <span className="text-white">8×8 pixels</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Range:</span>
+                    <span className="text-white">-20°C to +80°C</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Accuracy:</span>
+                    <span className="text-white">±2.5°C</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Update Rate:</span>
+                    <span className="text-white">10 Hz</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Temperature Statistics */}
+            {thermalData && (
+              <div className="relative">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-purple-500/10 via-fuchsia-500/5 to-pink-500/10 blur-xl" />
+                <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                    <span className="text-purple-400 mr-2">📊</span>
+                    Current Stats
+                  </h3>
+                  {(() => {
+                    const stats = getTemperatureStats();
+                    if (!stats) return null;
+                    
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-300">Min:</span>
+                          <span className="text-cyan-400 font-medium">{stats.minTemp.toFixed(1)}°C</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-300">Max:</span>
+                          <span className="text-red-400 font-medium">{stats.maxTemp.toFixed(1)}°C</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-300">Average:</span>
+                          <span className="text-emerald-400 font-medium">{stats.avgTemp.toFixed(1)}°C</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Connection Controls */}
+            <div className="relative">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-amber-500/10 via-orange-500/5 to-red-500/10 blur-xl" />
+              <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <span className="text-amber-400 mr-2">⚙️</span>
+                  Controls
+                </h3>
+                <div className="space-y-3">
+                  <button
+                    onClick={connectWebSocket}
+                    disabled={isLoading}
+                    className="w-full py-2 px-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium hover:from-cyan-600 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? "Connecting..." : "Connect to Sensor"}
+                  </button>
+                  
+                  {!isConnected && (
+                    <button
+                      onClick={startDemoMode}
+                      disabled={isLoading}
+                      className="w-full py-2 px-4 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Start Demo Mode
+                    </button>
+                  )}
+                  
+                  {isConnected && connectionStatus === "Demo Mode" && (
+                    <button
+                      onClick={stopDemoMode}
+                      className="w-full py-2 px-4 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 text-white font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200"
+                    >
+                      Stop Demo Mode
+                    </button>
+                  )}
+                  
+                  <div className="text-xs text-gray-400 text-center pt-2 border-t border-white/10">
+                    <p className="mb-1">Demo Mode: Test the interface without hardware</p>
+                    <p>Real Sensor: Requires Raspberry Pi on port 8091</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Data Format Info */}
+        <div className="mt-8">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-slate-500/10 via-gray-500/5 to-zinc-500/10 blur-xl" />
+            <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <span className="text-slate-400 mr-2">📋</span>
+                Expected Data Format
+              </h3>
+              <div className="bg-black/30 rounded-lg p-4 font-mono text-sm">
+                <p className="text-gray-300 mb-2">// JSON format expected from Raspberry Pi:</p>
+                <pre className="text-cyan-400">
+{`{
+  "timestamp": 1703123456789,
+  "data": [
+    [25.1, 25.3, 25.2, ...], // 8 values
+    [25.4, 25.6, 25.5, ...], // 8 values
+    // ... 6 more rows
+  ]
+}`}
+                </pre>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
-              <Link href="/dashboard" className="group fixed bottom-6 left-6 sm:bottom-8 sm:left-8">
-        <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-purple-500/30 via-fuchsia-500/25 to-cyan-500/30 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
-        <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 opacity-90" aria-hidden="true">
-            <path d="M11.47 3.84a.75.75 0 0 1 1.06 0l8.25 8.25a.75.75 0 1 1-1.06 1.06l-.97-.97v8.07a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5h-3v4.5a.75.75 0 0 1-.75.75H4.5a.75.75 0 0 1-.75-.75v-8.07l-.97.97a.75.75 0 1 1-1.06-1.06Z" />
-          </svg>
-          <span className="sr-only">Home</span>
-        </span>
-      </Link>
-    </>
+    </div>
   );
 }
 

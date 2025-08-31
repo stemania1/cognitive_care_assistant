@@ -133,7 +133,7 @@ export default function QuestionsHistoryPage() {
               >
                 Clear All
               </button>
-              <Link href="/dashboard" className="text-sm rounded-md border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15">
+              <Link href="/" className="text-sm rounded-md border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15">
                 Home
               </Link>
             </div>

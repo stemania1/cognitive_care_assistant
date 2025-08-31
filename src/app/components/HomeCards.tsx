@@ -26,9 +26,9 @@ export default function HomeCards() {
       />
 
       <LinkCard
-        href="/sensors"
-        title="Thermal Camera • Sleep Patterns"
-        description="Track nightly sleep patterns using thermal data"
+        href="/sleepbehaviors"
+        title="Sleep Behaviors"
+        description="Monitor thermal patterns and sleep analysis"
         accent="from-cyan-500 to-sky-500"
       />
 

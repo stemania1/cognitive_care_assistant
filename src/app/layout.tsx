@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cognitive Care Assistant",
+  title: "Dashboard - Cognitive Care Assistant",
   description: "A hub for EMG, motion/thermal sensing, assessments, and reminders",
 };
 
