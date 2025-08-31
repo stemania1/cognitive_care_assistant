@@ -105,20 +105,20 @@ export default function SleepBehaviors() {
 
         {/* Main Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Thermal Camera Status */}
+          {/* Thermal Sensor Monitor */}
           <div className="lg:col-span-2">
             <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-sky-500/5 to-blue-500/10 blur-xl" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold">Thermal Camera Status</h2>
+                  <h2 className="text-xl font-semibold">Thermal Sensor Monitor</h2>
                   <div className="flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${isThermalActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
                     <span className="text-sm">{isThermalActive ? 'Active' : 'Inactive'}</span>
                   </div>
                 </div>
 
-                {/* Camera Preview Area */}
+                {/* Thermal Sensor Display */}
                 <div className="relative aspect-video rounded-xl border border-white/20 bg-gradient-to-br from-gray-900 to-gray-800 overflow-hidden mb-6">
                   {isThermalActive ? (
                     <div className="absolute inset-0 flex items-center justify-center p-4">
@@ -131,10 +131,10 @@ export default function SleepBehaviors() {
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center">
                         <svg className="w-16 h-16 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <p className="text-gray-400">Camera Offline</p>
-                        <p className="text-xs text-gray-500 mt-2">Click "Start Camera" to connect to thermal sensor</p>
+                        <p className="text-gray-400">Sensor Offline</p>
+                        <p className="text-xs text-gray-500 mt-2">Click "Start Sensor" to connect to thermal sensor</p>
                       </div>
                     </div>
                   )}
@@ -150,7 +150,7 @@ export default function SleepBehaviors() {
                         : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
                     }`}
                   >
-                    {isThermalActive ? 'Stop Camera' : 'Start Camera'}
+                    {isThermalActive ? 'Stop Sensor' : 'Start Sensor'}
                   </button>
                   
                   <button
