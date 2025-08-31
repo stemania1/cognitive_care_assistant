@@ -16,6 +16,10 @@ import numpy as np
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Ports configuration
+HTTP_PORT = 8091
+WEBSOCKET_PORT = 8092
+
 # Check if smbus is available
 try:
     import smbus
@@ -298,19 +302,19 @@ class ThermalDataHandler(BaseHTTPRequestHandler):
             <body>
                 <h1>AMG8833 Thermal Sensor Server</h1>
                 <div class="status connected">
-                    <strong>Status:</strong> Server is running on port 8091
+                    <strong>Status:</strong> HTTP server is running on port %HTTP_PORT%
                 </div>
                 <h2>Endpoints:</h2>
                 <ul>
                     <li><strong>GET /thermal-data</strong> - Get current thermal data (JSON)</li>
-                    <li><strong>WebSocket ws://localhost:8091</strong> - Real-time thermal data stream</li>
+                    <li><strong>WebSocket ws://localhost:%WEBSOCKET_PORT%</strong> - Real-time thermal data stream</li>
                 </ul>
                 <h2>Usage:</h2>
                 <p>Connect your thermal sensor monitor to this server to receive real-time thermal data.</p>
             </body>
             </html>
             """
-            
+            html_content = html_content.replace('%HTTP_PORT%', str(HTTP_PORT)).replace('%WEBSOCKET_PORT%', str(WEBSOCKET_PORT))
             self.wfile.write(html_content.encode())
             
         else:
@@ -373,16 +377,16 @@ async def main():
     sensor = AMG8833(bus_number=1)
     
     # Start HTTP server
-    http_server = HTTPServer(('0.0.0.0', 8091), ThermalDataHandler)
-    logger.info("Starting HTTP server on port 8091...")
-    
+    http_server = HTTPServer(('0.0.0.0', HTTP_PORT), ThermalDataHandler)
+    logger.info(f"Starting HTTP server on port {HTTP_PORT}...")
+
     # Start WebSocket server
-    logger.info("Starting WebSocket server on port 8091...")
-    
-    # Run both servers concurrently
+    logger.info(f"Starting WebSocket server on port {WEBSOCKET_PORT}...")
+
+    # Run both servers concurrently (on different ports)
     await asyncio.gather(
         asyncio.get_event_loop().run_in_executor(None, http_server.serve_forever),
-        serve(websocket_handler, "0.0.0.0", 8091)
+        serve(websocket_handler, "0.0.0.0", WEBSOCKET_PORT)
     )
 
 if __name__ == "__main__":

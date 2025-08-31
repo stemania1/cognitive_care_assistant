@@ -18,7 +18,7 @@ export const SENSOR_CONFIG = {
   
   // Server ports
   HTTP_PORT: 8091,
-  WEBSOCKET_PORT: 8091,
+  WEBSOCKET_PORT: 8092,
   
   // Connection settings
   WEBSOCKET_RECONNECT_INTERVAL: 5000, // 5 seconds
