@@ -193,14 +193,14 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
     }
   }, [thermalData]);
 
-  // Fallback to HTTP polling if WebSocket fails
+  // Fallback to HTTP polling via Next.js API proxy (avoids CORS/mixed content)
   useEffect(() => {
-    if (!isActive || connectionStatus === 'connected' || !discoveredIP) return;
+    if (!isActive || connectionStatus === 'connected') return;
 
     const pollData = async () => {
       try {
-        // Use discovered IP for HTTP URL
-        const response = await fetch(`http://${discoveredIP}:${SENSOR_CONFIG.HTTP_PORT}/thermal-data`);
+        const query = discoveredIP ? `?ip=${encodeURIComponent(discoveredIP)}&port=${SENSOR_CONFIG.HTTP_PORT}` : "";
+        const response = await fetch(`/api/thermal${query}`, { cache: 'no-store' });
         if (response.ok) {
           const data: ThermalData = await response.json();
           setThermalData(data.thermal_data);
