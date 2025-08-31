@@ -3,7 +3,18 @@
 
 export const SENSOR_CONFIG = {
   // Raspberry Pi IP address on your local network
+  // Try these common IP addresses first:
   RASPBERRY_PI_IP: '192.168.1.100', // UPDATE THIS TO YOUR PI'S IP
+  
+  // Common IP ranges to try (update the one that works)
+  COMMON_IPS: [
+    '192.168.1.100',  // Common for Netgear/Linksys routers
+    '192.168.0.100',  // Common for TP-Link/Asus routers
+    '192.168.1.50',   // Alternative
+    '192.168.0.50',   // Alternative
+    '10.0.0.100',     // Some business networks
+    '172.16.0.100',   // Some home networks
+  ],
   
   // Server ports
   HTTP_PORT: 8091,
@@ -35,4 +46,28 @@ export const getHttpUrl = () => {
 
 export const getThermalDataUrl = () => {
   return `${getHttpUrl()}/thermal-data`;
+};
+
+// Network discovery helper
+export const testConnection = async (ip: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`http://${ip}:8091/thermal-data`, {
+      method: 'GET',
+      mode: 'no-cors', // This helps with CORS issues
+      cache: 'no-cache'
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Try to find the Raspberry Pi automatically
+export const findRaspberryPi = async (): Promise<string | null> => {
+  for (const ip of SENSOR_CONFIG.COMMON_IPS) {
+    if (await testConnection(ip)) {
+      return ip;
+    }
+  }
+  return null;
 };

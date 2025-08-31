@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { SENSOR_CONFIG, getWebSocketUrl, getThermalDataUrl } from '../config/sensor-config';
+import { SENSOR_CONFIG, getWebSocketUrl, getThermalDataUrl, findRaspberryPi } from '../config/sensor-config';
 
 interface ThermalData {
   type: string;
@@ -27,14 +27,36 @@ interface ThermalVisualizationProps {
 export default function ThermalVisualization({ isActive, onDataReceived }: ThermalVisualizationProps) {
   const [thermalData, setThermalData] = useState<number[][]>([]);
   const [sensorInfo, setSensorInfo] = useState<any>(null);
-  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'discovering'>('disconnected');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [discoveredIP, setDiscoveredIP] = useState<string | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Auto-discover Raspberry Pi when component becomes active
+  useEffect(() => {
+    if (!isActive) return;
+
+    const discoverPi = async () => {
+      setConnectionStatus('discovering');
+      const foundIP = await findRaspberryPi();
+      
+      if (foundIP) {
+        setDiscoveredIP(foundIP);
+        setConnectionStatus('connecting');
+        // Update the config temporarily for this session
+        SENSOR_CONFIG.RASPBERRY_PI_IP = foundIP;
+      } else {
+        setConnectionStatus('disconnected');
+      }
+    };
+
+    discoverPi();
+  }, [isActive]);
+
   // WebSocket connection
   useEffect(() => {
-    if (!isActive) {
+    if (!isActive || !discoveredIP) {
       if (websocketRef.current) {
         websocketRef.current.close();
         websocketRef.current = null;
@@ -46,8 +68,8 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
     const connectWebSocket = () => {
       setConnectionStatus('connecting');
       
-      // Use configuration for WebSocket URL
-      const wsUrl = getWebSocketUrl();
+      // Use discovered IP for WebSocket URL
+      const wsUrl = `ws://${discoveredIP}:${SENSOR_CONFIG.WEBSOCKET_PORT}`;
       
       try {
         const ws = new WebSocket(wsUrl);
@@ -173,12 +195,12 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
 
   // Fallback to HTTP polling if WebSocket fails
   useEffect(() => {
-    if (!isActive || connectionStatus === 'connected') return;
+    if (!isActive || connectionStatus === 'connected' || !discoveredIP) return;
 
     const pollData = async () => {
       try {
-        // Use configuration for HTTP URL
-        const response = await fetch(getThermalDataUrl());
+        // Use discovered IP for HTTP URL
+        const response = await fetch(`http://${discoveredIP}:${SENSOR_CONFIG.HTTP_PORT}/thermal-data`);
         if (response.ok) {
           const data: ThermalData = await response.json();
           setThermalData(data.thermal_data);
@@ -193,13 +215,14 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
 
     const interval = setInterval(pollData, 2000); // Poll every 2 seconds
     return () => clearInterval(interval);
-  }, [isActive, connectionStatus, onDataReceived]);
+  }, [isActive, connectionStatus, discoveredIP, onDataReceived]);
 
   const getStatusColor = () => {
     switch (connectionStatus) {
       case 'connected': return 'bg-green-400';
       case 'connecting': return 'bg-yellow-400';
       case 'disconnected': return 'bg-red-400';
+      case 'discovering': return 'bg-blue-400';
       default: return 'bg-gray-400';
     }
   };
@@ -209,6 +232,7 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
       case 'connected': return 'Connected';
       case 'connecting': return 'Connecting...';
       case 'disconnected': return 'Disconnected';
+      case 'discovering': return 'Discovering Pi...';
       default: return 'Unknown';
     }
   };
@@ -268,9 +292,29 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
       {/* Connection Instructions */}
       {connectionStatus === 'disconnected' && (
         <div className="text-xs text-yellow-400 bg-yellow-400/10 p-3 rounded-lg">
-          <strong>Setup Required:</strong> Update the IP address in <code className="bg-black/20 px-1 rounded">src/app/config/sensor-config.ts</code> to match your Raspberry Pi's IP address.
+          <strong>Setup Required:</strong> 
+          {discoveredIP ? (
+            <>
+              Raspberry Pi found at: <code className="bg-black/20 px-1 rounded">{discoveredIP}</code>
+              <br />
+              Update <code className="bg-black/20 px-1 rounded">src/app/config/sensor-config.ts</code> with this IP address.
+            </>
+          ) : (
+            <>
+              Update the IP address in <code className="bg-black/20 px-1 rounded">src/app/config/sensor-config.ts</code> to match your Raspberry Pi's IP address.
+              <br />
+              Current: <code className="bg-black/20 px-1 rounded">{SENSOR_CONFIG.RASPBERRY_PI_IP}</code>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Discovery Status */}
+      {connectionStatus === 'discovering' && (
+        <div className="text-xs text-blue-400 bg-blue-400/10 p-3 rounded-lg">
+          <strong>Discovering Raspberry Pi...</strong>
           <br />
-          Current: <code className="bg-black/20 px-1 rounded">{SENSOR_CONFIG.RASPBERRY_PI_IP}</code>
+          Trying common IP addresses: {SENSOR_CONFIG.COMMON_IPS.join(', ')}
         </div>
       )}
     </div>
