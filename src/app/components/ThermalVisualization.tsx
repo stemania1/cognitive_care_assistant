@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { SENSOR_CONFIG, getWebSocketUrl, getThermalDataUrl } from '../config/sensor-config';
 
 interface ThermalData {
+  type: string;
   timestamp: number;
   thermal_data: number[][];
   sensor_info: {

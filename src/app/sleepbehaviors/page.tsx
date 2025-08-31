@@ -6,6 +6,7 @@ import Image from "next/image";
 import ThermalVisualization from "../components/ThermalVisualization";
 
 interface ThermalData {
+  type: string;
   timestamp: number;
   thermal_data: number[][];
   sensor_info: any;
