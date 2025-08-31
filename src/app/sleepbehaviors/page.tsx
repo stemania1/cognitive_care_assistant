@@ -3,22 +3,39 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import ThermalVisualization from "../components/ThermalVisualization";
+
+interface ThermalData {
+  timestamp: number;
+  thermal_data: number[][];
+  sensor_info: any;
+  grid_size: { width: number; height: number };
+}
 
 export default function SleepBehaviors() {
   const [isThermalActive, setIsThermalActive] = useState(false);
   const [currentTemp, setCurrentTemp] = useState(22.5);
   const [isRecording, setIsRecording] = useState(false);
   const [sessionDuration, setSessionDuration] = useState(0);
+  const [thermalData, setThermalData] = useState<ThermalData | null>(null);
+  const [sessionData, setSessionData] = useState<ThermalData[]>([]);
 
-  // Simulate temperature updates
-  useEffect(() => {
-    if (isThermalActive) {
-      const interval = setInterval(() => {
-        setCurrentTemp(prev => prev + (Math.random() - 0.5) * 2);
-      }, 2000);
-      return () => clearInterval(interval);
+  // Handle real thermal data from sensor
+  const handleThermalDataReceived = (data: ThermalData) => {
+    setThermalData(data);
+    
+    // Update current temperature (average of all pixels)
+    if (data.thermal_data && data.thermal_data.length > 0) {
+      const allTemps = data.thermal_data.flat();
+      const avgTemp = allTemps.reduce((sum, temp) => sum + temp, 0) / allTemps.length;
+      setCurrentTemp(avgTemp);
     }
-  }, [isThermalActive]);
+    
+    // Store session data if recording
+    if (isRecording) {
+      setSessionData(prev => [...prev, data]);
+    }
+  };
 
   // Session timer
   useEffect(() => {
@@ -103,20 +120,20 @@ export default function SleepBehaviors() {
                 {/* Camera Preview Area */}
                 <div className="relative aspect-video rounded-xl border border-white/20 bg-gradient-to-br from-gray-900 to-gray-800 overflow-hidden mb-6">
                   {isThermalActive ? (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 animate-pulse" />
-                        <p className="text-sm text-gray-300">Thermal Feed Active</p>
-                        <p className="text-xs text-gray-400">Temperature: {currentTemp.toFixed(1)}°C</p>
-                      </div>
+                    <div className="absolute inset-0 flex items-center justify-center p-4">
+                      <ThermalVisualization 
+                        isActive={isThermalActive}
+                        onDataReceived={handleThermalDataReceived}
+                      />
                     </div>
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center">
                         <svg className="w-16 h-16 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 0 002 2z" />
                         </svg>
                         <p className="text-gray-400">Camera Offline</p>
+                        <p className="text-xs text-gray-500 mt-2">Click "Start Camera" to connect to thermal sensor</p>
                       </div>
                     </div>
                   )}
@@ -209,8 +226,60 @@ export default function SleepBehaviors() {
           </div>
         </div>
 
-                  {/* Navigation Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Session Data Display */}
+        {isRecording && sessionData.length > 0 && (
+          <div className="mb-8">
+            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-purple-500/10 via-fuchsia-500/5 to-pink-500/10 blur-xl" />
+              <div className="relative">
+                <h2 className="text-xl font-semibold mb-4">Recording Session Data</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Session Statistics</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Data Points:</span>
+                        <span className="text-white">{sessionData.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Duration:</span>
+                        <span className="text-white">{formatTime(sessionDuration)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Avg Temperature:</span>
+                        <span className="text-white">{currentTemp.toFixed(1)}°C</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Temperature Range</h3>
+                    <div className="space-y-2 text-sm">
+                      {thermalData && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">Min:</span>
+                            <span className="text-blue-400">
+                              {Math.min(...thermalData.thermal_data.flat()).toFixed(1)}°C
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">Max:</span>
+                            <span className="text-red-400">
+                              {Math.max(...thermalData.thermal_data.flat()).toFixed(1)}°C
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Navigation Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Link
                href="/"
                className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-5 py-6 hover:bg-white/10 transition-all duration-200"

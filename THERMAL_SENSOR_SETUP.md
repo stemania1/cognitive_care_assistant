@@ -1,271 +1,166 @@
 # AMG8833 Thermal Sensor Setup Guide
 
-This guide explains how to set up the AMG8833 thermal sensor with a Raspberry Pi and connect it to the Cognitive Care Assistant web application.
+This guide will help you connect your AMG8833 thermal sensor (connected to a Raspberry Pi) to your Cognitive Care Assistant website.
 
-## Hardware Requirements
+## 🍓 Raspberry Pi Setup
 
-- **Raspberry Pi** (3B+, 4B, or newer recommended)
-- **AMG8833 Thermal Sensor Module**
-- **Jumper wires** (4 wires)
-- **Breadboard** (optional, for prototyping)
-
-## Hardware Connection
-
-### AMG8833 Pinout
-```
-VCC   → 3.3V (Pin 1 or 17)
-GND   → Ground (Pin 6, 9, 14, 20, 25, 30, 34, or 39)
-SDA   → GPIO 2 (Pin 3) - I2C Data
-SCL   → GPIO 3 (Pin 5) - I2C Clock
-```
-
-### Connection Diagram
-```
-Raspberry Pi          AMG8833
-┌─────────────┐      ┌─────────────┐
-│ 3.3V (Pin1)├──────┤ VCC         │
-│ GND (Pin6) ├──────┤ GND         │
-│ SDA (Pin3) ├──────┤ SDA         │
-│ SCL (Pin5) ├──────┤ SCL         │
-└─────────────┘      └─────────────┘
-```
-
-## Software Setup on Raspberry Pi
-
-### 1. Enable I2C Interface
-```bash
-# Open Raspberry Pi configuration
-sudo raspi-config
-
-# Navigate to: Interface Options → I2C → Enable
-# Reboot the Raspberry Pi
-sudo reboot
-```
+### 1. Hardware Requirements
+- Raspberry Pi (3B+, 4, or newer)
+- AMG8833 thermal sensor
+- I2C connection (SDA/SCL pins)
+- Power supply
+- Network connection (WiFi or Ethernet)
 
 ### 2. Install Dependencies
 ```bash
-# Update package list
-sudo apt update
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Python dependencies
+sudo apt install python3-pip python3-dev python3-venv
+sudo apt install python3-smbus i2c-tools
+
+# Enable I2C
+sudo raspi-config
+# Navigate to: Interface Options > I2C > Enable
 
 # Install Python packages
-sudo apt install python3-pip python3-dev
-
-# Install required Python libraries
-pip3 install -r requirements.txt
-
-# Verify I2C is working
-sudo i2cdetect -y 1
+pip3 install websockets numpy
 ```
 
-### 3. Test Sensor Connection
-```bash
-# Check if AMG8833 is detected (should show address 0x69)
-sudo i2cdetect -y 1
-
-# Expected output:
-#      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-# 00:          -- -- -- -- -- -- -- -- -- -- -- -- -- 
-# 10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-# 20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-# 30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-# 40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-# 50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-# 60: -- -- -- -- -- -- -- -- 69 -- -- -- -- -- -- -- 
-# 70: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+### 3. Connect AMG8833 Sensor
+```
+AMG8833 Pin -> Raspberry Pi Pin
+VCC        -> 3.3V (Pin 1)
+GND        -> GND (Pin 6)
+SDA        -> GPIO 2 (Pin 3)
+SCL        -> GPIO 3 (Pin 5)
 ```
 
-## Running the Thermal Sensor Server
-
-### 1. Start the Server
+### 4. Test I2C Connection
 ```bash
-# Navigate to the script directory
+# Check if sensor is detected
+sudo i2cdetect -y 1
+
+# You should see the AMG8833 at address 0x69
+```
+
+### 5. Run the Thermal Server
+```bash
+# Navigate to your project directory
 cd /path/to/your/project
 
-# Run the thermal sensor server
+# Run the server
 python3 raspberry_pi_thermal_server.py
+
+# The server will start on port 8091
+# You should see: "Starting HTTP server on port 8091..."
 ```
 
-### 2. Expected Output
+## 🌐 Website Integration
+
+### 1. Update Configuration
+Edit `src/app/config/sensor-config.ts`:
+```typescript
+export const SENSOR_CONFIG = {
+  // Update this to your Raspberry Pi's IP address
+  RASPBERRY_PI_IP: '192.168.1.100', // CHANGE THIS!
+  
+  // Keep these default values
+  HTTP_PORT: 8091,
+  WEBSOCKET_PORT: 8091,
+  // ... rest of config
+};
 ```
-AMG8833 Thermal Sensor Server
-========================================
-AMG8833 sensor initialized successfully
-WebSocket server started on port 8090
-WebSocket URL: ws://localhost:8090
+
+### 2. Find Your Raspberry Pi's IP Address
+On your Raspberry Pi, run:
+```bash
+hostname -I
+# or
+ip addr show wlan0  # for WiFi
+ip addr show eth0   # for Ethernet
 ```
 
 ### 3. Test the Connection
-```bash
-# Test HTTP endpoint
-curl http://localhost:8090/thermal-data
+1. Make sure your Raspberry Pi server is running
+2. Update the IP address in the config file
+3. Start your Next.js development server
+4. Navigate to the Sleep Behaviors page
+5. Click "Start Camera" to test the connection
 
-# Expected response:
-# {
-#   "timestamp": 1703123456789,
-#   "data": [[25.1, 25.3, ...], ...],
-#   "thermistor": 25.0
-# }
-```
-
-## Network Configuration
-
-### 1. Find Raspberry Pi IP Address
-```bash
-# Get local IP address
-hostname -I
-
-# Example output: 192.168.1.100
-```
-
-### 2. Configure Firewall (if needed)
-```bash
-# Allow incoming connections on port 8090
-sudo ufw allow 8090
-```
-
-### 3. Test Network Connectivity
-```bash
-# From your computer, test connection to Raspberry Pi
-ping 192.168.1.100
-
-# Test port connectivity
-telnet 192.168.1.100 8090
-```
-
-## Web Application Integration
-
-### 1. Update Web App Configuration
-In your web application, update the connection URL to use the Raspberry Pi's IP address:
-
-```javascript
-// Instead of localhost, use the Raspberry Pi's IP
-const ws = new WebSocket("ws://192.168.1.100:8090");
-// or
-const response = await fetch("http://192.168.1.100:8090/thermal-data");
-```
-
-### 2. CORS Configuration
-The server includes CORS headers for cross-origin requests. If you encounter CORS issues, ensure your web application is accessing the correct endpoint.
-
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-#### 1. Sensor Not Detected
+#### 1. "Connection Failed" Error
+- Check if Raspberry Pi server is running
+- Verify IP address is correct
+- Ensure both devices are on the same network
+- Check firewall settings
+
+#### 2. "Sensor Not Detected" Error
+- Verify I2C is enabled: `sudo raspi-config`
+- Check physical connections
+- Run: `sudo i2cdetect -y 1`
+- Ensure proper power supply
+
+#### 3. WebSocket Connection Issues
+- Check if port 8091 is accessible
+- Try HTTP polling instead (automatic fallback)
+- Check network connectivity
+
+### Debug Commands
 ```bash
-# Check I2C bus
+# Check I2C devices
 sudo i2cdetect -y 1
 
-# Verify connections
-# Check for loose wires
-# Ensure 3.3V power supply
+# Check server logs
+python3 raspberry_pi_thermal_server.py
+
+# Test HTTP endpoint
+curl http://YOUR_PI_IP:8091/thermal-data
+
+# Check network connectivity
+ping YOUR_PI_IP
 ```
 
-#### 2. Permission Denied
-```bash
-# Add user to i2c group
-sudo usermod -a -G i2c $USER
+## 📱 Features
 
-# Log out and back in, or reboot
-sudo reboot
-```
+### Real-time Thermal Visualization
+- 8x8 thermal grid display
+- Color-coded temperature mapping
+- Live temperature updates
+- Connection status monitoring
 
-#### 3. Port Already in Use
-```bash
-# Check what's using port 8090
-sudo netstat -tulpn | grep 8090
+### Data Recording
+- Session recording with timestamps
+- Temperature statistics
+- Data export capabilities
+- Historical data storage
 
-# Kill process if needed
-sudo kill -9 <PID>
-```
+### Fallback Support
+- WebSocket for real-time updates
+- HTTP polling as backup
+- Automatic reconnection
+- Error handling and logging
 
-#### 4. Connection Refused
-```bash
-# Check if server is running
-ps aux | grep python3
+## 🚀 Next Steps
 
-# Check firewall settings
-sudo ufw status
+1. **Customize the visualization** - Modify colors, grid size, update frequency
+2. **Add data logging** - Store thermal data in a database
+3. **Create alerts** - Set temperature thresholds for notifications
+4. **Export data** - Add CSV/JSON export functionality
+5. **Mobile optimization** - Make the interface mobile-friendly
 
-# Verify network connectivity
-ping <raspberry_pi_ip>
-```
+## 📞 Support
 
-### Debug Mode
-Enable debug logging by modifying the Python script:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
+If you encounter issues:
+1. Check the console logs in your browser
+2. Verify Raspberry Pi server logs
+3. Test network connectivity
+4. Ensure all dependencies are installed
 
-## Performance Optimization
-
-### 1. Update Frequency
-- **WebSocket**: Updates every 500ms (2 FPS)
-- **HTTP**: Updates on request
-- Adjust timing in the script for your needs
-
-### 2. Data Resolution
-- AMG8833 provides 8×8 pixel resolution
-- Each pixel represents ~1cm² at typical distances
-- Temperature range: -20°C to +80°C
-- Accuracy: ±2.5°C
-
-### 3. Network Optimization
-- Use WebSocket for real-time updates
-- HTTP fallback for compatibility
-- Consider local network for best performance
-
-## Advanced Features
-
-### 1. Custom Temperature Ranges
-Modify the temperature constants in the web application:
-```javascript
-const MIN_TEMP = 15; // Celsius
-const MAX_TEMP = 85; // Celsius
-```
-
-### 2. Data Logging
-Add data logging to the Raspberry Pi:
-```python
-import json
-import datetime
-
-# Log thermal data to file
-with open(f"thermal_log_{datetime.date.today()}.json", "a") as f:
-    json.dump(response_data, f)
-    f.write("\n")
-```
-
-### 3. Multiple Sensors
-Support multiple AMG8833 sensors by modifying the I2C addresses and data handling.
-
-## Security Considerations
-
-### 1. Network Security
-- Only expose port 8090 on local network
-- Use firewall rules to restrict access
-- Consider VPN for remote access
-
-### 2. Data Privacy
-- Thermal data may reveal personal information
-- Implement user authentication if needed
-- Log access attempts
-
-## Support and Resources
-
-### Documentation
-- [AMG8833 Datasheet](https://www.panasonic-electric-works.com/cps/rde/xbcr/pew_eu_en/amg8833.pdf)
-- [Raspberry Pi I2C Guide](https://www.raspberrypi.org/documentation/hardware/raspberrypi/i2c/)
-- [WebSocket Protocol](https://tools.ietf.org/html/rfc6455)
-
-### Community
-- Raspberry Pi Forums
-- Stack Overflow
-- GitHub Issues
-
----
-
-**Note**: This setup provides real-time thermal imaging capabilities. Ensure compliance with local privacy laws and regulations when using thermal sensors.
+The system includes comprehensive error handling and will guide you through the setup process with helpful messages.
 
 
