@@ -175,39 +175,52 @@ class AMG8833:
             return 0
     
     def _convert_to_temperature(self, raw_value):
-        """Convert raw sensor value to temperature in Celsius"""
-        # AMG8833 raw values are 12-bit signed integers
-        # Convert to temperature using the sensor's conversion formula
-        if raw_value & 0x800:  # Check if negative (12-bit signed)
-            raw_value = raw_value - 0x1000
-        
-        # Convert to temperature (formula from AMG8833 datasheet)
-        temperature = raw_value * 0.0625
-        return temperature
+        """Convert raw 12-bit two's complement to Celsius (0.25°C/LSB)."""
+        raw_value &= 0x0FFF  # 12-bit
+        if raw_value & 0x800:  # negative
+            raw_value -= 0x1000
+        # AMG8833 pixel resolution is 0.25°C per LSB
+        return raw_value * 0.25
     
     def read_thermal_data(self):
-        """Read 8x8 thermal data from sensor"""
+        """Read 8x8 thermal data from sensor using block read (correct byte order)."""
         if not self.smbus_available or self.bus is None:
             return self._generate_mock_data()
-        
         try:
-            thermal_data = []
-            
-            # Read all 64 pixels (8x8 grid)
+            # Some SMBus implementations limit block reads to 32 bytes. Read in 4 chunks.
+            raw_bytes = []
+            for offset in range(0, 128, 32):
+                chunk = self.bus.read_i2c_block_data(self.AMG8833_ADDR, 0x80 + offset, 32)
+                raw_bytes.extend(chunk)
+
+            temps = []
             for i in range(64):
-                register = 0x80 + i  # Starting from 0x80 for pixel data
-                raw_value = self._read_word_data(register)
-                temperature = self._convert_to_temperature(raw_value)
-                thermal_data.append(temperature)
-            
-            # Reshape to 8x8 grid
-            thermal_grid = np.array(thermal_data).reshape(8, 8)
-            
+                low = raw_bytes[2 * i]
+                high = raw_bytes[2 * i + 1]
+                raw12 = ((high << 8) | low) & 0x0FFF
+                temp_c = self._convert_to_temperature(raw12)
+                temp_c = max(-20.0, min(80.0, temp_c))
+                temps.append(round(temp_c, 1))
+            thermal_grid = np.array(temps).reshape(8, 8)
             return thermal_grid.tolist()
-            
         except Exception as e:
-            logger.error(f"Failed to read thermal data: {e}")
-            return self._generate_mock_data()
+            logger.error(f"Failed to read thermal data (block): {e}")
+            # Fallback: byte-wise read
+            try:
+                temps = []
+                for i in range(64):
+                    base = 0x80 + (i * 2)
+                    low = self.bus.read_byte_data(self.AMG8833_ADDR, base)
+                    high = self.bus.read_byte_data(self.AMG8833_ADDR, base + 1)
+                    raw12 = ((high << 8) | low) & 0x0FFF
+                    temp_c = self._convert_to_temperature(raw12)
+                    temp_c = max(-20.0, min(80.0, temp_c))
+                    temps.append(round(temp_c, 1))
+                thermal_grid = np.array(temps).reshape(8, 8)
+                return thermal_grid.tolist()
+            except Exception as e2:
+                logger.error(f"Failed to read thermal data (byte): {e2}")
+                return self._generate_mock_data()
     
     def _generate_mock_data(self):
         """Generate realistic mock thermal data for testing"""

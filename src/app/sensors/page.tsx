@@ -2,14 +2,23 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { SENSOR_CONFIG } from "../config/sensor-config";
 
-interface ThermalData {
+interface ThermalFrame {
   timestamp: number;
   data: number[][]; // 8x8 grid for AMG8833
 }
 
+interface PiWebSocketPacket {
+  type: string; // 'connection' | 'thermal_data'
+  timestamp?: number;
+  thermal_data?: number[][];
+  sensor_info?: any;
+  grid_size?: { width: number; height: number };
+}
+
 export default function Sensors() {
-  const [thermalData, setThermalData] = useState<ThermalData | null>(null);
+  const [thermalData, setThermalData] = useState<ThermalFrame | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Disconnected");
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +28,9 @@ export default function Sensors() {
 
   // AMG8833 specifications
   const GRID_SIZE = 8;
-  const MIN_TEMP = 20; // Celsius
-  const MAX_TEMP = 80; // Celsius
+  // Tighter range for indoor/human subject visualization
+  const MIN_TEMP = 18; // Celsius
+  const MAX_TEMP = 40; // Celsius
 
   useEffect(() => {
     connectWebSocket();
@@ -42,7 +52,8 @@ export default function Sensors() {
       setError(null);
       
       // Try WebSocket first
-      const ws = new WebSocket("ws://localhost:8091");
+      const wsUrl = `ws://${SENSOR_CONFIG.RASPBERRY_PI_IP}:${SENSOR_CONFIG.WEBSOCKET_PORT}`;
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -55,8 +66,11 @@ export default function Sensors() {
 
       ws.onmessage = (event) => {
         try {
-          const data: ThermalData = JSON.parse(event.data);
-          setThermalData(data);
+          const msg: PiWebSocketPacket = JSON.parse(event.data);
+          if (msg.type === "thermal_data" && msg.thermal_data) {
+            setThermalData({ timestamp: msg.timestamp || Date.now(), data: msg.thermal_data });
+            setError(null);
+          }
         } catch (err) {
           console.error("Error parsing thermal data:", err);
         }
@@ -89,7 +103,7 @@ export default function Sensors() {
     setError(null);
     
     // Generate demo data
-    const demoData: ThermalData = {
+    const demoData: ThermalFrame = {
       timestamp: Date.now(),
       data: generateDemoThermalData()
     };
@@ -101,7 +115,7 @@ export default function Sensors() {
     
     // Update demo data every 2 seconds
     const interval = setInterval(() => {
-      const newDemoData: ThermalData = {
+      const newDemoData: ThermalFrame = {
         timestamp: Date.now(),
         data: generateDemoThermalData()
       };
@@ -156,18 +170,27 @@ export default function Sensors() {
     setIsLoading(true);
     const pollData = async () => {
       try {
-        const response = await fetch("http://localhost:8091/thermal-data");
+        const query = `?ip=${encodeURIComponent(SENSOR_CONFIG.RASPBERRY_PI_IP)}&port=${SENSOR_CONFIG.HTTP_PORT}`;
+        const response = await fetch(`/api/thermal${query}`, { cache: "no-store" });
         if (response.ok) {
-          const data: ThermalData = await response.json();
-          setThermalData(data);
-          setIsConnected(true);
-          setConnectionStatus("Connected (HTTP)");
-          setError(null);
+          const data = await response.json();
+          const grid: number[][] = data?.thermal_data || data?.data;
+          const ts: number = data?.timestamp || Date.now();
+          if (grid && Array.isArray(grid)) {
+            setThermalData({ timestamp: ts, data: grid });
+            setIsConnected(true);
+            setConnectionStatus("Connected (HTTP)");
+            setError(null);
+          } else {
+            throw new Error("Invalid thermal data shape");
+          }
         } else {
           throw new Error(`HTTP ${response.status}`);
         }
       } catch (err) {
-        setError("Failed to connect to thermal sensor. Please check if the Raspberry Pi is running and accessible on port 8091.");
+        setError(
+          `Failed to connect to thermal sensor. Ensure Pi HTTP ${SENSOR_CONFIG.HTTP_PORT} and WS ${SENSOR_CONFIG.WEBSOCKET_PORT} are reachable at ${SENSOR_CONFIG.RASPBERRY_PI_IP}.`
+        );
         setIsConnected(false);
         setConnectionStatus("Connection Failed");
       } finally {
@@ -200,8 +223,10 @@ export default function Sensors() {
     // Draw grid cells
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
-        const temp = thermalData.data[y][x];
-        const normalizedTemp = Math.max(0, Math.min(1, (temp - MIN_TEMP) / (MAX_TEMP - MIN_TEMP)));
+        // Clamp and normalize to reduce outlier impact
+        const tempRaw = thermalData.data[y][x];
+        const temp = Math.min(MAX_TEMP, Math.max(MIN_TEMP, tempRaw));
+        const normalizedTemp = (temp - MIN_TEMP) / (MAX_TEMP - MIN_TEMP);
         
         // Color gradient from blue (cold) to red (hot)
         const hue = (1 - normalizedTemp) * 240; // 240 (blue) to 0 (red)
@@ -485,7 +510,7 @@ export default function Sensors() {
                   
                   <div className="text-xs text-gray-400 text-center pt-2 border-t border-white/10">
                     <p className="mb-1">Demo Mode: Test the interface without hardware</p>
-                    <p>Real Sensor: Requires Raspberry Pi on port 8091</p>
+                    <p>Real Sensor: Pi HTTP {SENSOR_CONFIG.HTTP_PORT}, WS {SENSOR_CONFIG.WEBSOCKET_PORT}</p>
                   </div>
                 </div>
               </div>
@@ -504,16 +529,16 @@ export default function Sensors() {
               </h3>
               <div className="bg-black/30 rounded-lg p-4 font-mono text-sm">
                 <p className="text-gray-300 mb-2">// JSON format expected from Raspberry Pi:</p>
-                <pre className="text-cyan-400">
-{`{
+                <pre className="text-cyan-400">{`{
   "timestamp": 1703123456789,
-  "data": [
-    [25.1, 25.3, 25.2, ...], // 8 values
-    [25.4, 25.6, 25.5, ...], // 8 values
+  "thermal_data": [
+    [25.1, 25.3, 25.2, ...],
+    [25.4, 25.6, 25.5, ...],
     // ... 6 more rows
-  ]
-}`}
-                </pre>
+  ],
+  "sensor_info": { /* ... */ },
+  "grid_size": { "width": 8, "height": 8 }
+}`}</pre>
               </div>
             </div>
           </div>

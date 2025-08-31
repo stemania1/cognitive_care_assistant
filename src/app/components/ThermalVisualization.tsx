@@ -47,7 +47,9 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
         // Update the config temporarily for this session
         SENSOR_CONFIG.RASPBERRY_PI_IP = foundIP;
       } else {
-        setConnectionStatus('disconnected');
+        // Fallback to configured IP if discovery fails
+        setDiscoveredIP(SENSOR_CONFIG.RASPBERRY_PI_IP);
+        setConnectionStatus('connecting');
       }
     };
 
@@ -77,7 +79,7 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
 
         ws.onopen = () => {
           setConnectionStatus('connected');
-          console.log('WebSocket connected to thermal sensor');
+          console.log('WebSocket connected to thermal sensor at', wsUrl);
         };
 
         ws.onmessage = (event) => {
@@ -95,16 +97,26 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
         };
 
         ws.onclose = () => {
+          const code = (ws as any).closeCode || (ws as any).code;
+          const reason = (ws as any).closeReason || (ws as any).reason;
+          console.error('WebSocket closed', { wsUrl, code, reason });
           setConnectionStatus('disconnected');
-          console.log('WebSocket disconnected');
         };
 
         ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          try {
+            // Browser ErrorEvent often hides details; log target state
+            const ev = error as unknown as ErrorEvent;
+            const target: any = ev?.target;
+            const ready = target?.readyState;
+            console.error('WebSocket error', { wsUrl, readyState: ready, error: ev?.message || error });
+          } catch (_) {
+            console.error('WebSocket error (raw):', error);
+          }
           setConnectionStatus('disconnected');
         };
       } catch (error) {
-        console.error('Failed to create WebSocket:', error);
+        console.error('Failed to create WebSocket', { error, discoveredIP, port: SENSOR_CONFIG.WEBSOCKET_PORT });
         setConnectionStatus('disconnected');
       }
     };
