@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from "next/link";
 import MyoWareClient from '../components/MyoWareClient';
+import EMGChart from '../components/EMGChart';
 
 interface EMGData {
   timestamp: number;
@@ -284,6 +285,7 @@ export default function EMGPage() {
   const [currentWorkout, setCurrentWorkout] = useState<WorkoutExercise | null>(null);
   const [workoutTime, setWorkoutTime] = useState(0);
   const [emgData, setEmgData] = useState<EMGData[]>([]);
+  const [chartData, setChartData] = useState<EMGData[]>([]); // Data for chart visualization
   const [currentData, setCurrentData] = useState<EMGData | null>(null);
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
   const [calibrationData, setCalibrationData] = useState<{ [key: string]: { min: number; max: number } }>({});
@@ -354,6 +356,73 @@ export default function EMGPage() {
       setEmgData(prev => [...prev, data]);
     }
   };
+
+  // Fetch real-time data from API
+  const fetchRealTimeData = async () => {
+    try {
+      const response = await fetch('/api/emg/data');
+      const data = await response.json();
+      
+      console.log('Fetched EMG data:', data); // Debug log
+      
+      if (data.data && data.data.length > 0) {
+        // Get the latest data point
+        const latestData = data.data[data.data.length - 1];
+        const emgData: EMGData = {
+          timestamp: latestData.timestamp,
+          muscleActivity: latestData.muscleActivity,
+          muscleActivityProcessed: latestData.muscleActivityProcessed
+        };
+        
+        console.log('Setting current data:', emgData); // Debug log
+        setCurrentData(emgData);
+        
+        // Always update chart data for real-time visualization
+        setChartData(prev => {
+          const newData = [...prev, emgData];
+          // Keep only last 100 data points for chart performance
+          return newData.slice(-100);
+        });
+        
+        if (isRecording) {
+          setEmgData(prev => [...prev, emgData]);
+        }
+      } else {
+        console.log('No EMG data available'); // Debug log
+      }
+    } catch (error) {
+      console.error('Failed to fetch real-time data:', error);
+    }
+  };
+
+  // Poll for real-time data
+  useEffect(() => {
+    if (isMyoWareConnected) {
+      const interval = setInterval(fetchRealTimeData, 500); // Poll every 500ms for faster updates
+      return () => clearInterval(interval);
+    }
+  }, [isMyoWareConnected, isRecording]);
+
+  // Auto-connect to MyoWare when page loads
+  useEffect(() => {
+    const autoConnect = async () => {
+      try {
+        const response = await fetch('/api/emg/ws');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status && data.status.includes('EMG WebSocket server')) {
+            setIsMyoWareConnected(true);
+            setUseRealData(true);
+            console.log('Auto-connected to MyoWare server');
+          }
+        }
+      } catch (error) {
+        console.log('MyoWare server not available for auto-connect');
+      }
+    };
+    
+    autoConnect();
+  }, []);
 
   // Handle MyoWare connection changes
   const handleMyoWareConnection = (connected: boolean) => {
@@ -597,6 +666,31 @@ export default function EMGPage() {
               onDataReceived={handleMyoWareData}
               onConnectionChange={handleMyoWareConnection}
             />
+            
+            {/* Manual Connect Button for Testing */}
+            <div className="mt-4 p-4 bg-gray-800 rounded-lg">
+              <h3 className="text-lg font-semibold text-white mb-2">Debug Controls</h3>
+              <button
+                onClick={() => {
+                  setIsMyoWareConnected(true);
+                  setUseRealData(true);
+                  console.log('Manually connected to MyoWare');
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2"
+              >
+                Force Connect MyoWare
+              </button>
+              <button
+                onClick={() => {
+                  setIsMyoWareConnected(false);
+                  setUseRealData(false);
+                  console.log('Manually disconnected from MyoWare');
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Disconnect MyoWare
+              </button>
+            </div>
           </div>
 
           {/* Workout Selection */}
@@ -804,6 +898,14 @@ export default function EMGPage() {
                     </div>
                   </div>
                 )}
+
+                {/* EMG Chart */}
+                <div className="mb-6">
+                  <EMGChart 
+                    data={chartData} 
+                    isConnected={isMyoWareConnected} 
+                  />
+                </div>
 
                 {/* Workout Instructions */}
                 <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10">

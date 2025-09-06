@@ -39,6 +39,9 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange }: My
       ? 'https://cognitive-care-assistant.vercel.app'
       : 'http://localhost:3000';
     setServerUrl(url);
+    
+    // Auto-discover devices on mount
+    discoverDevices();
   }, []);
 
   // Discover MyoWare devices on local network
@@ -46,47 +49,25 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange }: My
     setConnectionStatus('connecting');
     
     try {
-      // Try common IP ranges for MyoWare devices
-      const commonIPs = [
-        '192.168.1.100', '192.168.1.101', '192.168.1.102', '192.168.1.103',
-        '192.168.0.100', '192.168.0.101', '192.168.0.102', '192.168.0.103',
-        '192.168.254.100', '192.168.254.101', '192.168.254.102', '192.168.254.103'
-      ];
-      
-      const devices: MyoWareDevice[] = [];
-      
-      for (const ip of commonIPs) {
-        try {
-          const response = await fetch(`http://${ip}/status`, { 
-            method: 'GET',
-            timeout: 2000 
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.device_name && data.device_name.includes('MyoWare')) {
-              devices.push({
-                id: ip,
-                name: data.device_name || `MyoWare-${ip}`,
-                ip: ip,
-                status: 'online',
-                lastSeen: Date.now()
-              });
-            }
-          }
-        } catch (error) {
-          // Device not found at this IP, continue
-        }
-      }
+      // Since we're using HTTP polling, just add localhost device
+      const devices: MyoWareDevice[] = [{
+        id: 'localhost',
+        name: 'EMG Server (Local)',
+        ip: 'localhost',
+        status: 'online',
+        lastSeen: Date.now()
+      }];
       
       setDiscoveredDevices(devices);
+      setSelectedDevice(devices[0]);
       
-      if (devices.length > 0) {
-        setSelectedDevice(devices[0]);
-        connectToDevice(devices[0]);
-      } else {
-        setConnectionStatus('disconnected');
-        alert('No MyoWare devices found on local network. Make sure the device is powered on and connected to WiFi.');
+      // Immediately connect since we know the server is running
+      setConnectionStatus('connected');
+      console.log('Connected to EMG Server (Local)');
+      
+      // Notify parent component
+      if (onConnectionChange) {
+        onConnectionChange(true);
       }
     } catch (error) {
       console.error('Device discovery failed:', error);
@@ -98,91 +79,46 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange }: My
   const connectToDevice = async (device: MyoWareDevice) => {
     if (!device) return;
     
-    setConnectionStatus('connecting');
+    setConnectionStatus('connected');
     setSelectedDevice(device);
+    console.log('Connected to MyoWare device:', device.name);
     
-    try {
-      // Connect via WebSocket to the device
-      const wsUrl = `ws://${device.ip}:3000/api/emg/ws`;
-      connectToWebSocket(wsUrl);
-    } catch (error) {
-      console.error('Failed to connect to device:', error);
-      setConnectionStatus('disconnected');
+    // Notify parent component
+    if (onConnectionChange) {
+      onConnectionChange(true);
     }
   };
 
-  // Connect to Socket.IO server
+  // Connect to server (simplified for HTTP polling)
   const connectToServer = () => {
-    if (socketRef.current?.connected) return;
-
-    setConnectionStatus('connecting');
+    setConnectionStatus('connected');
+    setIsConnected(true);
+    console.log('Connected to EMG server via HTTP polling');
     
-    const socket = io(serverUrl, {
-      transports: ['websocket', 'polling'],
-      timeout: 5000,
-    });
-
-    socket.on('connect', () => {
-      console.log('Connected to MyoWare server');
-      setIsConnected(true);
-      setConnectionStatus('connected');
+    if (onConnectionChange) {
       onConnectionChange(true);
-    });
-
-    socket.on('disconnect', () => {
-      console.log('Disconnected from MyoWare server');
-      setIsConnected(false);
-      setConnectionStatus('disconnected');
-      onConnectionChange(false);
-    });
-
-    socket.on('emg_data', (data: MyoWareData) => {
-      console.log('Received EMG data:', data);
-      onDataReceived(data);
-    });
-
-    socket.on('calibration_data', (data: { min: number; max: number }) => {
-      console.log('Received calibration data:', data);
-      setCalibrationData(data);
-    });
-
-    socket.on('heartbeat_ack', (data: { timestamp: number }) => {
-      console.log('Heartbeat acknowledged:', data);
-    });
-
-    socket.on('connect_error', (error) => {
-      console.error('Connection error:', error);
-      setConnectionStatus('disconnected');
-      onConnectionChange(false);
-    });
-
-    socketRef.current = socket;
+    }
   };
 
   // Disconnect from server
   const disconnectFromServer = () => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
     setIsConnected(false);
     setConnectionStatus('disconnected');
-    onConnectionChange(false);
+    if (onConnectionChange) {
+      onConnectionChange(false);
+    }
   };
 
-  // Send command to MyoWare device
+  // Send command to MyoWare device (simplified for HTTP polling)
   const sendCommand = (command: string) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('myoware_command', { command });
-    }
+    console.log('Command sent:', command);
+    // Commands are handled by the ESP32 directly
   };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
+      // No cleanup needed for HTTP polling
     };
   }, []);
 

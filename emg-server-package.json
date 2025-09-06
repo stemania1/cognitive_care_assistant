@@ -1,0 +1,18 @@
+{
+  "name": "emg-server",
+  "version": "1.0.0",
+  "description": "EMG WebSocket server for MyoWare 2.0",
+  "main": "emg-server.js",
+  "scripts": {
+    "start": "node emg-server.js",
+    "dev": "nodemon emg-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

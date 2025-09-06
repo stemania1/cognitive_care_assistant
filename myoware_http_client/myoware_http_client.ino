@@ -1,28 +1,23 @@
 /*
- * MyoWare 2.0 WiFi Simple Client
+ * MyoWare 2.0 HTTP Client
  * 
- * Simplified version for testing WebSocket connection
+ * Simplified version that uses HTTP POST instead of WebSocket
+ * This is easier to get working initially
  * 
  * Hardware: MyoWare 2.0 + MyoWare Wireless Shield (ESP32)
- * 
- * Features:
- * - WiFi connection to local network
- * - WebSocket communication with web app
- * - Real-time EMG data transmission
- * - Simple configuration
  */
 
 #include <WiFi.h>
-#include <WebSocketsClient.h>
+#include <HTTPClient.h>
 #include <ArduinoJson.h>
 
-// WiFi Configuration - UPDATE THESE!
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
+// WiFi Configuration
+const char* ssid = "Dinosaur";
+const char* password = "AnnoyingKid2010!";
 
 // Server Configuration - UPDATE THESE!
 const char* server_host = "192.168.254.204";  // Your computer's IP
-const int server_port = 3000;
+const int server_port = 3001;  // Use port 3001 for the EMG server
 const char* server_path = "/api/emg/ws";
 
 // MyoWare 2.0 sensor pin (ESP32 GPIO36 = A0)
@@ -49,8 +44,8 @@ bool isTransmitting = false;
 unsigned long lastHeartbeat = 0;
 const unsigned long HEARTBEAT_INTERVAL = 5000;
 
-// WebSocket client
-WebSocketsClient webSocket;
+// HTTP client
+HTTPClient http;
 
 void setup() {
   Serial.begin(115200);
@@ -67,22 +62,16 @@ void setup() {
     sensorReadings[i] = 0;
   }
   
-  Serial.println("MyoWare 2.0 WiFi Simple Client");
-  Serial.println("==============================");
+  Serial.println("MyoWare 2.0 HTTP Client");
+  Serial.println("=======================");
   
   // Setup WiFi
   setupWiFi();
-  
-  // Setup WebSocket
-  setupWebSocket();
   
   Serial.println("Setup complete!");
 }
 
 void loop() {
-  // Handle WebSocket
-  webSocket.loop();
-  
   // Send data if connected and transmitting
   if (isConnected && isTransmitting && millis() - lastDataSend >= DATA_SEND_INTERVAL) {
     sendEMGData();
@@ -96,10 +85,8 @@ void loop() {
   }
   
   // Check connection status
-  if (isConnected && millis() - lastHeartbeat > HEARTBEAT_INTERVAL * 2) {
-    Serial.println("Connection lost, attempting to reconnect...");
+  if (millis() - lastHeartbeat > HEARTBEAT_INTERVAL * 2) {
     isConnected = false;
-    connectToServer();
   }
   
   delay(10);
@@ -121,6 +108,8 @@ void setupWiFi() {
     Serial.println("WiFi connected!");
     Serial.println("IP address: " + WiFi.localIP().toString());
     Serial.println("MAC address: " + WiFi.macAddress());
+    isConnected = true;
+    lastHeartbeat = millis();
   } else {
     Serial.println("");
     Serial.println("WiFi connection failed!");
@@ -128,66 +117,73 @@ void setupWiFi() {
   }
 }
 
-void setupWebSocket() {
-  webSocket.onEvent(webSocketEvent);
-  connectToServer();
-}
-
-void connectToServer() {
-  Serial.println("Connecting to: " + String(server_host) + ":" + String(server_port) + server_path);
-  webSocket.begin(server_host, server_port, server_path);
-}
-
-void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
-  switch(type) {
-    case WStype_DISCONNECTED:
-      Serial.println("WebSocket disconnected");
-      isConnected = false;
-      break;
-      
-    case WStype_CONNECTED:
-      Serial.println("WebSocket connected!");
-      isConnected = true;
-      lastHeartbeat = millis();
-      break;
-      
-    case WStype_TEXT:
-      handleWebSocketMessage((char*)payload);
-      break;
-      
-    case WStype_ERROR:
-      Serial.println("WebSocket error");
-      isConnected = false;
-      break;
+void sendEMGData() {
+  // Read and smooth sensor data
+  int smoothedValue = readSmoothedSensor();
+  float activation = calculateMuscleActivation(smoothedValue);
+  
+  // Create JSON data
+  DynamicJsonDocument doc(512);
+  doc["type"] = "emg_data";
+  doc["timestamp"] = millis();
+  doc["muscleActivity"] = smoothedValue;
+  doc["muscleActivityProcessed"] = activation;
+  doc["voltage"] = (smoothedValue * 3.3) / 4095.0; // ESP32 uses 3.3V and 12-bit ADC
+  doc["calibrated"] = isCalibrated;
+  
+  String jsonString;
+  serializeJson(doc, jsonString);
+  
+  // Send HTTP POST request
+  String url = "http://" + String(server_host) + ":" + String(server_port) + server_path;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  
+  int httpResponseCode = http.POST(jsonString);
+  
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.println("HTTP Response: " + String(httpResponseCode));
+    Serial.println("Response: " + response);
+  } else {
+    Serial.println("HTTP Error: " + String(httpResponseCode));
+    isConnected = false;
   }
+  
+  http.end();
 }
 
-void handleWebSocketMessage(String message) {
-  Serial.println("Received: " + message);
+void sendHeartbeat() {
+  DynamicJsonDocument doc(256);
+  doc["type"] = "heartbeat";
+  doc["timestamp"] = millis();
+  doc["rssi"] = WiFi.RSSI();
+  doc["freeHeap"] = ESP.getFreeHeap();
   
-  // Parse JSON message
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, message);
+  String jsonString;
+  serializeJson(doc, jsonString);
   
-  String type = doc["type"];
+  // Send HTTP POST request
+  String url = "http://" + String(server_host) + ":" + String(server_port) + server_path;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
   
-  if (type == "calibrate") {
-    calibrateSensor();
-  } else if (type == "start") {
-    startTransmission();
-  } else if (type == "stop") {
-    stopTransmission();
-  } else if (type == "status") {
-    sendStatus();
+  int httpResponseCode = http.POST(jsonString);
+  
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.println("Heartbeat sent: " + String(httpResponseCode));
+  } else {
+    Serial.println("Heartbeat failed: " + String(httpResponseCode));
+    isConnected = false;
   }
+  
+  http.end();
 }
 
 void calibrateSensor() {
   Serial.println("Starting calibration...");
   isTransmitting = false;
-  
-  // Send calibration start message
-  sendMessage("calibration_start", "Calibration started");
   
   unsigned long calibrationStart = millis();
   const unsigned long CALIBRATION_DURATION = 10000; // 10 seconds
@@ -229,83 +225,32 @@ void calibrateSensor() {
   
   String calJson;
   serializeJson(calDoc, calJson);
-  webSocket.sendTXT(calJson);
   
-  sendMessage("calibration_complete", "Calibration completed");
+  // Send HTTP POST request
+  String url = "http://" + String(server_host) + ":" + String(server_port) + server_path;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  
+  int httpResponseCode = http.POST(calJson);
+  
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.println("Calibration data sent: " + String(httpResponseCode));
+  } else {
+    Serial.println("Calibration data failed: " + String(httpResponseCode));
+  }
+  
+  http.end();
 }
 
 void startTransmission() {
   Serial.println("Starting EMG data transmission...");
   isTransmitting = true;
-  sendMessage("transmission_started", "Data transmission started");
 }
 
 void stopTransmission() {
   Serial.println("Stopping EMG data transmission...");
   isTransmitting = false;
-  sendMessage("transmission_stopped", "Data transmission stopped");
-}
-
-void sendEMGData() {
-  // Read and smooth sensor data
-  int smoothedValue = readSmoothedSensor();
-  float activation = calculateMuscleActivation(smoothedValue);
-  
-  // Create JSON data
-  DynamicJsonDocument doc(512);
-  doc["type"] = "emg_data";
-  doc["timestamp"] = millis();
-  doc["muscleActivity"] = smoothedValue;
-  doc["muscleActivityProcessed"] = activation;
-  doc["voltage"] = (smoothedValue * 3.3) / 4095.0; // ESP32 uses 3.3V and 12-bit ADC
-  doc["calibrated"] = isCalibrated;
-  
-  String jsonString;
-  serializeJson(doc, jsonString);
-  webSocket.sendTXT(jsonString);
-}
-
-void sendHeartbeat() {
-  DynamicJsonDocument doc(256);
-  doc["type"] = "heartbeat";
-  doc["timestamp"] = millis();
-  doc["rssi"] = WiFi.RSSI();
-  doc["freeHeap"] = ESP.getFreeHeap();
-  
-  String jsonString;
-  serializeJson(doc, jsonString);
-  webSocket.sendTXT(jsonString);
-}
-
-void sendStatus() {
-  DynamicJsonDocument doc(512);
-  doc["type"] = "status";
-  doc["connected"] = isConnected;
-  doc["transmitting"] = isTransmitting;
-  doc["calibrated"] = isCalibrated;
-  doc["deviceName"] = "MyoWare-ESP32";
-  doc["wifiRSSI"] = WiFi.RSSI();
-  doc["freeHeap"] = ESP.getFreeHeap();
-  
-  if (isCalibrated) {
-    doc["calibrationMin"] = sensorMin;
-    doc["calibrationMax"] = sensorMax;
-  }
-  
-  String jsonString;
-  serializeJson(doc, jsonString);
-  webSocket.sendTXT(jsonString);
-}
-
-void sendMessage(String type, String message) {
-  DynamicJsonDocument doc(256);
-  doc["type"] = type;
-  doc["message"] = message;
-  doc["timestamp"] = millis();
-  
-  String jsonString;
-  serializeJson(doc, jsonString);
-  webSocket.sendTXT(jsonString);
 }
 
 int readSmoothedSensor() {

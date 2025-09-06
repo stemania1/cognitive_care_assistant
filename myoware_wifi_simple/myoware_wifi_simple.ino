@@ -1,37 +1,29 @@
 /*
- * MyoWare 2.0 WiFi Direct Client
+ * MyoWare 2.0 WiFi Simple Client
  * 
- * This code programs the MyoWare Wireless Shield directly (ESP32-based)
- * to connect to the Cognitive Care Assistant via WiFi and WebSocket.
+ * Simplified version for testing WebSocket connection
  * 
  * Hardware: MyoWare 2.0 + MyoWare Wireless Shield (ESP32)
- * No Arduino needed - program the shield directly!
  * 
  * Features:
  * - WiFi connection to local network
  * - WebSocket communication with web app
  * - Real-time EMG data transmission
- * - Automatic reconnection
- * - Web-based configuration
- * - OTA updates support
+ * - Simple configuration
  */
 
 #include <WiFi.h>
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
-#include <EEPROM.h>
-#include <WebServer.h>
-#include <DNSServer.h>
 
-// WiFi Configuration
+// WiFi Configuration - UPDATE THESE!
 const char* ssid = "Dinosaur";
 const char* password = "AnnoyingKid2010!";
 
-// WebSocket Configuration
-const char* ws_host_local = "192.168.254.204";     // Your computer's local IP
-const char* ws_host_prod = "cognitive-care-assistant.vercel.app";
-const int ws_port = 3000;
-const char* ws_path = "/api/emg/ws";
+// Server Configuration - UPDATE THESE!
+const char* server_host = "192.168.254.204";  // Your computer's IP
+const int server_port = 3000;
+const char* server_path = "/api/emg/ws";
 
 // MyoWare 2.0 sensor pin (ESP32 GPIO36 = A0)
 const int SENSOR_PIN = 36;
@@ -60,22 +52,8 @@ const unsigned long HEARTBEAT_INTERVAL = 5000;
 // WebSocket client
 WebSocketsClient webSocket;
 
-// Configuration server
-WebServer server(80);
-DNSServer dnsServer;
-
-// Configuration variables
-String deviceName = "MyoWare-ESP32";
-String serverMode = "auto"; // auto, local, production
-String localServerIP = "192.168.1.100";
-String productionServer = "cognitive-care-assistant.vercel.app";
-
 void setup() {
   Serial.begin(115200);
-  
-  // Initialize EEPROM
-  EEPROM.begin(512);
-  loadConfiguration();
   
   // Initialize sensor data
   sensorMin = 1023;
@@ -89,7 +67,7 @@ void setup() {
     sensorReadings[i] = 0;
   }
   
-  Serial.println("MyoWare 2.0 WiFi Direct Client");
+  Serial.println("MyoWare 2.0 WiFi Simple Client");
   Serial.println("==============================");
   
   // Setup WiFi
@@ -98,19 +76,10 @@ void setup() {
   // Setup WebSocket
   setupWebSocket();
   
-  // Setup configuration server
-  setupConfigServer();
-  
   Serial.println("Setup complete!");
-  Serial.println("Device Name: " + deviceName);
-  Serial.println("Server Mode: " + serverMode);
 }
 
 void loop() {
-  // Handle configuration server
-  server.handleClient();
-  dnsServer.processNextRequest();
-  
   // Handle WebSocket
   webSocket.loop();
   
@@ -131,17 +100,6 @@ void loop() {
     Serial.println("Connection lost, attempting to reconnect...");
     isConnected = false;
     connectToServer();
-  }
-  
-  // If in auto mode and local connection failed, try production
-  if (serverMode == "auto" && !isConnected && millis() > 10000) {
-    static bool triedProduction = false;
-    if (!triedProduction) {
-      Serial.println("Local connection failed, trying production...");
-      triedProduction = true;
-      serverMode = "production";
-      connectToServer();
-    }
   }
   
   delay(10);
@@ -166,8 +124,7 @@ void setupWiFi() {
   } else {
     Serial.println("");
     Serial.println("WiFi connection failed!");
-    Serial.println("Starting configuration server...");
-    startConfigServer();
+    Serial.println("Please check your credentials and try again.");
   }
 }
 
@@ -177,38 +134,8 @@ void setupWebSocket() {
 }
 
 void connectToServer() {
-  String host;
-  int port;
-  String path;
-  bool useSSL = false;
-  
-  if (serverMode == "local") {
-    host = localServerIP;
-    port = ws_port;
-    path = ws_path;
-    useSSL = false;
-  } else if (serverMode == "production") {
-    host = productionServer;
-    port = 443; // HTTPS port for production
-    path = ws_path;
-    useSSL = true;
-  } else { // auto mode
-    // Try local first, then production
-    host = localServerIP;
-    port = ws_port;
-    path = ws_path;
-    useSSL = false;
-  }
-  
-  Serial.println("Connecting to: " + host + ":" + String(port) + path);
-  
-  if (useSSL) {
-    // For production, use secure WebSocket
-    webSocket.begin(host.c_str(), port, path.c_str(), "wss");
-  } else {
-    // For local development, use regular WebSocket
-    webSocket.begin(host.c_str(), port, path.c_str());
-  }
+  Serial.println("Connecting to: " + String(server_host) + ":" + String(server_port) + server_path);
+  webSocket.begin(server_host, server_port, server_path);
 }
 
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
@@ -252,8 +179,6 @@ void handleWebSocketMessage(String message) {
     stopTransmission();
   } else if (type == "status") {
     sendStatus();
-  } else if (type == "config") {
-    handleConfigUpdate(doc);
   }
 }
 
@@ -332,7 +257,7 @@ void sendEMGData() {
   doc["timestamp"] = millis();
   doc["muscleActivity"] = smoothedValue;
   doc["muscleActivityProcessed"] = activation;
-  doc["voltage"] = (smoothedValue * 5.0) / 1023.0;
+  doc["voltage"] = (smoothedValue * 3.3) / 4095.0; // ESP32 uses 3.3V and 12-bit ADC
   doc["calibrated"] = isCalibrated;
   
   String jsonString;
@@ -358,8 +283,7 @@ void sendStatus() {
   doc["connected"] = isConnected;
   doc["transmitting"] = isTransmitting;
   doc["calibrated"] = isCalibrated;
-  doc["deviceName"] = deviceName;
-  doc["serverMode"] = serverMode;
+  doc["deviceName"] = "MyoWare-ESP32";
   doc["wifiRSSI"] = WiFi.RSSI();
   doc["freeHeap"] = ESP.getFreeHeap();
   
@@ -417,148 +341,4 @@ void printCalibrationData() {
   Serial.println("Min: " + String(sensorMin));
   Serial.println("Max: " + String(sensorMax));
   Serial.println("Range: " + String(sensorMax - sensorMin));
-}
-
-// Configuration Server Functions
-void setupConfigServer() {
-  server.on("/", handleRoot);
-  server.on("/config", handleConfig);
-  server.on("/save", handleSave);
-  server.on("/status", handleStatus);
-  server.on("/calibrate", handleCalibrate);
-  server.on("/start", handleStart);
-  server.on("/stop", handleStop);
-  
-  server.begin();
-  Serial.println("Configuration server started");
-}
-
-void startConfigServer() {
-  // Start captive portal
-  WiFi.softAP("MyoWare-Config");
-  dnsServer.start(53, "*", WiFi.softAPIP());
-  server.begin();
-  Serial.println("Captive portal started");
-  Serial.println("Connect to 'MyoWare-Config' WiFi network");
-  Serial.println("Then go to: http://192.168.4.1");
-}
-
-void handleRoot() {
-  String html = "<!DOCTYPE html><html><head><title>MyoWare Configuration</title></head><body>";
-  html += "<h1>MyoWare 2.0 Configuration</h1>";
-  html += "<form action='/config' method='GET'>";
-  html += "<h2>WiFi Settings</h2>";
-  html += "<p>SSID: <input type='text' name='ssid' value='" + String(ssid) + "'></p>";
-  html += "<p>Password: <input type='password' name='password' value='" + String(password) + "'></p>";
-  html += "<h2>Server Settings</h2>";
-  html += "<p>Mode: <select name='mode'><option value='auto'>Auto</option><option value='local'>Local</option><option value='production'>Production</option></select></p>";
-  html += "<p>Local Server IP: <input type='text' name='local_ip' value='" + localServerIP + "'></p>";
-  html += "<p>Device Name: <input type='text' name='device_name' value='" + deviceName + "'></p>";
-  html += "<p><input type='submit' value='Save Configuration'></p>";
-  html += "</form>";
-  html += "<h2>Device Status</h2>";
-  html += "<p>WiFi: " + String(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected") + "</p>";
-  html += "<p>IP: " + WiFi.localIP().toString() + "</p>";
-  html += "<p>WebSocket: " + String(isConnected ? "Connected" : "Disconnected") + "</p>";
-  html += "<p>Calibrated: " + String(isCalibrated ? "Yes" : "No") + "</p>";
-  html += "<h2>Actions</h2>";
-  html += "<p><a href='/calibrate'>Calibrate Sensor</a></p>";
-  html += "<p><a href='/start'>Start Transmission</a></p>";
-  html += "<p><a href='/stop'>Stop Transmission</a></p>";
-  html += "</body></html>";
-  
-  server.send(200, "text/html", html);
-}
-
-void handleConfig() {
-  if (server.hasArg("ssid")) {
-    // Save configuration
-    String newSSID = server.arg("ssid");
-    String newPassword = server.arg("password");
-    String newMode = server.arg("mode");
-    String newLocalIP = server.arg("local_ip");
-    String newDeviceName = server.arg("device_name");
-    
-    // Update variables
-    deviceName = newDeviceName;
-    serverMode = newMode;
-    localServerIP = newLocalIP;
-    
-    // Save to EEPROM
-    saveConfiguration();
-    
-    server.send(200, "text/plain", "Configuration saved! Restarting...");
-    delay(1000);
-    ESP.restart();
-  } else {
-    handleRoot();
-  }
-}
-
-void handleSave() {
-  handleConfig();
-}
-
-void handleStatus() {
-  DynamicJsonDocument doc(512);
-  doc["wifi_connected"] = WiFi.status() == WL_CONNECTED;
-  doc["wifi_ip"] = WiFi.localIP().toString();
-  doc["wifi_rssi"] = WiFi.RSSI();
-  doc["websocket_connected"] = isConnected;
-  doc["transmitting"] = isTransmitting;
-  doc["calibrated"] = isCalibrated;
-  doc["device_name"] = deviceName;
-  doc["server_mode"] = serverMode;
-  doc["free_heap"] = ESP.getFreeHeap();
-  
-  String jsonString;
-  serializeJson(doc, jsonString);
-  server.send(200, "application/json", jsonString);
-}
-
-void handleCalibrate() {
-  calibrateSensor();
-  server.send(200, "text/plain", "Calibration started");
-}
-
-void handleStart() {
-  startTransmission();
-  server.send(200, "text/plain", "Transmission started");
-}
-
-void handleStop() {
-  stopTransmission();
-  server.send(200, "text/plain", "Transmission stopped");
-}
-
-void handleConfigUpdate(DynamicJsonDocument& doc) {
-  if (doc.containsKey("deviceName")) {
-    deviceName = doc["deviceName"].as<String>();
-  }
-  if (doc.containsKey("serverMode")) {
-    serverMode = doc["serverMode"].as<String>();
-  }
-  if (doc.containsKey("localServerIP")) {
-    localServerIP = doc["localServerIP"].as<String>();
-  }
-  
-  saveConfiguration();
-}
-
-void saveConfiguration() {
-  EEPROM.put(0, deviceName);
-  EEPROM.put(32, serverMode);
-  EEPROM.put(64, localServerIP);
-  EEPROM.commit();
-}
-
-void loadConfiguration() {
-  EEPROM.get(0, deviceName);
-  EEPROM.get(32, serverMode);
-  EEPROM.get(64, localServerIP);
-  
-  // Set defaults if empty
-  if (deviceName.length() == 0) deviceName = "MyoWare-ESP32";
-  if (serverMode.length() == 0) serverMode = "auto";
-  if (localServerIP.length() == 0) localServerIP = "192.168.1.100";
 }
