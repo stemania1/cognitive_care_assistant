@@ -5,18 +5,32 @@ import Link from "next/link";
 
 interface EMGData {
   timestamp: number;
-  leftBicep: number;
-  rightBicep: number;
-  leftTricep: number;
-  rightTricep: number;
-  leftForearm: number;
-  rightForearm: number;
-  leftQuad: number;
-  rightQuad: number;
-  leftHamstring: number;
-  rightHamstring: number;
-  leftCalf: number;
-  rightCalf: number;
+  // MyoWare 2.0 sensor data (0-1023 analog range, 0-5V)
+  leftBicep: number;      // Raw analog value from MyoWare 2.0
+  rightBicep: number;     // Raw analog value from MyoWare 2.0
+  leftTricep: number;     // Raw analog value from MyoWare 2.0
+  rightTricep: number;    // Raw analog value from MyoWare 2.0
+  leftForearm: number;    // Raw analog value from MyoWare 2.0
+  rightForearm: number;   // Raw analog value from MyoWare 2.0
+  leftQuad: number;       // Raw analog value from MyoWare 2.0
+  rightQuad: number;      // Raw analog value from MyoWare 2.0
+  leftHamstring: number;  // Raw analog value from MyoWare 2.0
+  rightHamstring: number; // Raw analog value from MyoWare 2.0
+  leftCalf: number;       // Raw analog value from MyoWare 2.0
+  rightCalf: number;      // Raw analog value from MyoWare 2.0
+  // Processed values
+  leftBicepProcessed: number;      // Processed muscle activation (0-100%)
+  rightBicepProcessed: number;     // Processed muscle activation (0-100%)
+  leftTricepProcessed: number;     // Processed muscle activation (0-100%)
+  rightTricepProcessed: number;    // Processed muscle activation (0-100%)
+  leftForearmProcessed: number;    // Processed muscle activation (0-100%)
+  rightForearmProcessed: number;   // Processed muscle activation (0-100%)
+  leftQuadProcessed: number;       // Processed muscle activation (0-100%)
+  rightQuadProcessed: number;      // Processed muscle activation (0-100%)
+  leftHamstringProcessed: number;  // Processed muscle activation (0-100%)
+  rightHamstringProcessed: number; // Processed muscle activation (0-100%)
+  leftCalfProcessed: number;       // Processed muscle activation (0-100%)
+  rightCalfProcessed: number;      // Processed muscle activation (0-100%)
 }
 
 interface WorkoutExercise {
@@ -91,26 +105,64 @@ export default function EMGPage() {
   const [emgData, setEmgData] = useState<EMGData[]>([]);
   const [currentData, setCurrentData] = useState<EMGData | null>(null);
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
+  const [calibrationData, setCalibrationData] = useState<{ [key: string]: { min: number; max: number } }>({});
+  const [isCalibrating, setIsCalibrating] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Simulate EMG data generation
+  // MyoWare 2.0 data processing functions
+  const processMyoWareData = (rawValue: number, muscle: string): number => {
+    // MyoWare 2.0 outputs 0-1023 analog range (0-5V)
+    // Convert to percentage based on calibration data
+    const cal = calibrationData[muscle];
+    if (!cal) return 0;
+    
+    const normalized = Math.max(0, Math.min(100, 
+      ((rawValue - cal.min) / (cal.max - cal.min)) * 100
+    ));
+    return normalized;
+  };
+
+  // Simulate MyoWare 2.0 EMG data generation
   const generateEMGData = (): EMGData => {
     const now = Date.now();
+    
+    // Generate raw MyoWare 2.0 analog values (0-1023)
+    const rawData = {
+      leftBicep: Math.floor(Math.random() * 200) + 400,      // 400-600 range
+      rightBicep: Math.floor(Math.random() * 200) + 400,     // 400-600 range
+      leftTricep: Math.floor(Math.random() * 200) + 400,     // 400-600 range
+      rightTricep: Math.floor(Math.random() * 200) + 400,    // 400-600 range
+      leftForearm: Math.floor(Math.random() * 200) + 400,    // 400-600 range
+      rightForearm: Math.floor(Math.random() * 200) + 400,   // 400-600 range
+      leftQuad: Math.floor(Math.random() * 200) + 400,       // 400-600 range
+      rightQuad: Math.floor(Math.random() * 200) + 400,      // 400-600 range
+      leftHamstring: Math.floor(Math.random() * 200) + 400,  // 400-600 range
+      rightHamstring: Math.floor(Math.random() * 200) + 400, // 400-600 range
+      leftCalf: Math.floor(Math.random() * 200) + 400,       // 400-600 range
+      rightCalf: Math.floor(Math.random() * 200) + 400,      // 400-600 range
+    };
+
+    // Process raw data to percentages
+    const processedData = {
+      leftBicepProcessed: processMyoWareData(rawData.leftBicep, 'leftBicep'),
+      rightBicepProcessed: processMyoWareData(rawData.rightBicep, 'rightBicep'),
+      leftTricepProcessed: processMyoWareData(rawData.leftTricep, 'leftTricep'),
+      rightTricepProcessed: processMyoWareData(rawData.rightTricep, 'rightTricep'),
+      leftForearmProcessed: processMyoWareData(rawData.leftForearm, 'leftForearm'),
+      rightForearmProcessed: processMyoWareData(rawData.rightForearm, 'rightForearm'),
+      leftQuadProcessed: processMyoWareData(rawData.leftQuad, 'leftQuad'),
+      rightQuadProcessed: processMyoWareData(rawData.rightQuad, 'rightQuad'),
+      leftHamstringProcessed: processMyoWareData(rawData.leftHamstring, 'leftHamstring'),
+      rightHamstringProcessed: processMyoWareData(rawData.rightHamstring, 'rightHamstring'),
+      leftCalfProcessed: processMyoWareData(rawData.leftCalf, 'leftCalf'),
+      rightCalfProcessed: processMyoWareData(rawData.rightCalf, 'rightCalf'),
+    };
+
     return {
       timestamp: now,
-      leftBicep: Math.random() * 100,
-      rightBicep: Math.random() * 100,
-      leftTricep: Math.random() * 100,
-      rightTricep: Math.random() * 100,
-      leftForearm: Math.random() * 100,
-      rightForearm: Math.random() * 100,
-      leftQuad: Math.random() * 100,
-      rightQuad: Math.random() * 100,
-      leftHamstring: Math.random() * 100,
-      rightHamstring: Math.random() * 100,
-      leftCalf: Math.random() * 100,
-      rightCalf: Math.random() * 100,
+      ...rawData,
+      ...processedData,
     };
   };
 
@@ -178,6 +230,33 @@ export default function EMGPage() {
     setEmgData([]);
   };
 
+  // Calibration functions for MyoWare 2.0
+  const startCalibration = () => {
+    setIsCalibrating(true);
+    setCalibrationData({});
+    
+    // Initialize calibration data with default ranges
+    const muscles = ['leftBicep', 'rightBicep', 'leftTricep', 'rightTricep', 
+                    'leftForearm', 'rightForearm', 'leftQuad', 'rightQuad', 
+                    'leftHamstring', 'rightHamstring', 'leftCalf', 'rightCalf'];
+    
+    const defaultCal = muscles.reduce((acc, muscle) => {
+      acc[muscle] = { min: 400, max: 600 }; // Default MyoWare 2.0 range
+      return acc;
+    }, {} as { [key: string]: { min: number; max: number } });
+    
+    setCalibrationData(defaultCal);
+    
+    // Auto-calibrate after 5 seconds
+    setTimeout(() => {
+      setIsCalibrating(false);
+    }, 5000);
+  };
+
+  const stopCalibration = () => {
+    setIsCalibrating(false);
+  };
+
   // Calculate average muscle activation
   const calculateAverageActivation = () => {
     if (emgData.length === 0) return {};
@@ -189,7 +268,7 @@ export default function EMGPage() {
     const averages: { [key: string]: number } = {};
     
     muscles.forEach(muscle => {
-      const sum = emgData.reduce((acc, data) => acc + (data as any)[muscle], 0);
+      const sum = emgData.reduce((acc, data) => acc + (data as any)[muscle + 'Processed'], 0);
       averages[muscle] = sum / emgData.length;
     });
     
@@ -251,21 +330,33 @@ export default function EMGPage() {
           </div>
           
           {/* Connection Controls */}
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-wrap">
             {!isConnected ? (
               <button
                 onClick={connectEMG}
                 className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-600 transition-all duration-200"
               >
-                Connect EMG Sensors
+                Connect MyoWare 2.0 Sensors
               </button>
             ) : (
-              <button
-                onClick={disconnectEMG}
-                className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200"
-              >
-                Disconnect EMG
-              </button>
+              <>
+                <button
+                  onClick={disconnectEMG}
+                  className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200"
+                >
+                  Disconnect EMG
+                </button>
+                <button
+                  onClick={isCalibrating ? stopCalibration : startCalibration}
+                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                    isCalibrating 
+                      ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600' 
+                      : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'
+                  }`}
+                >
+                  {isCalibrating ? 'Stop Calibration' : 'Calibrate Sensors'}
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -324,23 +415,66 @@ export default function EMGPage() {
                 {/* Real-time EMG Data */}
                 {currentData && (
                   <div className="mb-6">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {Object.entries(currentData).filter(([key]) => key !== 'timestamp').map(([muscle, value]) => (
-                        <div key={muscle} className="p-3 rounded-lg bg-white/5 border border-white/10">
-                          <div className="text-xs text-gray-400 mb-1 capitalize">
-                            {muscle.replace(/([A-Z])/g, ' $1').trim()}
-                          </div>
-                          <div className="text-lg font-semibold text-white">
-                            {value.toFixed(1)}
-                          </div>
-                          <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
-                            <div 
-                              className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-200"
-                              style={{ width: `${Math.min(value, 100)}%` }}
-                            />
-                          </div>
+                    <div className="mb-4">
+                      <h3 className="text-lg font-medium text-white mb-2">MyoWare 2.0 Sensor Data</h3>
+                      {isCalibrating && (
+                        <div className="p-3 rounded-lg bg-orange-500/20 border border-orange-500/30 mb-4">
+                          <p className="text-orange-200 text-sm">
+                            🔧 Calibrating sensors... Please contract and relax your muscles for 5 seconds.
+                          </p>
                         </div>
-                      ))}
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {['leftBicep', 'rightBicep', 'leftTricep', 'rightTricep', 'leftForearm', 'rightForearm', 'leftQuad', 'rightQuad', 'leftHamstring', 'rightHamstring', 'leftCalf', 'rightCalf'].map((muscle) => {
+                        const rawValue = (currentData as any)[muscle];
+                        const processedValue = (currentData as any)[muscle + 'Processed'];
+                        const cal = calibrationData[muscle];
+                        
+                        return (
+                          <div key={muscle} className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <div className="text-sm text-gray-400 mb-2 capitalize">
+                              {muscle.replace(/([A-Z])/g, ' $1').trim()}
+                            </div>
+                            
+                            {/* Raw MyoWare 2.0 Data */}
+                            <div className="mb-3">
+                              <div className="text-xs text-gray-500 mb-1">Raw (0-1023)</div>
+                              <div className="text-lg font-semibold text-blue-400">
+                                {rawValue}
+                              </div>
+                              <div className="w-full bg-gray-700 rounded-full h-1.5 mt-1">
+                                <div 
+                                  className="bg-gradient-to-r from-blue-400 to-cyan-500 h-1.5 rounded-full transition-all duration-200"
+                                  style={{ width: `${Math.min((rawValue / 1023) * 100, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                            
+                            {/* Processed Percentage */}
+                            <div className="mb-2">
+                              <div className="text-xs text-gray-500 mb-1">Processed (%)</div>
+                              <div className="text-xl font-bold text-white">
+                                {processedValue.toFixed(1)}%
+                              </div>
+                              <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
+                                <div 
+                                  className="bg-gradient-to-r from-green-400 to-emerald-500 h-2 rounded-full transition-all duration-200"
+                                  style={{ width: `${Math.min(processedValue, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                            
+                            {/* Calibration Range */}
+                            {cal && (
+                              <div className="text-xs text-gray-500">
+                                Range: {cal.min}-{cal.max}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
