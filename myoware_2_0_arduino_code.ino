@@ -22,24 +22,20 @@
  * or use multiple Arduino boards for more sensors.
  */
 
-// Sensor pin definitions
-const int SENSOR_PINS[] = {A0, A1, A2, A3, A4, A5};
-const int NUM_SENSORS = 6;
-const String SENSOR_NAMES[] = {
-  "leftBicep", "rightBicep", "leftTricep", 
-  "rightTricep", "leftForearm", "rightForearm"
-};
+// Single MyoWare 2.0 sensor configuration
+const int SENSOR_PIN = A0;  // Connect MyoWare 2.0 to analog pin A0
+const String SENSOR_NAME = "muscleActivity";
 
-// Calibration data for each sensor
-int sensorMin[NUM_SENSORS];
-int sensorMax[NUM_SENSORS];
-bool isCalibrated[NUM_SENSORS];
+// Calibration data for single sensor
+int sensorMin = 1023;
+int sensorMax = 0;
+bool isCalibrated = false;
 
 // Data smoothing
 const int SMOOTHING_SAMPLES = 10;
-int sensorReadings[NUM_SENSORS][SMOOTHING_SAMPLES];
-int readingIndex[NUM_SENSORS];
-int sensorTotals[NUM_SENSORS];
+int sensorReadings[SMOOTHING_SAMPLES];
+int readingIndex = 0;
+int sensorTotal = 0;
 
 // Timing
 unsigned long lastDataSend = 0;
@@ -48,21 +44,19 @@ const unsigned long DATA_SEND_INTERVAL = 100; // Send data every 100ms (10Hz)
 void setup() {
   Serial.begin(115200);
   
-  // Initialize sensor arrays
-  for (int i = 0; i < NUM_SENSORS; i++) {
-    sensorMin[i] = 1023;
-    sensorMax[i] = 0;
-    isCalibrated[i] = false;
-    readingIndex[i] = 0;
-    sensorTotals[i] = 0;
-    
-    // Initialize smoothing arrays
-    for (int j = 0; j < SMOOTHING_SAMPLES; j++) {
-      sensorReadings[i][j] = 0;
-    }
+  // Initialize sensor data
+  sensorMin = 1023;
+  sensorMax = 0;
+  isCalibrated = false;
+  readingIndex = 0;
+  sensorTotal = 0;
+  
+  // Initialize smoothing array
+  for (int i = 0; i < SMOOTHING_SAMPLES; i++) {
+    sensorReadings[i] = 0;
   }
   
-  Serial.println("MyoWare 2.0 EMG Sensor System Ready");
+  Serial.println("MyoWare 2.0 Single Sensor System Ready");
   Serial.println("Commands:");
   Serial.println("CALIBRATE - Start calibration process");
   Serial.println("START - Begin data transmission");
@@ -93,22 +87,20 @@ void loop() {
 
 void calibrateSensors() {
   Serial.println("Starting calibration...");
-  Serial.println("Please contract and relax each muscle group for 10 seconds");
+  Serial.println("Please contract and relax your muscle for 10 seconds");
   
   unsigned long calibrationStart = millis();
   const unsigned long CALIBRATION_DURATION = 10000; // 10 seconds
   
   while (millis() - calibrationStart < CALIBRATION_DURATION) {
-    for (int i = 0; i < NUM_SENSORS; i++) {
-      int rawValue = analogRead(SENSOR_PINS[i]);
-      
-      // Update min/max values
-      if (rawValue < sensorMin[i]) {
-        sensorMin[i] = rawValue;
-      }
-      if (rawValue > sensorMax[i]) {
-        sensorMax[i] = rawValue;
-      }
+    int rawValue = analogRead(SENSOR_PIN);
+    
+    // Update min/max values
+    if (rawValue < sensorMin) {
+      sensorMin = rawValue;
+    }
+    if (rawValue > sensorMax) {
+      sensorMax = rawValue;
     }
     
     // Show progress
@@ -122,10 +114,8 @@ void calibrateSensors() {
     delay(50);
   }
   
-  // Mark sensors as calibrated
-  for (int i = 0; i < NUM_SENSORS; i++) {
-    isCalibrated[i] = true;
-  }
+  // Mark sensor as calibrated
+  isCalibrated = true;
   
   Serial.println("Calibration complete!");
   printCalibrationData();
@@ -133,18 +123,16 @@ void calibrateSensors() {
 
 void printCalibrationData() {
   Serial.println("Calibration Results:");
-  for (int i = 0; i < NUM_SENSORS; i++) {
-    Serial.print(SENSOR_NAMES[i]);
-    Serial.print(": Min=");
-    Serial.print(sensorMin[i]);
-    Serial.print(", Max=");
-    Serial.println(sensorMax[i]);
-  }
+  Serial.print(SENSOR_NAME);
+  Serial.print(": Min=");
+  Serial.print(sensorMin);
+  Serial.print(", Max=");
+  Serial.println(sensorMax);
 }
 
 void startDataTransmission() {
   Serial.println("Starting EMG data transmission...");
-  Serial.println("Format: TIMESTAMP,LEFT_BICEP,RIGHT_BICEP,LEFT_TRICEP,RIGHT_TRICEP,LEFT_FOREARM,RIGHT_FOREARM");
+  Serial.println("Format: TIMESTAMP,MUSCLE_ACTIVITY");
 }
 
 void stopDataTransmission() {
@@ -153,86 +141,63 @@ void stopDataTransmission() {
 
 void sendEMGData() {
   // Read and smooth sensor data
-  int smoothedValues[NUM_SENSORS];
-  
-  for (int i = 0; i < NUM_SENSORS; i++) {
-    smoothedValues[i] = readSmoothedSensor(i);
-  }
+  int smoothedValue = readSmoothedSensor();
   
   // Send data in JSON format
   Serial.print("{");
   Serial.print("\"timestamp\":");
   Serial.print(millis());
-  Serial.print(",");
-  
-  for (int i = 0; i < NUM_SENSORS; i++) {
-    Serial.print("\"");
-    Serial.print(SENSOR_NAMES[i]);
-    Serial.print("\":");
-    Serial.print(smoothedValues[i]);
-    
-    if (i < NUM_SENSORS - 1) {
-      Serial.print(",");
-    }
-  }
-  
+  Serial.print(",\"");
+  Serial.print(SENSOR_NAME);
+  Serial.print("\":");
+  Serial.print(smoothedValue);
   Serial.println("}");
 }
 
-int readSmoothedSensor(int sensorIndex) {
+int readSmoothedSensor() {
   // Read raw value
-  int rawValue = analogRead(SENSOR_PINS[sensorIndex]);
+  int rawValue = analogRead(SENSOR_PIN);
   
   // Add to smoothing array
-  sensorTotals[sensorIndex] = sensorTotals[sensorIndex] - sensorReadings[sensorIndex][readingIndex[sensorIndex]];
-  sensorReadings[sensorIndex][readingIndex[sensorIndex]] = rawValue;
-  sensorTotals[sensorIndex] = sensorTotals[sensorIndex] + sensorReadings[sensorIndex][readingIndex[sensorIndex]];
-  readingIndex[sensorIndex] = (readingIndex[sensorIndex] + 1) % SMOOTHING_SAMPLES;
+  sensorTotal = sensorTotal - sensorReadings[readingIndex];
+  sensorReadings[readingIndex] = rawValue;
+  sensorTotal = sensorTotal + sensorReadings[readingIndex];
+  readingIndex = (readingIndex + 1) % SMOOTHING_SAMPLES;
   
   // Return smoothed average
-  return sensorTotals[sensorIndex] / SMOOTHING_SAMPLES;
+  return sensorTotal / SMOOTHING_SAMPLES;
 }
 
 // Calculate muscle activation percentage
-float calculateMuscleActivation(int sensorIndex, int rawValue) {
-  if (!isCalibrated[sensorIndex]) {
+float calculateMuscleActivation(int rawValue) {
+  if (!isCalibrated) {
     return 0.0;
   }
   
-  int range = sensorMax[sensorIndex] - sensorMin[sensorIndex];
+  int range = sensorMax - sensorMin;
   if (range == 0) {
     return 0.0;
   }
   
-  float activation = ((float)(rawValue - sensorMin[sensorIndex]) / range) * 100.0;
+  float activation = ((float)(rawValue - sensorMin) / range) * 100.0;
   return constrain(activation, 0.0, 100.0);
 }
 
 // Send processed data with muscle activation percentages
 void sendProcessedEMGData() {
+  int rawValue = readSmoothedSensor();
+  float activation = calculateMuscleActivation(rawValue);
+  
   Serial.print("{");
   Serial.print("\"timestamp\":");
   Serial.print(millis());
-  Serial.print(",");
-  
-  for (int i = 0; i < NUM_SENSORS; i++) {
-    int rawValue = readSmoothedSensor(i);
-    float activation = calculateMuscleActivation(i, rawValue);
-    
-    Serial.print("\"");
-    Serial.print(SENSOR_NAMES[i]);
-    Serial.print("\":");
-    Serial.print(rawValue);
-    Serial.print(",");
-    Serial.print("\"");
-    Serial.print(SENSOR_NAMES[i]);
-    Serial.print("Processed\":");
-    Serial.print(activation);
-    
-    if (i < NUM_SENSORS - 1) {
-      Serial.print(",");
-    }
-  }
-  
+  Serial.print(",\"");
+  Serial.print(SENSOR_NAME);
+  Serial.print("\":");
+  Serial.print(rawValue);
+  Serial.print(",\"");
+  Serial.print(SENSOR_NAME);
+  Serial.print("Processed\":");
+  Serial.print(activation);
   Serial.println("}");
 }

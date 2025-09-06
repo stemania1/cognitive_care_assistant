@@ -5,32 +5,9 @@ import Link from "next/link";
 
 interface EMGData {
   timestamp: number;
-  // MyoWare 2.0 sensor data (0-1023 analog range, 0-5V)
-  leftBicep: number;      // Raw analog value from MyoWare 2.0
-  rightBicep: number;     // Raw analog value from MyoWare 2.0
-  leftTricep: number;     // Raw analog value from MyoWare 2.0
-  rightTricep: number;    // Raw analog value from MyoWare 2.0
-  leftForearm: number;    // Raw analog value from MyoWare 2.0
-  rightForearm: number;   // Raw analog value from MyoWare 2.0
-  leftQuad: number;       // Raw analog value from MyoWare 2.0
-  rightQuad: number;      // Raw analog value from MyoWare 2.0
-  leftHamstring: number;  // Raw analog value from MyoWare 2.0
-  rightHamstring: number; // Raw analog value from MyoWare 2.0
-  leftCalf: number;       // Raw analog value from MyoWare 2.0
-  rightCalf: number;      // Raw analog value from MyoWare 2.0
-  // Processed values
-  leftBicepProcessed: number;      // Processed muscle activation (0-100%)
-  rightBicepProcessed: number;     // Processed muscle activation (0-100%)
-  leftTricepProcessed: number;     // Processed muscle activation (0-100%)
-  rightTricepProcessed: number;    // Processed muscle activation (0-100%)
-  leftForearmProcessed: number;    // Processed muscle activation (0-100%)
-  rightForearmProcessed: number;   // Processed muscle activation (0-100%)
-  leftQuadProcessed: number;       // Processed muscle activation (0-100%)
-  rightQuadProcessed: number;      // Processed muscle activation (0-100%)
-  leftHamstringProcessed: number;  // Processed muscle activation (0-100%)
-  rightHamstringProcessed: number; // Processed muscle activation (0-100%)
-  leftCalfProcessed: number;       // Processed muscle activation (0-100%)
-  rightCalfProcessed: number;      // Processed muscle activation (0-100%)
+  // Single MyoWare 2.0 sensor data (0-1023 analog range, 0-5V)
+  muscleActivity: number;      // Raw analog value from MyoWare 2.0
+  muscleActivityProcessed: number; // Processed muscle activation (0-100%)
 }
 
 interface WorkoutExercise {
@@ -44,55 +21,213 @@ interface WorkoutExercise {
 
 const WORKOUT_ROUTINES: WorkoutExercise[] = [
   {
-    id: 'bicep_curls',
-    name: 'Bicep Curls',
-    duration: 30,
+    id: 'seated_stretch_breathe',
+    name: 'Seated Stretch & Breathe',
+    duration: 300, // 5 minutes
     targetMuscles: ['leftBicep', 'rightBicep'],
-    description: 'Classic bicep strengthening exercise',
+    description: 'A calming routine with deep breaths, shoulder rolls, and gentle seated twists',
     instructions: [
-      'Hold weights with arms at sides',
-      'Slowly curl weights up to shoulders',
-      'Squeeze biceps at the top',
-      'Lower weights slowly and controlled'
+      'Sit comfortably with feet flat on floor',
+      'Take 3 deep breaths, inhaling through nose',
+      'Roll shoulders backward 5 times',
+      'Gently twist torso left, then right',
+      'Reach arms overhead and stretch',
+      'End with 3 more deep breaths'
     ]
   },
   {
-    id: 'tricep_dips',
-    name: 'Tricep Dips',
-    duration: 30,
-    targetMuscles: ['leftTricep', 'rightTricep'],
-    description: 'Target tricep muscles for arm strength',
+    id: 'chair_arm_swings',
+    name: 'Chair & Arm Swings',
+    duration: 240, // 4 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Builds rhythm and coordination with seated marching and arm movements',
     instructions: [
-      'Sit on edge of chair or bench',
-      'Place hands beside hips, fingers forward',
-      'Lower body by bending elbows',
-      'Push back up to starting position'
+      'Sit tall with good posture',
+      'March in place while seated',
+      'Swing arms naturally with marching',
+      'Add gentle arm circles forward',
+      'Switch to backward arm circles',
+      'Keep rhythm steady and comfortable'
     ]
   },
   {
-    id: 'squats',
-    name: 'Squats',
-    duration: 45,
-    targetMuscles: ['leftQuad', 'rightQuad', 'leftHamstring', 'rightHamstring'],
-    description: 'Full leg workout targeting quads and hamstrings',
+    id: 'balance_posture',
+    name: 'Balance & Posture (With Support)',
+    duration: 300, // 5 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Standing exercises using a chair for support and balance',
     instructions: [
-      'Stand with feet shoulder-width apart',
-      'Lower body as if sitting back in chair',
-      'Keep knees behind toes',
-      'Return to standing position'
+      'Stand behind chair, holding back for support',
+      'Rise up onto toes, hold for 3 seconds',
+      'Lower heels slowly to ground',
+      'Lift toes up, hold for 3 seconds',
+      'Step to the side, return to center',
+      'Repeat sequence 3-5 times'
     ]
   },
   {
-    id: 'calf_raises',
-    name: 'Calf Raises',
-    duration: 30,
-    targetMuscles: ['leftCalf', 'rightCalf'],
-    description: 'Strengthen calf muscles',
+    id: 'finger_wrist_hand',
+    name: 'Finger, Wrist & Hand Movements',
+    duration: 180, // 3 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Fine motor skill workout for dexterity and coordination',
     instructions: [
-      'Stand with feet hip-width apart',
-      'Rise up onto balls of feet',
-      'Hold for a moment at the top',
-      'Lower heels slowly to ground'
+      'Sit with arms resting on thighs',
+      'Tap each finger to thumb individually',
+      'Roll wrists in circular motions',
+      'Squeeze imaginary soft ball',
+      'Open and close hands slowly',
+      'Repeat each movement 10 times'
+    ]
+  },
+  {
+    id: 'leg_foot_movement',
+    name: 'Leg & Foot Movement',
+    duration: 240, // 4 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Improves circulation with seated leg and foot exercises',
+    instructions: [
+      'Sit with feet flat on floor',
+      'Tap toes up and down alternately',
+      'Extend one leg at a time, hold 3 seconds',
+      'Make ankle circles clockwise and counterclockwise',
+      'Seated kicks - lift knee up gently',
+      'Repeat each movement 10 times per leg'
+    ]
+  },
+  {
+    id: 'yoga_flow',
+    name: 'Yoga Flow',
+    duration: 360, // 6 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Gentle, flowing seated poses for flexibility and relaxation',
+    instructions: [
+      'Sit tall with spine straight',
+      'Reach right arm up and over to left side',
+      'Hold stretch for 3 breaths',
+      'Return to center, repeat on left side',
+      'Interlace fingers, reach arms overhead',
+      'Gently twist spine left and right'
+    ]
+  },
+  {
+    id: 'dance_clap_music',
+    name: 'Dance and Clap to Music',
+    duration: 300, // 5 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Pick a familiar, happy song and move to the rhythm',
+    instructions: [
+      'Choose a favorite upbeat song',
+      'Clap hands to the beat',
+      'Sway arms side to side',
+      'Tap feet to the rhythm',
+      'Add gentle head movements',
+      'Enjoy the joyful movement!'
+    ]
+  },
+  {
+    id: 'hoop_ball_play',
+    name: 'Hoop & Ball Play',
+    duration: 240, // 4 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Seated balloon toss or light ball catch for coordination',
+    instructions: [
+      'Sit with good posture',
+      'Hold balloon or light ball',
+      'Toss gently up and catch',
+      'Pass ball from hand to hand',
+      'Try gentle overhead passes',
+      'Keep movements smooth and controlled'
+    ]
+  },
+  {
+    id: 'lifting_weights',
+    name: 'Lifting Weights',
+    duration: 300, // 5 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Light arm exercises using water bottles or soup cans',
+    instructions: [
+      'Hold water bottles or soup cans',
+      'Curl arms up to shoulders slowly',
+      'Lower weights with control',
+      'Raise arms out to sides',
+      'Press weights overhead gently',
+      'Repeat each movement 8-10 times'
+    ]
+  },
+  {
+    id: 'visual_memory_game',
+    name: 'Visual & Memory Movement Game',
+    duration: 240, // 4 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Touch objects and match movements to memory cues',
+    instructions: [
+      'Name a color or object nearby',
+      'Touch the object when named',
+      'Match movements to cues',
+      'Touch knees when hearing "apple"',
+      'Touch head when hearing "hat"',
+      'Keep movements fun and engaging'
+    ]
+  },
+  {
+    id: 'neck_gentle_stretch',
+    name: 'Neck Gentle Stretch',
+    duration: 180, // 3 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Easy movements to reduce tension in neck and shoulders',
+    instructions: [
+      'Sit with spine straight',
+      'Gently tilt head to right, hold 3 breaths',
+      'Return to center, tilt to left',
+      'Roll shoulders backward slowly',
+      'Gently twist neck left and right',
+      'End with gentle head nods'
+    ]
+  },
+  {
+    id: 'mini_tai_chi',
+    name: 'Mini Tai Chi-Inspired Moves',
+    duration: 300, // 5 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Slow, flowing movements inspired by Tai Chi',
+    instructions: [
+      'Sit or stand with feet shoulder-width apart',
+      'Wave hands like clouds slowly',
+      'Paint the sky with arm movements',
+      'Scoop the air with cupped hands',
+      'Move in slow, flowing motions',
+      'Focus on smooth, continuous movement'
+    ]
+  },
+  {
+    id: 'foot_strength_balance',
+    name: 'Foot Strength & Balance',
+    duration: 240, // 4 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Standing exercises near a counter for support',
+    instructions: [
+      'Stand near counter for support',
+      'Walk heel-to-toe slowly',
+      'Tap toes while holding counter',
+      'Do mini squats with support',
+      'Stand on one foot briefly',
+      'Always use counter for safety'
+    ]
+  },
+  {
+    id: 'mindful_breathing',
+    name: 'Mindful Breathing & Movement',
+    duration: 300, // 5 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'Sit quietly and move arms with breaths for relaxation',
+    instructions: [
+      'Sit quietly with eyes closed',
+      'Move arms up with each inhale',
+      'Lower arms with each exhale',
+      'Relax hands and face muscles',
+      'Focus on slow, deep breathing',
+      'End with 3 deep inhales and exhales'
     ]
   }
 ];
@@ -111,10 +246,10 @@ export default function EMGPage() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // MyoWare 2.0 data processing functions
-  const processMyoWareData = (rawValue: number, muscle: string): number => {
+  const processMyoWareData = (rawValue: number): number => {
     // MyoWare 2.0 outputs 0-1023 analog range (0-5V)
     // Convert to percentage based on calibration data
-    const cal = calibrationData[muscle];
+    const cal = calibrationData['muscleActivity'];
     if (!cal) return 0;
     
     const normalized = Math.max(0, Math.min(100, 
@@ -127,42 +262,16 @@ export default function EMGPage() {
   const generateEMGData = (): EMGData => {
     const now = Date.now();
     
-    // Generate raw MyoWare 2.0 analog values (0-1023)
-    const rawData = {
-      leftBicep: Math.floor(Math.random() * 200) + 400,      // 400-600 range
-      rightBicep: Math.floor(Math.random() * 200) + 400,     // 400-600 range
-      leftTricep: Math.floor(Math.random() * 200) + 400,     // 400-600 range
-      rightTricep: Math.floor(Math.random() * 200) + 400,    // 400-600 range
-      leftForearm: Math.floor(Math.random() * 200) + 400,    // 400-600 range
-      rightForearm: Math.floor(Math.random() * 200) + 400,   // 400-600 range
-      leftQuad: Math.floor(Math.random() * 200) + 400,       // 400-600 range
-      rightQuad: Math.floor(Math.random() * 200) + 400,      // 400-600 range
-      leftHamstring: Math.floor(Math.random() * 200) + 400,  // 400-600 range
-      rightHamstring: Math.floor(Math.random() * 200) + 400, // 400-600 range
-      leftCalf: Math.floor(Math.random() * 200) + 400,       // 400-600 range
-      rightCalf: Math.floor(Math.random() * 200) + 400,      // 400-600 range
-    };
-
-    // Process raw data to percentages
-    const processedData = {
-      leftBicepProcessed: processMyoWareData(rawData.leftBicep, 'leftBicep'),
-      rightBicepProcessed: processMyoWareData(rawData.rightBicep, 'rightBicep'),
-      leftTricepProcessed: processMyoWareData(rawData.leftTricep, 'leftTricep'),
-      rightTricepProcessed: processMyoWareData(rawData.rightTricep, 'rightTricep'),
-      leftForearmProcessed: processMyoWareData(rawData.leftForearm, 'leftForearm'),
-      rightForearmProcessed: processMyoWareData(rawData.rightForearm, 'rightForearm'),
-      leftQuadProcessed: processMyoWareData(rawData.leftQuad, 'leftQuad'),
-      rightQuadProcessed: processMyoWareData(rawData.rightQuad, 'rightQuad'),
-      leftHamstringProcessed: processMyoWareData(rawData.leftHamstring, 'leftHamstring'),
-      rightHamstringProcessed: processMyoWareData(rawData.rightHamstring, 'rightHamstring'),
-      leftCalfProcessed: processMyoWareData(rawData.leftCalf, 'leftCalf'),
-      rightCalfProcessed: processMyoWareData(rawData.rightCalf, 'rightCalf'),
-    };
+    // Generate raw MyoWare 2.0 analog value (0-1023)
+    const muscleActivity = Math.floor(Math.random() * 200) + 400; // 400-600 range
+    
+    // Process raw data to percentage
+    const muscleActivityProcessed = processMyoWareData(muscleActivity);
 
     return {
       timestamp: now,
-      ...rawData,
-      ...processedData,
+      muscleActivity,
+      muscleActivityProcessed,
     };
   };
 
@@ -235,15 +344,10 @@ export default function EMGPage() {
     setIsCalibrating(true);
     setCalibrationData({});
     
-    // Initialize calibration data with default ranges
-    const muscles = ['leftBicep', 'rightBicep', 'leftTricep', 'rightTricep', 
-                    'leftForearm', 'rightForearm', 'leftQuad', 'rightQuad', 
-                    'leftHamstring', 'rightHamstring', 'leftCalf', 'rightCalf'];
-    
-    const defaultCal = muscles.reduce((acc, muscle) => {
-      acc[muscle] = { min: 400, max: 600 }; // Default MyoWare 2.0 range
-      return acc;
-    }, {} as { [key: string]: { min: number; max: number } });
+    // Initialize calibration data with default range for single sensor
+    const defaultCal = {
+      muscleActivity: { min: 400, max: 600 } // Default MyoWare 2.0 range
+    };
     
     setCalibrationData(defaultCal);
     
@@ -259,20 +363,10 @@ export default function EMGPage() {
 
   // Calculate average muscle activation
   const calculateAverageActivation = () => {
-    if (emgData.length === 0) return {};
+    if (emgData.length === 0) return 0;
     
-    const muscles = ['leftBicep', 'rightBicep', 'leftTricep', 'rightTricep', 
-                    'leftForearm', 'rightForearm', 'leftQuad', 'rightQuad', 
-                    'leftHamstring', 'rightHamstring', 'leftCalf', 'rightCalf'];
-    
-    const averages: { [key: string]: number } = {};
-    
-    muscles.forEach(muscle => {
-      const sum = emgData.reduce((acc, data) => acc + (data as any)[muscle + 'Processed'], 0);
-      averages[muscle] = sum / emgData.length;
-    });
-    
-    return averages;
+    const sum = emgData.reduce((acc, data) => acc + data.muscleActivityProcessed, 0);
+    return sum / emgData.length;
   };
 
   // Format time
@@ -420,61 +514,48 @@ export default function EMGPage() {
                       {isCalibrating && (
                         <div className="p-3 rounded-lg bg-orange-500/20 border border-orange-500/30 mb-4">
                           <p className="text-orange-200 text-sm">
-                            🔧 Calibrating sensors... Please contract and relax your muscles for 5 seconds.
+                            🔧 Calibrating sensor... Please contract and relax your muscles for 5 seconds.
                           </p>
                         </div>
                       )}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {['leftBicep', 'rightBicep', 'leftTricep', 'rightTricep', 'leftForearm', 'rightForearm', 'leftQuad', 'rightQuad', 'leftHamstring', 'rightHamstring', 'leftCalf', 'rightCalf'].map((muscle) => {
-                        const rawValue = (currentData as any)[muscle];
-                        const processedValue = (currentData as any)[muscle + 'Processed'];
-                        const cal = calibrationData[muscle];
-                        
-                        return (
-                          <div key={muscle} className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <div className="text-sm text-gray-400 mb-2 capitalize">
-                              {muscle.replace(/([A-Z])/g, ' $1').trim()}
-                            </div>
-                            
-                            {/* Raw MyoWare 2.0 Data */}
-                            <div className="mb-3">
-                              <div className="text-xs text-gray-500 mb-1">Raw (0-1023)</div>
-                              <div className="text-lg font-semibold text-blue-400">
-                                {rawValue}
-                              </div>
-                              <div className="w-full bg-gray-700 rounded-full h-1.5 mt-1">
-                                <div 
-                                  className="bg-gradient-to-r from-blue-400 to-cyan-500 h-1.5 rounded-full transition-all duration-200"
-                                  style={{ width: `${Math.min((rawValue / 1023) * 100, 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                            
-                            {/* Processed Percentage */}
-                            <div className="mb-2">
-                              <div className="text-xs text-gray-500 mb-1">Processed (%)</div>
-                              <div className="text-xl font-bold text-white">
-                                {processedValue.toFixed(1)}%
-                              </div>
-                              <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
-                                <div 
-                                  className="bg-gradient-to-r from-green-400 to-emerald-500 h-2 rounded-full transition-all duration-200"
-                                  style={{ width: `${Math.min(processedValue, 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                            
-                            {/* Calibration Range */}
-                            {cal && (
-                              <div className="text-xs text-gray-500">
-                                Range: {cal.min}-{cal.max}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Raw MyoWare 2.0 Data */}
+                      <div className="p-6 rounded-lg bg-white/5 border border-white/10">
+                        <div className="text-lg font-medium text-white mb-4">Raw Sensor Data</div>
+                        <div className="text-3xl font-bold text-blue-400 mb-2">
+                          {currentData.muscleActivity}
+                        </div>
+                        <div className="text-sm text-gray-400 mb-4">Analog Value (0-1023)</div>
+                        <div className="w-full bg-gray-700 rounded-full h-3">
+                          <div 
+                            className="bg-gradient-to-r from-blue-400 to-cyan-500 h-3 rounded-full transition-all duration-200"
+                            style={{ width: `${Math.min((currentData.muscleActivity / 1023) * 100, 100)}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 mt-2">
+                          Voltage: {(currentData.muscleActivity * 5 / 1023).toFixed(2)}V
+                        </div>
+                      </div>
+                      
+                      {/* Processed Percentage */}
+                      <div className="p-6 rounded-lg bg-white/5 border border-white/10">
+                        <div className="text-lg font-medium text-white mb-4">Muscle Activation</div>
+                        <div className="text-4xl font-bold text-green-400 mb-2">
+                          {currentData.muscleActivityProcessed.toFixed(1)}%
+                        </div>
+                        <div className="text-sm text-gray-400 mb-4">Processed Percentage</div>
+                        <div className="w-full bg-gray-700 rounded-full h-3">
+                          <div 
+                            className="bg-gradient-to-r from-green-400 to-emerald-500 h-3 rounded-full transition-all duration-200"
+                            style={{ width: `${Math.min(currentData.muscleActivityProcessed, 100)}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 mt-2">
+                          Range: {calibrationData.muscleActivity?.min || 400}-{calibrationData.muscleActivity?.max || 600}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -533,6 +614,9 @@ export default function EMGPage() {
                           <h3 className="font-medium text-white">{session.exercise.name}</h3>
                           <p className="text-sm text-gray-300">
                             {formatTime(session.duration)} • {session.dataPoints} data points
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Avg Activation: {session.avgMuscleActivation.toFixed(1)}%
                           </p>
                         </div>
                         <div className="text-right">
