@@ -12,6 +12,7 @@ interface MyoWareData {
 interface MyoWareClientProps {
   onDataReceived: (data: MyoWareData) => void;
   onConnectionChange: (connected: boolean) => void;
+  deviceConnected?: boolean; // server-verified connection state from parent
 }
 
 interface MyoWareDevice {
@@ -22,7 +23,7 @@ interface MyoWareDevice {
   lastSeen: number;
 }
 
-export default function MyoWareClient({ onDataReceived, onConnectionChange }: MyoWareClientProps) {
+export default function MyoWareClient({ onDataReceived, onConnectionChange, deviceConnected }: MyoWareClientProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [serverUrl, setServerUrl] = useState<string>('');
@@ -44,6 +45,13 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange }: My
     discoverDevices();
   }, []);
 
+  // Derive UI status from parent-verified connectivity when provided
+  const effectiveStatus: 'disconnected' | 'connecting' | 'connected' = deviceConnected
+    ? 'connected'
+    : connectionStatus === 'connecting'
+      ? 'connecting'
+      : 'disconnected';
+
   // Discover MyoWare devices on local network
   const discoverDevices = async () => {
     setConnectionStatus('connecting');
@@ -61,14 +69,9 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange }: My
       setDiscoveredDevices(devices);
       setSelectedDevice(devices[0]);
       
-      // Immediately connect since we know the server is running
-      setConnectionStatus('connected');
-      console.log('Connected to EMG Server (Local)');
-      
-      // Notify parent component
-      if (onConnectionChange) {
-        onConnectionChange(true);
-      }
+      // Keep in connecting until server confirms via parent
+      setConnectionStatus('connecting');
+      console.log('Discovered EMG Server (Local)');
     } catch (error) {
       console.error('Device discovery failed:', error);
       setConnectionStatus('disconnected');
@@ -79,25 +82,16 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange }: My
   const connectToDevice = async (device: MyoWareDevice) => {
     if (!device) return;
     
-    setConnectionStatus('connected');
+    setConnectionStatus('connecting');
     setSelectedDevice(device);
-    console.log('Connected to MyoWare device:', device.name);
-    
-    // Notify parent component
-    if (onConnectionChange) {
-      onConnectionChange(true);
-    }
+    console.log('Attempting device connection:', device.name);
   };
 
   // Connect to server (simplified for HTTP polling)
   const connectToServer = () => {
-    setConnectionStatus('connected');
+    setConnectionStatus('connecting');
     setIsConnected(true);
-    console.log('Connected to EMG server via HTTP polling');
-    
-    if (onConnectionChange) {
-      onConnectionChange(true);
-    }
+    console.log('Initiated EMG server connection (HTTP polling)');
   };
 
   // Disconnect from server
@@ -153,13 +147,13 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange }: My
       {/* Connection Status */}
       <div className="flex items-center gap-3 mb-4">
         <div className={`w-3 h-3 rounded-full ${
-          connectionStatus === 'connected' ? 'bg-green-400 animate-pulse' :
-          connectionStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' :
+          effectiveStatus === 'connected' ? 'bg-green-400 animate-pulse' :
+          effectiveStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' :
           'bg-red-400'
         }`} />
         <span className="text-sm text-gray-300">
-          {connectionStatus === 'connected' ? 'Connected' :
-           connectionStatus === 'connecting' ? 'Connecting...' :
+          {effectiveStatus === 'connected' ? 'Connected' :
+           effectiveStatus === 'connecting' ? 'Connecting...' :
            'Disconnected'}
         </span>
         {selectedDevice && (

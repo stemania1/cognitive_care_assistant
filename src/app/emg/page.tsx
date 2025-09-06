@@ -309,44 +309,7 @@ export default function EMGPage() {
     return normalized;
   };
 
-  // Simulate MyoWare 2.0 EMG data generation
-  const generateEMGData = (): EMGData => {
-    const now = Date.now();
-    
-    // Generate raw MyoWare 2.0 analog value (0-1023)
-    const muscleActivity = Math.floor(Math.random() * 200) + 400; // 400-600 range
-    
-    // Process raw data to percentage
-    const muscleActivityProcessed = processMyoWareData(muscleActivity);
-
-    return {
-      timestamp: now,
-      muscleActivity,
-      muscleActivityProcessed,
-    };
-  };
-
-  // Start EMG data simulation
-  const startEMGSimulation = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    
-    intervalRef.current = setInterval(() => {
-      const newData = generateEMGData();
-      setCurrentData(newData);
-      
-      if (isRecording) {
-        setEmgData(prev => [...prev, newData]);
-      }
-    }, 100); // 10Hz sampling rate
-  };
-
-  // Stop EMG data simulation
-  const stopEMGSimulation = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  };
+  // Note: Simulation functions removed - only real MyoWare device data is used
 
   // Handle real MyoWare data
   const handleMyoWareData = (data: EMGData) => {
@@ -360,10 +323,49 @@ export default function EMGPage() {
   // Fetch real-time data from API
   const fetchRealTimeData = async () => {
     try {
-      const response = await fetch('/api/emg/data');
+      console.log('Fetching EMG data from /api/emg/data...');
+      const response = await fetch('/api/emg/data', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-cache'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       console.log('Fetched EMG data:', data); // Debug log
+      console.log('Connection status:', data.isConnected, 'Data count:', data.data?.length || 0);
+      
+      // Update connection status based on actual data availability
+      const hasRecentData = (data.data && data.data.length > 0);
+      const hasRecentHeartbeat = data.timeSinceLastHeartbeat < 30000; // 30 seconds
+      
+      console.log('Connection check:', {
+        isConnected: data.isConnected,
+        dataCount: data.data?.length || 0,
+        hasRecentData,
+        hasRecentHeartbeat,
+        timeSinceLastHeartbeat: data.timeSinceLastHeartbeat
+      });
+      
+      // Consider connected if we have recent data OR a recent heartbeat
+      if (hasRecentData || hasRecentHeartbeat) {
+        if (!isMyoWareConnected) {
+          setIsMyoWareConnected(true);
+          console.log('MyoWare device connected - starting data collection');
+        }
+      } else {
+        if (isMyoWareConnected) {
+          setIsMyoWareConnected(false);
+          console.log('MyoWare device disconnected - no recent data or server not connected');
+        }
+        return; // Stop processing if no device connected
+      }
       
       if (data.data && data.data.length > 0) {
         // Get the latest data point
@@ -388,68 +390,146 @@ export default function EMGPage() {
           setEmgData(prev => [...prev, emgData]);
         }
       } else {
-        console.log('No EMG data available'); // Debug log
+        console.log('No EMG data available - device may be connected but not sending data'); // Debug log
       }
     } catch (error) {
       console.error('Failed to fetch real-time data:', error);
+      
+      // Handle error with proper typing
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+      } else {
+        console.error('Unknown error type:', error);
+      }
+      
+      // If we can't fetch data, assume device is disconnected
+      if (isMyoWareConnected) {
+        setIsMyoWareConnected(false);
+        console.log('Lost connection to EMG server');
+      }
     }
   };
 
   // Poll for real-time data
   useEffect(() => {
-    if (isMyoWareConnected) {
-      const interval = setInterval(fetchRealTimeData, 500); // Poll every 500ms for faster updates
-      return () => clearInterval(interval);
-    }
-  }, [isMyoWareConnected, isRecording]);
+    // Always poll for data to detect device connection/disconnection
+    const interval = setInterval(fetchRealTimeData, 1000); // Poll every 1 second for device detection
+    
+    return () => clearInterval(interval);
+  }, [isRecording]);
 
   // Auto-connect to MyoWare when page loads
   useEffect(() => {
+    // Reset connection state on page load
+    setIsMyoWareConnected(false);
+    setUseRealData(false);
+    setIsConnected(false);
+    
     const autoConnect = async () => {
       try {
-        const response = await fetch('/api/emg/ws');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.status && data.status.includes('EMG WebSocket server')) {
-            setIsMyoWareConnected(true);
-            setUseRealData(true);
-            console.log('Auto-connected to MyoWare server');
+        console.log('Auto-connecting to MyoWare...');
+        
+        // First check if the EMG server is running
+        const wsResponse = await fetch('/api/emg/ws', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-cache'
+        });
+        
+        if (wsResponse.ok) {
+          const wsData = await wsResponse.json();
+          console.log('EMG WebSocket server status:', wsData);
+          
+          // Then check if there's actual EMG data available
+          const dataResponse = await fetch('/api/emg/data', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            cache: 'no-cache'
+          });
+          
+          if (dataResponse.ok) {
+            const dataData = await dataResponse.json();
+            console.log('EMG data status:', dataData);
+            
+            // Only connect if we have actual data AND the server says it's connected
+            if (dataData.isConnected && dataData.data && dataData.data.length > 0) {
+              setIsMyoWareConnected(true);
+              setUseRealData(true);
+              console.log('Auto-connected to MyoWare device with data');
+            } else {
+              console.log('EMG server running but no device connected');
+              setIsMyoWareConnected(false);
+              setUseRealData(false);
+            }
+          } else {
+            console.log('Failed to fetch EMG data during auto-connect');
+            setIsMyoWareConnected(false);
+            setUseRealData(false);
           }
+        } else {
+          console.log('EMG WebSocket server not responding');
+          setIsMyoWareConnected(false);
+          setUseRealData(false);
         }
       } catch (error) {
-        console.log('MyoWare server not available for auto-connect');
+        console.log('MyoWare server not available for auto-connect:', error);
+        
+        // Handle error with proper typing
+        if (error instanceof Error) {
+          console.error('Auto-connect error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          });
+        } else {
+          console.error('Unknown auto-connect error type:', error);
+        }
+        
+        setIsMyoWareConnected(false);
+        setUseRealData(false);
       }
     };
     
-    autoConnect();
+    // Check connection after a short delay
+    setTimeout(autoConnect, 1000);
   }, []);
 
   // Handle MyoWare connection changes
   const handleMyoWareConnection = (connected: boolean) => {
-    setIsMyoWareConnected(connected);
-    if (connected) {
-      setUseRealData(true);
-      stopEMGSimulation(); // Stop simulation when real data is available
-    } else {
-      setUseRealData(false);
+    // Do NOT set connected=true here. We only trust server data to mark connected.
+    if (!connected) {
+      if (isMyoWareConnected) {
+        setIsMyoWareConnected(false);
+      }
       if (isConnected) {
-        startEMGSimulation(); // Resume simulation if needed
+        // If device disconnects while recording, stop recording
+        setIsConnected(false);
+        console.log('MyoWare device disconnected - stopping recording');
       }
     }
   };
 
   // Connect to EMG sensors
   const connectEMG = () => {
-    setIsConnected(true);
-    if (!useRealData) {
-      startEMGSimulation();
+    // Only allow connection if we have a real MyoWare device
+    if (isMyoWareConnected) {
+      setIsConnected(true);
+    } else {
+      console.log('Cannot connect: No MyoWare device detected');
     }
   };
 
   // Disconnect from EMG sensors
   const disconnectEMG = () => {
     setIsConnected(false);
-    stopEMGSimulation();
     setCurrentData(null);
   };
 
@@ -578,7 +658,10 @@ export default function EMGPage() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopEMGSimulation();
+      // Cleanup any active intervals
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
   }, []);
 
@@ -593,20 +676,14 @@ export default function EMGPage() {
               <p className="text-gray-300">Monitor muscle activation during exercises</p>
             </div>
             <div className="flex items-center gap-4">
-              <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+              <div className={`w-3 h-3 rounded-full ${isMyoWareConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
               <span className="text-sm text-gray-300">
-                {isConnected ? 'EMG Connected' : 'EMG Disconnected'}
+                {isMyoWareConnected ? 'MyoWare Device Connected' : 'No MyoWare Device Detected'}
               </span>
-              {isMyoWareConnected && (
+              {isMyoWareConnected && isConnected && (
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-                  <span className="text-xs text-blue-300">Real MyoWare Data</span>
-                </div>
-              )}
-              {!isMyoWareConnected && isConnected && (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-yellow-400 rounded-full" />
-                  <span className="text-xs text-yellow-300">Simulated Data</span>
+                  <span className="text-xs text-blue-300">Recording Active</span>
                 </div>
               )}
             </div>
@@ -629,12 +706,16 @@ export default function EMGPage() {
           
           {/* Connection Controls */}
           <div className="flex gap-4 flex-wrap">
-            {!isConnected ? (
+            {!isMyoWareConnected ? (
+              <div className="px-6 py-3 bg-gray-600 text-gray-300 rounded-lg font-medium">
+                Waiting for MyoWare Device...
+              </div>
+            ) : !isConnected ? (
               <button
                 onClick={connectEMG}
                 className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-600 transition-all duration-200"
               >
-                Connect MyoWare 2.0 Sensors
+                Start Recording
               </button>
             ) : (
               <>
@@ -642,7 +723,7 @@ export default function EMGPage() {
                   onClick={disconnectEMG}
                   className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200"
                 >
-                  Disconnect EMG
+                  Stop Recording
                 </button>
                 <button
                   onClick={isCalibrating ? stopCalibration : startCalibration}
@@ -665,31 +746,17 @@ export default function EMGPage() {
             <MyoWareClient 
               onDataReceived={handleMyoWareData}
               onConnectionChange={handleMyoWareConnection}
+              deviceConnected={isMyoWareConnected}
             />
             
-            {/* Manual Connect Button for Testing */}
+            {/* Device Help */}
             <div className="mt-4 p-4 bg-gray-800 rounded-lg">
-              <h3 className="text-lg font-semibold text-white mb-2">Debug Controls</h3>
-              <button
-                onClick={() => {
-                  setIsMyoWareConnected(true);
-                  setUseRealData(true);
-                  console.log('Manually connected to MyoWare');
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2"
-              >
-                Force Connect MyoWare
-              </button>
-              <button
-                onClick={() => {
-                  setIsMyoWareConnected(false);
-                  setUseRealData(false);
-                  console.log('Manually disconnected from MyoWare');
-                }}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Disconnect MyoWare
-              </button>
+              <h3 className="text-lg font-semibold text-white mb-2">Device Connection Help</h3>
+              <div className="text-xs text-gray-400 space-y-1">
+                <p>• Power on the MyoWare device</p>
+                <p>• Ensure it is connected to the same WiFi network</p>
+                <p>• The device must POST to /api/emg/ws with type "heartbeat" and "emg_data"</p>
+              </div>
             </div>
           </div>
 
@@ -766,10 +833,12 @@ export default function EMGPage() {
                   {/* Start Workout Button */}
                   <button
                     onClick={startWorkout}
-                    disabled={!isConnected || currentWorkout !== null}
+                    disabled={!isMyoWareConnected || !isConnected || currentWorkout !== null}
                     className="w-full py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {currentWorkout ? 'Workout in Progress' : 'Start Workout'}
+                    {!isMyoWareConnected ? 'Connect MyoWare Device First' : 
+                     !isConnected ? 'Start Recording First' :
+                     currentWorkout ? 'Workout in Progress' : 'Start Workout'}
                   </button>
                 </div>
                 
@@ -846,14 +915,44 @@ export default function EMGPage() {
                 </div>
 
                 {/* Real-time EMG Data */}
-                {currentData && (
+                {!isMyoWareConnected ? (
+                  <div className="mb-6 p-6 rounded-lg bg-gray-800 border border-gray-700">
+                    <div className="text-center">
+                      <div className="text-4xl mb-4">🔌</div>
+                      <h3 className="text-lg font-medium text-gray-300 mb-2">No MyoWare Device Connected</h3>
+                      <p className="text-sm text-gray-400 mb-4">
+                        Connect your MyoWare 2.0 device to start monitoring muscle activity
+                      </p>
+                      <div className="text-xs text-gray-500">
+                        <p>• Make sure your device is powered on</p>
+                        <p>• Check that it's connected to WiFi</p>
+                        <p>• Verify the device is sending data to the server</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : currentData && (
                   <div className="mb-6">
                     <div className="mb-4">
-                      <h3 className="text-lg font-medium text-white mb-2">MyoWare 2.0 Sensor Data</h3>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-medium text-white">MyoWare 2.0 Sensor Data</h3>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full ${isMyoWareConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+                          <span className={`text-sm ${isMyoWareConnected ? 'text-green-200' : 'text-red-200'}`}>
+                            {isMyoWareConnected ? 'Connected' : 'Disconnected'}
+                          </span>
+                        </div>
+                      </div>
                       {isCalibrating && (
                         <div className="p-3 rounded-lg bg-orange-500/20 border border-orange-500/30 mb-4">
                           <p className="text-orange-200 text-sm">
                             🔧 Calibrating sensor... Please contract and relax your muscles for 5 seconds.
+                          </p>
+                        </div>
+                      )}
+                      {!isMyoWareConnected && (
+                        <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 mb-4">
+                          <p className="text-red-200 text-sm">
+                            ⚠️ MyoWare sensor disconnected. Turn on the sensor to resume data collection.
                           </p>
                         </div>
                       )}
@@ -902,7 +1001,7 @@ export default function EMGPage() {
                 {/* EMG Chart */}
                 <div className="mb-6">
                   <EMGChart 
-                    data={chartData} 
+                    data={isMyoWareConnected ? chartData : []} 
                     isConnected={isMyoWareConnected} 
                   />
                 </div>

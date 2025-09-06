@@ -21,10 +21,16 @@ export function updateHeartbeat() {
 }
 
 export function getEMGData() {
+  const now = Date.now();
+  const timeSinceLastHeartbeat = now - lastHeartbeat;
+  const isConnected = timeSinceLastHeartbeat < 30000; // 30 seconds timeout
+  
   return {
     data: emgData.slice(-50), // Return last 50 data points for chart
     calibration: calibrationData,
     lastHeartbeat: lastHeartbeat,
-    dataCount: emgData.length
+    dataCount: emgData.length,
+    isConnected: isConnected,
+    timeSinceLastHeartbeat: timeSinceLastHeartbeat
   };
 }

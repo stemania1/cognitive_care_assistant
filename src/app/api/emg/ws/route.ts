@@ -44,6 +44,9 @@ export async function POST(request: NextRequest) {
         
         emgData.push(emgEntry);
         storeEMGData(emgEntry);
+        // Update heartbeat on data receipt to reflect active device
+        lastHeartbeat = Date.now();
+        updateHeartbeat();
         
         // Keep only last 1000 entries
         if (emgData.length > 1000) {
