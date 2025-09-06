@@ -17,6 +17,9 @@ interface WorkoutExercise {
   targetMuscles: string[];
   description: string;
   instructions: string[];
+  myoWareSuitable: boolean; // Whether this workout benefits from MyoWare monitoring
+  myoWareReason: string; // Why MyoWare is useful for this workout
+  sensorPlacement: string; // Where to place the MyoWare sensor
 }
 
 const WORKOUT_ROUTINES: WorkoutExercise[] = [
@@ -33,7 +36,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Gently twist torso left, then right',
       'Reach arms overhead and stretch',
       'End with 3 more deep breaths'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Monitor arm muscle activation during overhead reaches and shoulder rolls',
+    sensorPlacement: 'Place on upper arm (bicep) to track arm movement intensity'
   },
   {
     id: 'chair_arm_swings',
@@ -48,7 +54,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Add gentle arm circles forward',
       'Switch to backward arm circles',
       'Keep rhythm steady and comfortable'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Track arm swing intensity and rhythm consistency',
+    sensorPlacement: 'Place on upper arm (bicep) to monitor arm movement patterns'
   },
   {
     id: 'balance_posture',
@@ -63,7 +72,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Lift toes up, hold for 3 seconds',
       'Step to the side, return to center',
       'Repeat sequence 3-5 times'
-    ]
+    ],
+    myoWareSuitable: false,
+    myoWareReason: 'This workout focuses on leg and balance movements, not arm muscles',
+    sensorPlacement: 'Not recommended - focus on leg exercises'
   },
   {
     id: 'finger_wrist_hand',
@@ -78,7 +90,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Squeeze imaginary soft ball',
       'Open and close hands slowly',
       'Repeat each movement 10 times'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Monitor forearm muscle activation during finger and wrist movements',
+    sensorPlacement: 'Place on forearm to track fine motor muscle activity'
   },
   {
     id: 'leg_foot_movement',
@@ -93,7 +108,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Make ankle circles clockwise and counterclockwise',
       'Seated kicks - lift knee up gently',
       'Repeat each movement 10 times per leg'
-    ]
+    ],
+    myoWareSuitable: false,
+    myoWareReason: 'This workout focuses on leg movements, not arm muscles',
+    sensorPlacement: 'Not recommended - focus on leg exercises'
   },
   {
     id: 'yoga_flow',
@@ -108,7 +126,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Return to center, repeat on left side',
       'Interlace fingers, reach arms overhead',
       'Gently twist spine left and right'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Track arm muscle engagement during stretches and poses',
+    sensorPlacement: 'Place on upper arm (bicep) to monitor stretch intensity'
   },
   {
     id: 'dance_clap_music',
@@ -123,7 +144,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Tap feet to the rhythm',
       'Add gentle head movements',
       'Enjoy the joyful movement!'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Monitor arm movement intensity and rhythm consistency',
+    sensorPlacement: 'Place on upper arm (bicep) to track dance movements'
   },
   {
     id: 'hoop_ball_play',
@@ -138,7 +162,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Pass ball from hand to hand',
       'Try gentle overhead passes',
       'Keep movements smooth and controlled'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Track arm coordination and ball handling movements',
+    sensorPlacement: 'Place on upper arm (bicep) to monitor ball play movements'
   },
   {
     id: 'lifting_weights',
@@ -153,7 +180,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Raise arms out to sides',
       'Press weights overhead gently',
       'Repeat each movement 8-10 times'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Perfect for monitoring muscle activation during weight lifting',
+    sensorPlacement: 'Place on upper arm (bicep) to track lifting intensity'
   },
   {
     id: 'visual_memory_game',
@@ -168,7 +198,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Touch knees when hearing "apple"',
       'Touch head when hearing "hat"',
       'Keep movements fun and engaging'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Monitor arm movement patterns during memory-based exercises',
+    sensorPlacement: 'Place on upper arm (bicep) to track reaching movements'
   },
   {
     id: 'neck_gentle_stretch',
@@ -183,7 +216,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Roll shoulders backward slowly',
       'Gently twist neck left and right',
       'End with gentle head nods'
-    ]
+    ],
+    myoWareSuitable: false,
+    myoWareReason: 'This workout focuses on neck and shoulder movements, not arm muscles',
+    sensorPlacement: 'Not recommended - focus on neck and shoulder exercises'
   },
   {
     id: 'mini_tai_chi',
@@ -198,7 +234,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Scoop the air with cupped hands',
       'Move in slow, flowing motions',
       'Focus on smooth, continuous movement'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Track smooth, flowing arm movements and muscle control',
+    sensorPlacement: 'Place on upper arm (bicep) to monitor Tai Chi movements'
   },
   {
     id: 'foot_strength_balance',
@@ -213,7 +252,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Do mini squats with support',
       'Stand on one foot briefly',
       'Always use counter for safety'
-    ]
+    ],
+    myoWareSuitable: false,
+    myoWareReason: 'This workout focuses on leg and balance movements, not arm muscles',
+    sensorPlacement: 'Not recommended - focus on leg exercises'
   },
   {
     id: 'mindful_breathing',
@@ -228,7 +270,10 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
       'Relax hands and face muscles',
       'Focus on slow, deep breathing',
       'End with 3 deep inhales and exhales'
-    ]
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Monitor gentle arm movements synchronized with breathing',
+    sensorPlacement: 'Place on upper arm (bicep) to track breathing movements'
   }
 ];
 
@@ -458,6 +503,21 @@ export default function EMGPage() {
             </div>
           </div>
           
+          {/* MyoWare Guidance */}
+          <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="text-blue-400 text-xl">💡</div>
+              <div>
+                <h3 className="text-sm font-medium text-blue-200 mb-2">MyoWare 2.0 Sensor Guidance</h3>
+                <div className="text-xs text-gray-300 space-y-1">
+                  <p><span className="text-green-400">●</span> <strong>Green workouts</strong> are perfect for MyoWare monitoring - they involve arm movements that the sensor can track effectively.</p>
+                  <p><span className="text-orange-400">●</span> <strong>Orange workouts</strong> focus on other body parts (legs, neck, balance) where MyoWare won't provide useful data.</p>
+                  <p><strong>Sensor placement:</strong> For arm-focused workouts, place the MyoWare sensor on your upper arm (bicep) for best results.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           {/* Connection Controls */}
           <div className="flex gap-4 flex-wrap">
             {!isConnected ? (
@@ -512,6 +572,36 @@ export default function EMGPage() {
                     </p>
                     <div className="text-xs text-gray-400 mb-4">
                       Duration: {formatTime(WORKOUT_ROUTINES[currentWorkoutIndex].duration)}
+                    </div>
+                    
+                    {/* MyoWare Suitability Indicator */}
+                    <div className={`p-3 rounded-lg mb-4 ${
+                      WORKOUT_ROUTINES[currentWorkoutIndex].myoWareSuitable 
+                        ? 'bg-green-500/20 border border-green-500/30' 
+                        : 'bg-orange-500/20 border border-orange-500/30'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-3 h-3 rounded-full ${
+                          WORKOUT_ROUTINES[currentWorkoutIndex].myoWareSuitable 
+                            ? 'bg-green-400' 
+                            : 'bg-orange-400'
+                        }`} />
+                        <span className={`text-sm font-medium ${
+                          WORKOUT_ROUTINES[currentWorkoutIndex].myoWareSuitable 
+                            ? 'text-green-200' 
+                            : 'text-orange-200'
+                        }`}>
+                          {WORKOUT_ROUTINES[currentWorkoutIndex].myoWareSuitable 
+                            ? 'MyoWare Recommended' 
+                            : 'MyoWare Not Needed'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-300 mb-2">
+                        {WORKOUT_ROUTINES[currentWorkoutIndex].myoWareReason}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {WORKOUT_ROUTINES[currentWorkoutIndex].sensorPlacement}
+                      </p>
                     </div>
                   </div>
                   
@@ -569,11 +659,21 @@ export default function EMGPage() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium">{exercise.name}</div>
-                          <div className="text-xs text-gray-400">
-                            {formatTime(exercise.duration)}
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <div className="text-sm font-medium">{exercise.name}</div>
+                            <div className="text-xs text-gray-400">
+                              {formatTime(exercise.duration)}
+                            </div>
                           </div>
+                          {/* MyoWare Indicator */}
+                          <div className={`w-2 h-2 rounded-full ${
+                            exercise.myoWareSuitable ? 'bg-green-400' : 'bg-orange-400'
+                          }`} title={
+                            exercise.myoWareSuitable 
+                              ? 'MyoWare Recommended' 
+                              : 'MyoWare Not Needed'
+                          } />
                         </div>
                         {index === currentWorkoutIndex && (
                           <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
