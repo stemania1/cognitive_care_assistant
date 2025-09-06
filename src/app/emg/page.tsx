@@ -242,6 +242,7 @@ export default function EMGPage() {
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
   const [calibrationData, setCalibrationData] = useState<{ [key: string]: { min: number; max: number } }>({});
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -310,8 +311,22 @@ export default function EMGPage() {
     setCurrentData(null);
   };
 
+  // Navigation functions
+  const nextWorkout = () => {
+    setCurrentWorkoutIndex((prev) => (prev + 1) % WORKOUT_ROUTINES.length);
+  };
+
+  const prevWorkout = () => {
+    setCurrentWorkoutIndex((prev) => (prev - 1 + WORKOUT_ROUTINES.length) % WORKOUT_ROUTINES.length);
+  };
+
+  const selectWorkout = (index: number) => {
+    setCurrentWorkoutIndex(index);
+  };
+
   // Start workout
-  const startWorkout = (exercise: WorkoutExercise) => {
+  const startWorkout = () => {
+    const exercise = WORKOUT_ROUTINES[currentWorkoutIndex];
     setCurrentWorkout(exercise);
     setWorkoutTime(0);
     setEmgData([]);
@@ -398,6 +413,26 @@ export default function EMGPage() {
     };
   }, [currentWorkout, isRecording]);
 
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') {
+        prevWorkout();
+      } else if (event.key === 'ArrowRight') {
+        nextWorkout();
+      } else if (event.key === 'Enter' && !currentWorkout) {
+        startWorkout();
+      } else if (event.key === 'Escape' && currentWorkout) {
+        stopWorkout();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [currentWorkout]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -456,33 +491,95 @@ export default function EMGPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Workout Routines */}
+          {/* Workout Selection */}
           <div className="lg:col-span-1">
             <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-blue-500/10 via-purple-500/5 to-pink-500/10 blur-xl" />
               <div className="relative">
-                <h2 className="text-xl font-semibold mb-6">Workout Routines</h2>
-                <div className="space-y-4">
-                  {WORKOUT_ROUTINES.map((exercise) => (
-                    <div
-                      key={exercise.id}
-                      className="p-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors duration-200"
-                    >
-                      <h3 className="font-medium text-white mb-2">{exercise.name}</h3>
-                      <p className="text-sm text-gray-300 mb-3">{exercise.description}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-400">
-                          {exercise.duration}s • {exercise.targetMuscles.length} muscles
-                        </span>
-                        <button
-                          onClick={() => startWorkout(exercise)}
-                          disabled={!isConnected || currentWorkout !== null}
-                          className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Start
-                        </button>
-                      </div>
+                <h2 className="text-xl font-semibold mb-6">Select Workout</h2>
+                
+                {/* Current Workout Display */}
+                <div className="p-6 rounded-lg border border-white/20 bg-white/10 mb-6">
+                  <div className="text-center mb-4">
+                    <div className="text-sm text-gray-400 mb-2">
+                      Workout {currentWorkoutIndex + 1} of {WORKOUT_ROUTINES.length}
                     </div>
+                    <h3 className="text-xl font-semibold text-white mb-2">
+                      {WORKOUT_ROUTINES[currentWorkoutIndex].name}
+                    </h3>
+                    <p className="text-sm text-gray-300 mb-4">
+                      {WORKOUT_ROUTINES[currentWorkoutIndex].description}
+                    </p>
+                    <div className="text-xs text-gray-400 mb-4">
+                      Duration: {formatTime(WORKOUT_ROUTINES[currentWorkoutIndex].duration)}
+                    </div>
+                  </div>
+                  
+                  {/* Navigation Buttons */}
+                  <div className="flex gap-2 mb-4">
+                    <button
+                      onClick={prevWorkout}
+                      className="flex-1 py-2 px-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white text-sm rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all duration-200"
+                    >
+                      ← Previous
+                    </button>
+                    <button
+                      onClick={nextWorkout}
+                      className="flex-1 py-2 px-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white text-sm rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all duration-200"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                  
+                  {/* Start Workout Button */}
+                  <button
+                    onClick={startWorkout}
+                    disabled={!isConnected || currentWorkout !== null}
+                    className="w-full py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {currentWorkout ? 'Workout in Progress' : 'Start Workout'}
+                  </button>
+                </div>
+                
+                {/* Workout List (Collapsed) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-sm font-medium text-gray-300">All Workouts:</div>
+                    <div className="text-xs text-gray-400">
+                      {currentWorkoutIndex + 1}/{WORKOUT_ROUTINES.length}
+                    </div>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full bg-gray-700 rounded-full h-2 mb-4">
+                    <div 
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${((currentWorkoutIndex + 1) / WORKOUT_ROUTINES.length) * 100}%` }}
+                    />
+                  </div>
+                  
+                  {WORKOUT_ROUTINES.map((exercise, index) => (
+                    <button
+                      key={exercise.id}
+                      onClick={() => selectWorkout(index)}
+                      className={`w-full p-3 rounded-lg text-left transition-all duration-200 ${
+                        index === currentWorkoutIndex
+                          ? 'bg-blue-500/20 border border-blue-500/30 text-blue-200'
+                          : 'bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">{exercise.name}</div>
+                          <div className="text-xs text-gray-400">
+                            {formatTime(exercise.duration)}
+                          </div>
+                        </div>
+                        {index === currentWorkoutIndex && (
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                        )}
+                      </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -561,21 +658,28 @@ export default function EMGPage() {
                 )}
 
                 {/* Workout Instructions */}
-                {currentWorkout && (
-                  <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10">
-                    <h3 className="font-medium text-white mb-3">Exercise Instructions</h3>
-                    <ul className="space-y-2">
-                      {currentWorkout.instructions.map((instruction, index) => (
-                        <li key={index} className="text-sm text-gray-300 flex items-start">
-                          <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-3 mt-0.5 flex-shrink-0">
-                            {index + 1}
-                          </span>
-                          {instruction}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10">
+                  <h3 className="font-medium text-white mb-3">
+                    {currentWorkout ? 'Exercise Instructions' : 'Workout Preview'}
+                  </h3>
+                  <ul className="space-y-2">
+                    {(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).instructions.map((instruction, index) => (
+                      <li key={index} className="text-sm text-gray-300 flex items-start">
+                        <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-3 mt-0.5 flex-shrink-0">
+                          {index + 1}
+                        </span>
+                        {instruction}
+                      </li>
+                    ))}
+                  </ul>
+                  {!currentWorkout && (
+                    <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <p className="text-sm text-blue-200">
+                        💡 Use arrow keys to navigate between workouts, Enter to start, or click the buttons above.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Workout Controls */}
                 {currentWorkout && (
@@ -590,7 +694,7 @@ export default function EMGPage() {
                       <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`} />
                       <span className="text-sm text-gray-300">
                         {isRecording ? 'Recording' : 'Not Recording'}
-                      </span>
+        </span>
                     </div>
                   </div>
                 )}
@@ -643,7 +747,7 @@ export default function EMGPage() {
               <span className="text-lg font-medium">Return to Dashboard</span>
               <span className="text-xl opacity-60 transition-transform group-hover:translate-x-1">→</span>
             </div>
-          </Link>
+      </Link>
         </div>
       </div>
     </div>
