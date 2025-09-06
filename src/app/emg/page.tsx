@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from "next/link";
+import MyoWareClient from '../components/MyoWareClient';
 
 interface EMGData {
   timestamp: number;
@@ -288,6 +289,8 @@ export default function EMGPage() {
   const [calibrationData, setCalibrationData] = useState<{ [key: string]: { min: number; max: number } }>({});
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
+  const [isMyoWareConnected, setIsMyoWareConnected] = useState(false);
+  const [useRealData, setUseRealData] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -343,10 +346,35 @@ export default function EMGPage() {
     }
   };
 
+  // Handle real MyoWare data
+  const handleMyoWareData = (data: EMGData) => {
+    setCurrentData(data);
+    
+    if (isRecording) {
+      setEmgData(prev => [...prev, data]);
+    }
+  };
+
+  // Handle MyoWare connection changes
+  const handleMyoWareConnection = (connected: boolean) => {
+    setIsMyoWareConnected(connected);
+    if (connected) {
+      setUseRealData(true);
+      stopEMGSimulation(); // Stop simulation when real data is available
+    } else {
+      setUseRealData(false);
+      if (isConnected) {
+        startEMGSimulation(); // Resume simulation if needed
+      }
+    }
+  };
+
   // Connect to EMG sensors
   const connectEMG = () => {
     setIsConnected(true);
-    startEMGSimulation();
+    if (!useRealData) {
+      startEMGSimulation();
+    }
   };
 
   // Disconnect from EMG sensors
@@ -500,6 +528,18 @@ export default function EMGPage() {
               <span className="text-sm text-gray-300">
                 {isConnected ? 'EMG Connected' : 'EMG Disconnected'}
               </span>
+              {isMyoWareConnected && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                  <span className="text-xs text-blue-300">Real MyoWare Data</span>
+                </div>
+              )}
+              {!isMyoWareConnected && isConnected && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full" />
+                  <span className="text-xs text-yellow-300">Simulated Data</span>
+                </div>
+              )}
             </div>
           </div>
           
@@ -551,6 +591,14 @@ export default function EMGPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* MyoWare Client */}
+          <div className="lg:col-span-1">
+            <MyoWareClient 
+              onDataReceived={handleMyoWareData}
+              onConnectionChange={handleMyoWareConnection}
+            />
+          </div>
+
           {/* Workout Selection */}
           <div className="lg:col-span-1">
             <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
