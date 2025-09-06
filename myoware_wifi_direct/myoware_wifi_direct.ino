@@ -24,17 +24,17 @@
 #include <DNSServer.h>
 
 // WiFi Configuration
-const char* ssid = "YOUR_WIFI_SSID";        // Change this to your WiFi name
-const char* password = "YOUR_WIFI_PASSWORD"; // Change this to your WiFi password
+const char* ssid = "Dinosaur";        // Change this to your WiFi name
+const char* password = "AnnoyingKid2010!"; // Change this to your WiFi password
 
 // WebSocket Configuration
-const char* ws_host_local = "192.168.1.100";     // Your computer's local IP
+const char* ws_host_local = "192.168.254.204";     // Your computer's local IP
 const char* ws_host_prod = "cognitive-care-assistant.vercel.app";
 const int ws_port = 3000;
 const char* ws_path = "/api/emg/ws";
 
-// MyoWare 2.0 sensor pin
-const int SENSOR_PIN = A0;
+// MyoWare 2.0 sensor pin (ESP32 GPIO36 = A0)
+const int SENSOR_PIN = 36;
 
 // Calibration data
 int sensorMin = 1023;
@@ -133,6 +133,17 @@ void loop() {
     connectToServer();
   }
   
+  // If in auto mode and local connection failed, try production
+  if (serverMode == "auto" && !isConnected && millis() > 10000) {
+    static bool triedProduction = false;
+    if (!triedProduction) {
+      Serial.println("Local connection failed, trying production...");
+      triedProduction = true;
+      serverMode = "production";
+      connectToServer();
+    }
+  }
+  
   delay(10);
 }
 
@@ -166,19 +177,38 @@ void setupWebSocket() {
 }
 
 void connectToServer() {
-  String wsUrl;
+  String host;
+  int port;
+  String path;
+  bool useSSL = false;
   
   if (serverMode == "local") {
-    wsUrl = "ws://" + localServerIP + ":" + String(ws_port) + ws_path;
+    host = localServerIP;
+    port = ws_port;
+    path = ws_path;
+    useSSL = false;
   } else if (serverMode == "production") {
-    wsUrl = "wss://" + productionServer + ws_path;
+    host = productionServer;
+    port = 443; // HTTPS port for production
+    path = ws_path;
+    useSSL = true;
   } else { // auto mode
     // Try local first, then production
-    wsUrl = "ws://" + localServerIP + ":" + String(ws_port) + ws_path;
+    host = localServerIP;
+    port = ws_port;
+    path = ws_path;
+    useSSL = false;
   }
   
-  Serial.println("Connecting to: " + wsUrl);
-  webSocket.begin(wsUrl.c_str());
+  Serial.println("Connecting to: " + host + ":" + String(port) + path);
+  
+  if (useSSL) {
+    // For production, use secure WebSocket
+    webSocket.begin(host.c_str(), port, path.c_str(), "wss");
+  } else {
+    // For local development, use regular WebSocket
+    webSocket.begin(host.c_str(), port, path.c_str());
+  }
 }
 
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
