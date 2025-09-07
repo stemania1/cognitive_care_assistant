@@ -290,11 +290,14 @@ export default function EMGPage() {
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
   const [calibrationData, setCalibrationData] = useState<{ [key: string]: { min: number; max: number } }>({});
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const calMinRef = useRef<number>(Infinity);
+  const calMaxRef = useRef<number>(-Infinity);
   const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
   const [isMyoWareConnected, setIsMyoWareConnected] = useState(false);
   const [useRealData, setUseRealData] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [showWorkoutList, setShowWorkoutList] = useState(false);
 
   // MyoWare 2.0 data processing functions
   const processMyoWareData = (rawValue: number): number => {
@@ -302,9 +305,10 @@ export default function EMGPage() {
     // Convert to percentage based on calibration data
     const cal = calibrationData['muscleActivity'];
     if (!cal) return 0;
-    
-    const normalized = Math.max(0, Math.min(100, 
-      ((rawValue - cal.min) / (cal.max - cal.min)) * 100
+    const range = cal.max - cal.min;
+    if (range <= 0) return 0;
+    const normalized = Math.max(0, Math.min(100,
+      ((rawValue - cal.min) / range) * 100
     ));
     return normalized;
   };
@@ -375,6 +379,13 @@ export default function EMGPage() {
           muscleActivity: latestData.muscleActivity,
           muscleActivityProcessed: latestData.muscleActivityProcessed
         };
+        // Update calibration min/max while calibrating
+        if (isCalibrating) {
+          if (typeof emgData.muscleActivity === 'number') {
+            if (emgData.muscleActivity < calMinRef.current) calMinRef.current = emgData.muscleActivity;
+            if (emgData.muscleActivity > calMaxRef.current) calMaxRef.current = emgData.muscleActivity;
+          }
+        }
         
         console.log('Setting current data:', emgData); // Debug log
         setCurrentData(emgData);
@@ -577,25 +588,38 @@ export default function EMGPage() {
   };
 
   // Calibration functions for MyoWare 2.0
-  const startCalibration = () => {
-    setIsCalibrating(true);
-    setCalibrationData({});
-    
-    // Initialize calibration data with default range for single sensor
-    const defaultCal = {
-      muscleActivity: { min: 400, max: 600 } // Default MyoWare 2.0 range
+  const finalizeCalibration = async () => {
+    setIsCalibrating(false);
+    const min = Number.isFinite(calMinRef.current) ? calMinRef.current : 400;
+    const max = Number.isFinite(calMaxRef.current) && calMaxRef.current > min ? calMaxRef.current : 600;
+    const newCal = {
+      muscleActivity: { min, max }
     };
-    
-    setCalibrationData(defaultCal);
-    
+    setCalibrationData(newCal);
+    // Persist calibration to server
+    try {
+      await fetch('/api/emg/ws', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'calibration_data', min, max, range: max - min })
+      });
+    } catch (e) {
+      // Swallow errors; UI state already updated
+    }
+  };
+
+  const startCalibration = () => {
+    calMinRef.current = Infinity;
+    calMaxRef.current = -Infinity;
+    setIsCalibrating(true);
     // Auto-calibrate after 5 seconds
     setTimeout(() => {
-      setIsCalibrating(false);
+      finalizeCalibration();
     }, 5000);
   };
 
   const stopCalibration = () => {
-    setIsCalibrating(false);
+    finalizeCalibration();
   };
 
   // Calculate average muscle activation
@@ -667,9 +691,9 @@ export default function EMGPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-4xl font-bold text-white mb-2">EMG Workout</h1>
@@ -690,7 +714,7 @@ export default function EMGPage() {
           </div>
           
           {/* MyoWare Guidance */}
-          <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-6">
+          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-4">
             <div className="flex items-start gap-3">
               <div className="text-blue-400 text-xl">💡</div>
               <div>
@@ -705,7 +729,7 @@ export default function EMGPage() {
           </div>
           
           {/* Connection Controls */}
-          <div className="flex gap-4 flex-wrap">
+          <div className="flex gap-3 flex-wrap">
             {!isMyoWareConnected ? (
               <div className="px-6 py-3 bg-gray-600 text-gray-300 rounded-lg font-medium">
                 Waiting for MyoWare Device...
@@ -733,14 +757,14 @@ export default function EMGPage() {
                       : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'
                   }`}
                 >
-                  {isCalibrating ? 'Stop Calibration' : 'Calibrate Sensors'}
+                  {isCalibrating ? 'Finish Calibration' : 'Calibrate (5s)'}
                 </button>
               </>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* MyoWare Client */}
           <div className="lg:col-span-1">
             <MyoWareClient 
@@ -762,13 +786,13 @@ export default function EMGPage() {
 
           {/* Workout Selection */}
           <div className="lg:col-span-1">
-            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-4">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-blue-500/10 via-purple-500/5 to-pink-500/10 blur-xl" />
               <div className="relative">
                 <h2 className="text-xl font-semibold mb-6">Select Workout</h2>
                 
                 {/* Current Workout Display */}
-                <div className="p-6 rounded-lg border border-white/20 bg-white/10 mb-6">
+                <div className="p-4 rounded-lg border border-white/20 bg-white/10 mb-4">
                   <div className="text-center mb-4">
                     <div className="text-sm text-gray-400 mb-2">
                       Workout {currentWorkoutIndex + 1} of {WORKOUT_ROUTINES.length}
@@ -815,7 +839,7 @@ export default function EMGPage() {
                   </div>
                   
                   {/* Navigation Buttons */}
-                  <div className="flex gap-2 mb-4">
+                  <div className="flex gap-2 mb-3">
                     <button
                       onClick={prevWorkout}
                       className="flex-1 py-2 px-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white text-sm rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all duration-200"
@@ -842,56 +866,70 @@ export default function EMGPage() {
                   </button>
                 </div>
                 
-                {/* Workout List (Collapsed) */}
+                {/* Workout List (Collapsible) */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="text-sm font-medium text-gray-300">All Workouts:</div>
-                    <div className="text-xs text-gray-400">
-                      {currentWorkoutIndex + 1}/{WORKOUT_ROUTINES.length}
+                    <div className="text-sm font-medium text-gray-300">All Workouts</div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-xs text-gray-400">
+                        {currentWorkoutIndex + 1}/{WORKOUT_ROUTINES.length}
+                      </div>
+                      <button
+                        onClick={() => setShowWorkoutList(v => !v)}
+                        className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+                        aria-expanded={showWorkoutList}
+                        aria-controls="workout-list"
+                      >
+                        {showWorkoutList ? 'Hide' : 'Show'}
+                      </button>
                     </div>
                   </div>
-                  
+
                   {/* Progress Bar */}
-                  <div className="w-full bg-gray-700 rounded-full h-2 mb-4">
+                  <div className="w-full bg-gray-700 rounded-full h-2 mb-1">
                     <div 
                       className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${((currentWorkoutIndex + 1) / WORKOUT_ROUTINES.length) * 100}%` }}
                     />
                   </div>
-                  
-                  {WORKOUT_ROUTINES.map((exercise, index) => (
-                    <button
-                      key={exercise.id}
-                      onClick={() => selectWorkout(index)}
-                      className={`w-full p-3 rounded-lg text-left transition-all duration-200 ${
-                        index === currentWorkoutIndex
-                          ? 'bg-blue-500/20 border border-blue-500/30 text-blue-200'
-                          : 'bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div>
-                            <div className="text-sm font-medium">{exercise.name}</div>
-                            <div className="text-xs text-gray-400">
-                              {formatTime(exercise.duration)}
+
+                  {showWorkoutList && (
+                    <div id="workout-list" className="space-y-2">
+                      {WORKOUT_ROUTINES.map((exercise, index) => (
+                        <button
+                          key={exercise.id}
+                          onClick={() => selectWorkout(index)}
+                          className={`w-full p-3 rounded-lg text-left transition-all duration-200 ${
+                            index === currentWorkoutIndex
+                              ? 'bg-blue-500/20 border border-blue-500/30 text-blue-200'
+                              : 'bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <div className="text-sm font-medium">{exercise.name}</div>
+                                <div className="text-xs text-gray-400">
+                                  {formatTime(exercise.duration)}
+                                </div>
+                              </div>
+                              {/* MyoWare Indicator */}
+                              <div className={`w-2 h-2 rounded-full ${
+                                exercise.myoWareSuitable ? 'bg-green-400' : 'bg-orange-400'
+                              }`} title={
+                                exercise.myoWareSuitable 
+                                  ? 'MyoWare Recommended' 
+                                  : 'MyoWare Not Needed'
+                              } />
                             </div>
+                            {index === currentWorkoutIndex && (
+                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                            )}
                           </div>
-                          {/* MyoWare Indicator */}
-                          <div className={`w-2 h-2 rounded-full ${
-                            exercise.myoWareSuitable ? 'bg-green-400' : 'bg-orange-400'
-                          }`} title={
-                            exercise.myoWareSuitable 
-                              ? 'MyoWare Recommended' 
-                              : 'MyoWare Not Needed'
-                          } />
-                        </div>
-                        {index === currentWorkoutIndex && (
-                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -899,10 +937,10 @@ export default function EMGPage() {
 
           {/* EMG Visualization */}
           <div className="lg:col-span-2">
-            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-4">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-sky-500/5 to-blue-500/10 blur-xl" />
               <div className="relative">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-3">
                   <h2 className="text-xl font-semibold">EMG Data Visualization</h2>
                   {currentWorkout && (
                     <div className="text-right">
@@ -931,8 +969,8 @@ export default function EMGPage() {
                     </div>
                   </div>
                 ) : currentData && (
-                  <div className="mb-6">
-                    <div className="mb-4">
+                  <div className="mb-4">
+                    <div className="mb-3">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="text-lg font-medium text-white">MyoWare 2.0 Sensor Data</h3>
                         <div className="flex items-center gap-2">
@@ -958,9 +996,9 @@ export default function EMGPage() {
                       )}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Raw MyoWare 2.0 Data */}
-                      <div className="p-6 rounded-lg bg-white/5 border border-white/10">
+                      <div className="p-4 rounded-lg bg-white/5 border border-white/10">
                         <div className="text-lg font-medium text-white mb-4">Raw Sensor Data</div>
                         <div className="text-3xl font-bold text-blue-400 mb-2">
                           {currentData.muscleActivity}
@@ -978,7 +1016,7 @@ export default function EMGPage() {
                       </div>
                       
                       {/* Processed Percentage */}
-                      <div className="p-6 rounded-lg bg-white/5 border border-white/10">
+                      <div className="p-4 rounded-lg bg-white/5 border border-white/10">
                         <div className="text-lg font-medium text-white mb-4">Muscle Activation</div>
                         <div className="text-4xl font-bold text-green-400 mb-2">
                           {currentData.muscleActivityProcessed.toFixed(1)}%
@@ -999,7 +1037,7 @@ export default function EMGPage() {
                 )}
 
                 {/* EMG Chart */}
-                <div className="mb-6">
+                <div className="mb-4">
                   <EMGChart 
                     data={isMyoWareConnected ? chartData : []} 
                     isConnected={isMyoWareConnected} 
@@ -1007,7 +1045,7 @@ export default function EMGPage() {
                 </div>
 
                 {/* Workout Instructions */}
-                <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10">
+                <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
                   <h3 className="font-medium text-white mb-3">
                     {currentWorkout ? 'Exercise Instructions' : 'Workout Preview'}
                   </h3>
@@ -1032,7 +1070,7 @@ export default function EMGPage() {
 
                 {/* Workout Controls */}
                 {currentWorkout && (
-                  <div className="flex gap-4">
+                  <div className="flex gap-3">
                     <button
                       onClick={stopWorkout}
                       className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200"

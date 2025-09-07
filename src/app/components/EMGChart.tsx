@@ -68,18 +68,23 @@ const EMGChart: React.FC<EMGChartProps> = ({ data, isConnected }) => {
   });
 
   const maxDataPoints = 50; // Show last 50 data points
+  const baseTimeRef = useRef<number | null>(null); // ms origin for counting seconds
+  const [resetTick, setResetTick] = useState(0);
 
   useEffect(() => {
     if (data.length === 0) return;
 
     // Get the last maxDataPoints entries
     const recentData = data.slice(-maxDataPoints);
-    
-    // Create time labels (relative to first data point)
-    const firstTimestamp = recentData[0]?.timestamp || 0;
-    const labels = recentData.map((_, index) => {
-      const timeDiff = (recentData[index]?.timestamp - firstTimestamp) / 1000; // Convert to seconds
-      return `${timeDiff.toFixed(1)}s`;
+    // Initialize/reset base time if needed
+    if (baseTimeRef.current === null) {
+      baseTimeRef.current = recentData[0]?.timestamp ?? 0;
+    }
+    const base = baseTimeRef.current ?? 0;
+    // Create simple counting-seconds labels from base
+    const labels = recentData.map((d) => {
+      const seconds = Math.max(0, Math.floor((d.timestamp - base) / 1000));
+      return `${seconds}s`;
     });
 
     // Extract processed and raw data
@@ -99,7 +104,7 @@ const EMGChart: React.FC<EMGChartProps> = ({ data, isConnected }) => {
         },
       ],
     });
-  }, [data]);
+  }, [data, resetTick]);
 
   const options = {
     responsive: true,
@@ -151,7 +156,7 @@ const EMGChart: React.FC<EMGChartProps> = ({ data, isConnected }) => {
         display: true,
         title: {
           display: true,
-          text: 'Time',
+          text: 'Time (s)',
           color: 'rgb(156, 163, 175)',
         },
         ticks: {
@@ -224,7 +229,16 @@ const EMGChart: React.FC<EMGChartProps> = ({ data, isConnected }) => {
   }
 
   return (
-    <div className="w-full h-80 bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+    <div className="w-full h-64 bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs text-gray-400">Counting seconds from last reset</div>
+        <button
+          onClick={() => { baseTimeRef.current = null; setResetTick((v) => v + 1); }}
+          className="px-2 py-0.5 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+        >
+          Reset Time
+        </button>
+      </div>
       <Line data={chartData} options={options} />
     </div>
   );

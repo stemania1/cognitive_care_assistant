@@ -1,3 +1,4 @@
+"use client";
 import Link from "next/link";
 import Image from "next/image";
 import HomeCards from "./components/HomeCards";
@@ -5,15 +6,15 @@ import HomeCards from "./components/HomeCards";
 export default function Home() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
-      {/* Background gradients */}
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
-      <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
+      {/* Background gradients (slightly brighter) */}
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.2),transparent)]" />
+      <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/40 via-purple-500/35 to-cyan-500/40 blur-3xl -z-10" />
 
       <main className="relative mx-auto max-w-5xl px-6 sm:px-10 py-12 sm:py-20">
         {/* Hero */}
-        <div className="flex flex-col items-center text-center gap-6 mb-10 sm:mb-14">
-          <div className="relative">
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/30 via-purple-500/20 to-cyan-500/30 blur-xl" />
+        <div className="flex flex-col items-center text-center gap-4 sm:gap-6 mb-8 sm:mb-12">
+          <Link href="/about" className="relative cursor-pointer select-none" title="Learn why we built Cognitive Care" role="button">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/40 via-purple-500/30 to-cyan-500/40 blur-xl" />
             <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-4">
               <Image
                 src="/digital_brain.png"
@@ -24,12 +25,14 @@ export default function Home() {
                 className="h-16 w-16 sm:h-24 sm:w-24 object-contain drop-shadow"
               />
             </div>
-          </div>
+          </Link>
 
-          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-fuchsia-500 to-cyan-400">
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
             Cognitive Care
           </h1>
+
         </div>
+        
 
         {/* Options */}
         <HomeCards />
@@ -39,7 +42,7 @@ export default function Home() {
       <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 flex flex-col gap-4">
         {/* Settings Button */}
         <Link href="/settings" className="group">
-          <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-purple-500/30 via-fuchsia-500/25 to-cyan-500/30 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
+          <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-purple-500/40 via-fuchsia-500/35 to-cyan-500/40 blur-xl opacity-70 group-hover:opacity-90 transition-opacity" />
           <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -56,7 +59,7 @@ export default function Home() {
 
         {/* Sign Out Button */}
         <Link href="/signout" className="group">
-          <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-red-500/30 via-pink-500/25 to-rose-500/30 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
+          <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-red-500/40 via-pink-500/35 to-rose-500/40 blur-xl opacity-70 group-hover:opacity-90 transition-opacity" />
           <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
             <svg
               xmlns="http://www.w3.org/2000/svg"
