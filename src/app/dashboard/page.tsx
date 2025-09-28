@@ -39,23 +39,6 @@ export default function Dashboard() {
 
       {/* Floating Action Buttons */}
       <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 flex flex-col gap-4">
-        {/* Settings Button */}
-        <Link href="/settings" className="group">
-          <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-purple-500/40 via-fuchsia-500/35 to-cyan-500/40 blur-xl opacity-70 group-hover:opacity-90 transition-opacity" />
-          <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="h-5 w-5 opacity-90"
-              aria-hidden="true"
-            >
-              <path d="M11.983 8.5a3.5 3.5 0 1 0 .034 7 3.5 3.5 0 0 0-.034-7Zm9.017 3.5a8.99 8.99 0 0 0-.15-1.6l2.082-1.595a.75.75 0 0 0 .177-.964l-1.973-3.416a.75.75 0 0 0-.91-.33l-2.45.9a9.08 9.08 0 0 0-1.39-.807l-.37-2.57A.75.75 0 0 0 14.3.5h-4.6a.75.75 0 0 0-.742.648l-.37 2.57c-.49.213-.953.487-1.39.807l-2.45-.9a.75.75 0 0 0-.91.33L1.27 7.34a.75.75 0 0 0 .177.964l2.082 1.595A8.99 8.99 0 0 0 3.38 12a8.99 8.99 0 0 0 .15 1.6L1.448 15.195a.75.75 0 0 0-.177.964l1.973 3.416a.75.75 0 0 0 .91.33l2.45-.9c.437.32.9.594 1.39.807l.37 2.57a.75.75 0 0 0 .742.648h4.6a.75.75 0 0 0 .742-.648l.37-2.57c.49-.213.953-.487 1.39-.807l2.45.9a.75.75 0 0 0 .91-.33l1.973-3.416a.75.75 0 0 0-.177-.964L21.85 13.6c.1-.52.15-1.06.15-1.6Z" />
-            </svg>
-            <span className="sr-only">Settings</span>
-          </span>
-        </Link>
-
         {/* Sign Out Button */}
         <Link href="/signout" className="group">
           <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-red-500/40 via-pink-500/35 to-rose-500/40 blur-xl opacity-70 group-hover:opacity-90 transition-opacity" />

@@ -37,18 +37,21 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.RESEND_API_KEY;
     if (apiKey) {
-      // Lazy import to avoid bundling when not set
-      const { Resend } = await import("resend");
-      const resend = new Resend(apiKey);
-      // Fire and forget; ignore failures to avoid leaking existence
+      // Lazy import only when API key is present; guard to avoid build/runtime failures when module isn't installed
       try {
+        // Use require to further avoid type-resolution during build where module may be absent
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { Resend } = require("resend");
+        const resend = new Resend(apiKey as string);
         await resend.emails.send({
           from: "Cognitive Care <no-reply@cognitivecare.local>",
           to: email,
           subject: "Reset your password",
           html: `<p>Click the link to reset your password (expires in 15 minutes):</p><p><a href="${url}">${url}</a></p>`,
         });
-      } catch {}
+      } catch {
+        // Ignore errors (missing module, network, etc.)
+      }
       return NextResponse.json({ ok: true });
     }
 
