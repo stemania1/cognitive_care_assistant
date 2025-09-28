@@ -27,7 +27,7 @@ export default function HomeCards() {
       {/* Row 1: Daily Questions + Medication */}
       <LinkCard
         href="/daily-questions"
-        title="Daily Questions"
+        title="Daily Checks"
         description="Quick daily check-in questionnaires"
         accent="from-emerald-500 to-teal-500"
         emoji="📝"
@@ -35,7 +35,7 @@ export default function HomeCards() {
 
       <LinkCard
         href="/reminders"
-        title="Nutrition"
+        title="Medication & Nutrition"
         description="Hydration, meals, and medicine times"
         accent="from-amber-500 to-orange-500"
         emoji="🥗"
