@@ -149,23 +149,7 @@ export default function SignIn() {
           </div>
         </div>
 
-        {/* Back to Dashboard Link */}
-        <div className="mt-8 text-center">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center space-x-2 text-gray-400 hover:text-white transition-colors duration-200"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="h-4 w-4"
-            >
-              <path d="M7.828 11H20v2H7.828l5.364 5.364-1.414 1.414L4 12l7.778-7.778 1.414 1.414L7.828 11z" />
-            </svg>
-            <span>Back to Dashboard</span>
-          </Link>
-        </div>
+        
       </main>
     </div>
   );

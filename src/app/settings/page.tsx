@@ -9,7 +9,7 @@ export default function SettingsPage() {
           <p className="opacity-80">Configure your Cognitive Care Assistant preferences here.</p>
         </div>
       </main>
-      <Link href="/" className="group fixed bottom-6 left-6 sm:bottom-8 sm:left-8">
+      <Link href="/dashboard" className="group fixed bottom-6 left-6 sm:bottom-8 sm:left-8">
         <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-purple-500/30 via-fuchsia-500/25 to-cyan-500/30 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
         <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 opacity-90" aria-hidden="true">

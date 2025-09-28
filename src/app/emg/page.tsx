@@ -1127,14 +1127,14 @@ export default function EMGPage() {
         {/* Navigation */}
         <div className="mt-8 flex justify-center">
           <Link
-            href="/"
+            href="/dashboard"
             className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-6 py-4 hover:bg-white/10 transition-all duration-200"
           >
             <div className="flex items-center justify-center gap-3">
               <span className="text-lg font-medium">Return to Dashboard</span>
               <span className="text-xl opacity-60 transition-transform group-hover:translate-x-1">→</span>
             </div>
-      </Link>
+          </Link>
         </div>
       </div>
     </div>

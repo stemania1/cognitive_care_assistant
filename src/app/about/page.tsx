@@ -20,7 +20,7 @@ export default function AboutPage() {
 
         <div className="mt-8">
           <Link
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 backdrop-blur px-4 py-2 hover:bg-white/10 transition-colors"
           >
             <span>← Back to Home</span>

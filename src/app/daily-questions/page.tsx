@@ -1,0 +1,213 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+type Question = { id: string; text: string; choices?: string[] };
+type StoredAnswer = string | { v: string; t: string };
+
+function getTodayKey(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+const ALL_QUESTIONS: Question[] = [
+  { id: "favoriteColor", text: "What is your favorite color?" },
+  { id: "favoriteMeal", text: "What’s your favorite meal of the day — breakfast, lunch, or dinner?", choices: ["Breakfast", "Lunch", "Dinner"] },
+  { id: "catsDogs", text: "Do you like cats, dogs, or both?", choices: ["Cats", "Dogs", "Both"] },
+  { id: "favoriteSeat", text: "What’s your favorite place to sit at home?" },
+  { id: "favoriteAsChild", text: "What was your favorite thing to do when you were younger?" },
+  { id: "firstJob", text: "What was your first job or something you enjoyed doing?" },
+  { id: "drinkPref", text: "What do you like to drink — tea, coffee, or something else?", choices: ["Tea", "Coffee", "Something else"] },
+  { id: "smile", text: "What makes you smile?" },
+  { id: "weather", text: "What kind of weather do you enjoy?" },
+  { id: "calm", text: "What helps you feel calm?" },
+  { id: "children", text: "Do you have any children?" },
+  { id: "grandchildren", text: "Do you have any grandchildren?" },
+  { id: "parentsNames", text: "What were your parents’ names?" },
+  { id: "siblings", text: "Do you have any brothers or sisters?" },
+  { id: "fullName", text: "What is your full name?" },
+  { id: "birthday", text: "When is your birthday (or do you remember what time of year it is)?" },
+  { id: "married", text: "Were you married?" },
+  { id: "born", text: "Where were you born or where did you grow up?" },
+];
+
+export default function DailyQuestionsPage() {
+  const today = useMemo(() => getTodayKey(), []);
+  const todayKey = useMemo(() => `dailyQuestions:${today}`, [today]);
+  const windowKey = useMemo(() => `dailyQuestionsWindow:${today}`, [today]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState(false);
+  const [windowStart, setWindowStart] = useState<number>(0);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(windowKey);
+      if (raw != null) {
+        const parsed = Number(raw);
+        if (!Number.isNaN(parsed)) {
+          setWindowStart(parsed % ALL_QUESTIONS.length);
+          return;
+        }
+      }
+      const base = Math.floor(Date.now() / 86400000);
+      const start = base % ALL_QUESTIONS.length;
+      setWindowStart(start);
+      localStorage.setItem(windowKey, String(start));
+    } catch {}
+  }, [windowKey]);
+
+  const todaysQuestions = useMemo(() => {
+    return [0, 1, 2].map((i) => ALL_QUESTIONS[(windowStart + i) % ALL_QUESTIONS.length]);
+  }, [windowStart]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(todayKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, StoredAnswer>;
+        const initial: Record<string, string> = {};
+        for (const [id, val] of Object.entries(parsed)) {
+          if (val && typeof val === "object" && "v" in val) {
+            initial[id] = (val as { v: string }).v;
+          } else if (typeof val === "string") {
+            initial[id] = val;
+          }
+        }
+        setAnswers(initial);
+      }
+    } catch {}
+  }, [todayKey]);
+
+  function saveOne(id: string, value: string) {
+    try {
+      const raw = localStorage.getItem(todayKey);
+      const current: Record<string, StoredAnswer> = raw ? JSON.parse(raw) : {};
+      current[id] = { v: value, t: new Date().toISOString() };
+      localStorage.setItem(todayKey, JSON.stringify(current));
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 800);
+    } catch {}
+  }
+
+  function setAnswer(id: string, value: string) {
+    setAnswers((prev) => ({ ...prev, [id]: value }));
+    saveOne(id, value);
+  }
+
+  const answeredCount = todaysQuestions.reduce((n, q) => (answers[q.id]?.trim() ? n + 1 : n), 0);
+
+  function nextThree() {
+    setWindowStart((prev) => {
+      const next = (prev + 3) % ALL_QUESTIONS.length;
+      try {
+        localStorage.setItem(windowKey, String(next));
+      } catch {}
+      return next;
+    });
+  }
+
+  function prevThree() {
+    setWindowStart((prev) => {
+      const next = (prev - 3 + ALL_QUESTIONS.length) % ALL_QUESTIONS.length;
+      try {
+        localStorage.setItem(windowKey, String(next));
+      } catch {}
+      return next;
+    });
+  }
+
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
+      <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
+
+      <main className="relative p-8 sm:p-16">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-6 flex items-center justify-between">
+            <h1 className="text-2xl sm:text-3xl font-semibold">Daily Questions</h1>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={prevThree}
+                className="text-sm rounded-md border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15"
+                aria-label="Show previous three questions"
+              >
+                Prev 3
+              </button>
+              <button
+                type="button"
+                onClick={nextThree}
+                className="text-sm rounded-md border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15"
+                aria-label="Show next three questions"
+              >
+                Next 3
+              </button>
+              {saved ? (
+                <span className="text-xs text-emerald-300">Saved</span>
+              ) : (
+                <span className="text-xs opacity-60">{answeredCount}/3 answered</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {todaysQuestions.map((q) => (
+              <div key={q.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <p className="text-sm mb-2">{q.text}</p>
+                {q.choices ? (
+                  <div className="flex gap-2 flex-wrap">
+                    {q.choices.map((choice) => (
+                      <button
+                        key={choice}
+                        onClick={() => setAnswer(q.id, choice)}
+                        className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                          answers[q.id] === choice ? "bg-emerald-500 text-black" : "bg-white/10 hover:bg-white/15"
+                        }`}
+                        type="button"
+                      >
+                        {choice}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={answers[q.id] ?? ""}
+                    onChange={(e) => setAnswer(q.id, e.target.value)}
+                    placeholder="Type your answer"
+                    className="w-full rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none placeholder-white/40"
+                  />
+                )}
+              </div>
+            ))}
+
+            <div className="flex items-center justify-end">
+              <Link
+                href="/questions/history"
+                className="mt-1 px-3 py-1 rounded-md border border-white/15 bg-white/10 text-xs hover:bg-white/15"
+              >
+                View saved answers
+              </Link>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <Link href="/dashboard" className="group fixed bottom-6 left-6 sm:bottom-8 sm:left-8">
+        <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-purple-500/30 via-fuchsia-500/25 to-cyan-500/30 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
+        <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 opacity-90" aria-hidden="true">
+            <path d="M11.47 3.84a.75.75 0 0 1 1.06 0l8.25 8.25a.75.75 0 1 1-1.06 1.06l-.97-.97v8.07a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5h-3v-4.5a.75.75 0 0 1-.75-.75H4.5a.75.75 0 0 1-.75-.75v-8.07l-.97.97a.75.75 0 1 1-1.06-1.06Z" />
+          </svg>
+          <span className="sr-only">Home</span>
+        </span>
+      </Link>
+    </div>
+  );
+}
+
+

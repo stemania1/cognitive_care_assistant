@@ -29,6 +29,7 @@ export default function HomeCards() {
         title="EMG Workout"
         description="Analyze muscle activation during workouts"
         accent="from-fuchsia-500 to-purple-500"
+        emoji="💪"
       />
 
       <LinkCard
@@ -36,11 +37,24 @@ export default function HomeCards() {
         title="Sleep Behaviors"
         description="Monitor thermal patterns and sleep analysis"
         accent="from-cyan-500 to-sky-500"
+        emoji="😴"
       />
 
-      <DailyQuestionCard />
+      <LinkCard
+        href="/daily-questions"
+        title="Daily Questions"
+        description="Quick daily check-in questionnaires"
+        accent="from-emerald-500 to-teal-500"
+        emoji="📝"
+      />
 
-      <RemindersCard />
+      <LinkCard
+        href="/reminders"
+        title="Reminders"
+        description="Toggle and schedule wellness reminders"
+        accent="from-amber-500 to-orange-500"
+        emoji="⏰"
+      />
 
       <div className="w-full sm:col-span-2 sm:w-1/2 justify-self-center">
         <LinkCard
@@ -49,6 +63,7 @@ export default function HomeCards() {
           description="Play cognitive exercises to train memory"
           accent="from-green-500 to-emerald-500"
           targetBlank
+          emoji="🧠"
         />
       </div>
     </div>
@@ -64,13 +79,27 @@ function CardShell({ accent, children }: { accent: string; children: React.React
   );
 }
 
-function LinkCard({ href, title, description, accent, targetBlank }: { href: string; title: string; description: string; accent: string; targetBlank?: boolean }) {
+function EmojiIcon({ symbol }: { symbol: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-base"
+    >
+      {symbol}
+    </span>
+  );
+}
+
+function LinkCard({ href, title, description, accent, targetBlank, emoji }: { href: string; title: string; description: string; accent: string; targetBlank?: boolean; emoji?: string }) {
   return (
     <Link href={href} className="contents" target={targetBlank ? "_blank" : undefined} rel={targetBlank ? "noopener noreferrer" : undefined}>
       <CardShell accent={accent}>
         <div className="min-h-[7rem] flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg sm:text-xl font-medium">{title}</h2>
+            <div className="flex items-center gap-2">
+              {emoji ? <EmojiIcon symbol={emoji} /> : null}
+              <h2 className="text-lg sm:text-xl font-medium">{title}</h2>
+            </div>
             <span className="text-base opacity-60 transition-transform group-hover:translate-x-0.5">→</span>
           </div>
           <p className="text-sm opacity-70">{description}</p>

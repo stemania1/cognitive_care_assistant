@@ -31,6 +31,7 @@ function Tabs({ value, onChange }: { value: string; onChange: (v: string) => voi
 // Simple memory matching game (4x3 = 12 cards, 6 pairs)
 function MemoryCards() {
   const baseIcons = ["🍎", "⭐", "🐶", "🌙", "🎵", "🌸"]; // simple emoji set
+  const [shuffleKey, setShuffleKey] = useState(0);
   const deck = useMemo(() => {
     const arr = [...baseIcons, ...baseIcons].map((v, i) => ({ id: i + 1, val: v }));
     // shuffle
@@ -39,11 +40,50 @@ function MemoryCards() {
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
-  }, []);
+  }, [shuffleKey]);
 
   const [flipped, setFlipped] = useState<number[]>([]);
   const [matched, setMatched] = useState<Set<string>>(new Set());
   const [lock, setLock] = useState(false);
+  const [burst, setBurst] = useState(false);
+  const wasCompleteRef = useRef(false);
+  const [showAward, setShowAward] = useState(false);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [incorrectCount, setIncorrectCount] = useState(0);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("games:memory:completed");
+      if (raw) setCompletedCount(Number(raw) || 0);
+    } catch {}
+  }, []);
+
+  function getMinuteBucket(d: Date): string {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const HH = String(d.getHours()).padStart(2, "0");
+    const MM = String(d.getMinutes()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}T${HH}:${MM}`;
+  }
+
+  function logIncorrectAttempt() {
+    try {
+      const now = new Date();
+      const iso = now.toISOString();
+      // Append to detailed log
+      const logRaw = localStorage.getItem("games:memory:incorrectLog");
+      const log: string[] = logRaw ? JSON.parse(logRaw) : [];
+      log.push(iso);
+      localStorage.setItem("games:memory:incorrectLog", JSON.stringify(log));
+      // Increment minute bucket
+      const bucketKey = getMinuteBucket(now);
+      const bucketsRaw = localStorage.getItem("games:memory:incorrectBuckets");
+      const buckets: Record<string, number> = bucketsRaw ? JSON.parse(bucketsRaw) : {};
+      buckets[bucketKey] = (buckets[bucketKey] || 0) + 1;
+      localStorage.setItem("games:memory:incorrectBuckets", JSON.stringify(buckets));
+    } catch {}
+  }
 
   function handleFlip(idx: number) {
     if (lock) return;
@@ -57,6 +97,14 @@ function MemoryCards() {
       window.setTimeout(() => {
         if (a.val === b.val) {
           setMatched((prev) => new Set(prev).add(a.val));
+        } else {
+          setIncorrectCount((prev) => prev + 1);
+          try {
+            const raw = localStorage.getItem("games:memory:incorrectTotal");
+            const nextTotal = (Number(raw) || 0) + 1;
+            localStorage.setItem("games:memory:incorrectTotal", String(nextTotal));
+          } catch {}
+          logIncorrectAttempt();
         }
         setFlipped([]);
         setLock(false);
@@ -66,8 +114,33 @@ function MemoryCards() {
 
   const allMatched = matched.size === baseIcons.length;
 
+  useEffect(() => {
+    if (allMatched && !wasCompleteRef.current) {
+      wasCompleteRef.current = true;
+      setBurst(true);
+      window.setTimeout(() => setBurst(false), 1800);
+      setShowAward(true);
+      setCompletedCount((prev) => {
+        const next = prev + 1;
+        try { localStorage.setItem("games:memory:completed", String(next)); } catch {}
+        return next;
+      });
+    } else if (!allMatched && wasCompleteRef.current) {
+      wasCompleteRef.current = false;
+    }
+  }, [allMatched]);
+
+  function playAgain() {
+    setShowAward(false);
+    setMatched(new Set());
+    setFlipped([]);
+    setIncorrectCount(0);
+    setShuffleKey((k) => k + 1);
+  }
+
   return (
     <div>
+      <ConfettiBurst show={burst} />
       <div className="grid grid-cols-4 gap-2">
         {deck.map((card, idx) => {
           const isUp = flipped.includes(idx) || matched.has(card.val);
@@ -86,8 +159,37 @@ function MemoryCards() {
           );
         })}
       </div>
-      {allMatched && (
-        <p className="mt-3 text-sm text-emerald-300">Great job! All pairs matched.</p>
+      <div className="mt-3 text-xs text-red-300">Incorrect attempts: {incorrectCount}</div>
+      {allMatched && <p aria-live="polite" className="sr-only">Congratulations! You matched all pairs.</p>}
+
+      {showAward && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
+          <div className="relative w-[92%] max-w-sm rounded-xl border border-white/15 bg-white/10 backdrop-blur p-4 text-white">
+            <div className="absolute -inset-px rounded-xl bg-gradient-to-r from-purple-500/20 via-fuchsia-500/15 to-cyan-500/20 opacity-30" />
+            <div className="relative">
+              <h3 className="text-xl font-semibold mb-1">Congratulations! 🎉</h3>
+              <p className="text-sm opacity-90">You matched all pairs.</p>
+              <p className="text-xs opacity-80 mt-1">Incorrect attempts: {incorrectCount}</p>
+              <p className="text-xs opacity-80">Total completions: {completedCount}</p>
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAward(false)}
+                  className="rounded-md border border-white/15 bg-white/10 px-3 py-1 text-sm hover:bg-white/15"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={playAgain}
+                  className="rounded-md border border-emerald-400/40 bg-emerald-500/20 px-3 py-1 text-sm hover:bg-emerald-500/30"
+                >
+                  Play again
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -304,11 +406,11 @@ export default function MemoryGamesPage() {
         </div>
       </main>
 
-      <Link href="/" className="group fixed bottom-6 left-6 sm:bottom-8 sm:left-8">
+      <Link href="/dashboard" className="group fixed bottom-6 left-6 sm:bottom-8 sm:left-8">
         <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-purple-500/30 via-fuchsia-500/25 to-cyan-500/30 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
         <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 opacity-90" aria-hidden="true">
-            <path d="M11.47 3.84a.75.75 0 0 1 1.06 0l8.25 8.25a.75.75 0 1 1-1.06 1.06l-.97-.97v8.07a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5h-3v4.5a.75.75 0 0 1-.75.75H4.5a.75.75 0 0 1-.75-.75v-8.07l-.97.97a.75.75 0 1 1-1.06-1.06Z" />
+            <path d="M11.47 3.84a.75.75 0 0 1 1.06 0l8.25 8.25a.75.75 0 1 1-1.06 1.06l-.97-.97v8.07a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5h-3v-4.5a.75.75 0 0 1-.75-.75H4.5a.75.75 0 0 1-.75-.75v-8.07l-.97.97a.75.75 0 1 1-1.06-1.06Z" />
           </svg>
           <span className="sr-only">Home</span>
         </span>

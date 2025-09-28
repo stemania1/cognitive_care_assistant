@@ -269,32 +269,32 @@ export default function SleepBehaviors() {
 
         {/* Navigation Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Link
-               href="/"
-               className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-5 py-6 hover:bg-white/10 transition-all duration-200"
-             >
-               <div className="flex items-center justify-between">
-                 <div>
-                   <h3 className="text-lg font-medium mb-2">Dashboard</h3>
-                   <p className="text-sm text-gray-300">Return to main dashboard</p>
-                 </div>
-                 <span className="text-2xl opacity-60 transition-transform group-hover:translate-x-1">→</span>
-               </div>
-             </Link>
-
-            <Link
-              href="/sensors"
-              className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-5 py-6 hover:bg-white/10 transition-all duration-200"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Sensors</h3>
-                  <p className="text-sm text-gray-300">View all sensor data</p>
-                </div>
-                <span className="text-2xl opacity-60 transition-transform group-hover:translate-x-1">→</span>
+          <Link
+            href="/dashboard"
+            className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-5 py-6 hover:bg-white/10 transition-all duration-200"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Dashboard</h3>
+                <p className="text-sm text-gray-300">Return to main dashboard</p>
               </div>
-            </Link>
-          </div>
+              <span className="text-2xl opacity-60 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          <Link
+            href="/sensors"
+            className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-5 py-6 hover:bg-white/10 transition-all duration-200"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Sensors</h3>
+                <p className="text-sm text-gray-300">View all sensor data</p>
+              </div>
+              <span className="text-2xl opacity-60 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+        </div>
        </main>
      </div>
    );

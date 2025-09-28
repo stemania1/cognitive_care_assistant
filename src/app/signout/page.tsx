@@ -103,7 +103,7 @@ export default function SignOut() {
                 </Link>
                 
                 <Link
-                  href="/"
+                  href="/dashboard"
                   className="block w-full py-3 px-4 rounded-lg border border-white/20 bg-white/5 text-white font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black transition-all duration-200"
                 >
                   Go to Home
