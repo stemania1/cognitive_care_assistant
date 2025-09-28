@@ -22,5 +22,26 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Futura", "Futura PT", "Avenir Next", "Avenir", "Nunito", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Animated gradient text utility */
+.gradient-text {
+  background: linear-gradient(90deg,
+    #ffffff 0%,      /* white */
+    #f1f5f9 20%,     /* very light */
+    #e0f2fe 45%,     /* sky-100 */
+    #bae6fd 70%,     /* sky-200 */
+    #93c5fd 100%     /* sky-300 */
+  );
+  background-size: 260% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradientFlowX 7s ease-in-out infinite alternate;
+}
+
+@keyframes gradientFlowX {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
 }

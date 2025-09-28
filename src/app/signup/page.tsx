@@ -46,6 +46,7 @@ export default function SignUpPage() {
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Create your account</h1>
+          <p className="text-gray-300 text-sm">Assistant</p>
           <p className="text-gray-300 text-sm">Join Cognitive Care Assistant</p>
         </div>
 

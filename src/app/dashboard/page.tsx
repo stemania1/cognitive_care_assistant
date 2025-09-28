@@ -26,8 +26,9 @@ export default function Dashboard() {
             </div>
           </Link>
 
-          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
-            Cognitive Care
+          <h1 className="font-extrabold tracking-tight text-center">
+            <span className="block text-3xl sm:text-5xl gradient-text leading-[1.15] pb-1">Cognitive Care</span>
+            <span className="block text-lg sm:text-2xl -mt-1 gradient-text">Assistant</span>
           </h1>
 
         </div>

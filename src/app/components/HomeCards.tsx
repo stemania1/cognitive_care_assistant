@@ -24,9 +24,27 @@ function getTodayKey(): string {
 export default function HomeCards() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+      {/* Row 1: Daily Questions + Medication */}
+      <LinkCard
+        href="/daily-questions"
+        title="Daily Questions"
+        description="Quick daily check-in questionnaires"
+        accent="from-emerald-500 to-teal-500"
+        emoji="📝"
+      />
+
+      <LinkCard
+        href="/reminders"
+        title="Nutrition"
+        description="Hydration, meals, and medicine times"
+        accent="from-amber-500 to-orange-500"
+        emoji="🥗"
+      />
+
+      {/* Row 2: Exercise + Sleep Behaviors */}
       <LinkCard
         href="/emg"
-        title="EMG Workout"
+        title="Exercise"
         description="Analyze muscle activation during workouts"
         accent="from-fuchsia-500 to-purple-500"
         emoji="💪"
@@ -40,23 +58,8 @@ export default function HomeCards() {
         emoji="😴"
       />
 
-      <LinkCard
-        href="/daily-questions"
-        title="Daily Questions"
-        description="Quick daily check-in questionnaires"
-        accent="from-emerald-500 to-teal-500"
-        emoji="📝"
-      />
-
-      <LinkCard
-        href="/reminders"
-        title="Reminders"
-        description="Toggle and schedule wellness reminders"
-        accent="from-amber-500 to-orange-500"
-        emoji="⏰"
-      />
-
-      <div className="w-full sm:col-span-2 sm:w-1/2 justify-self-center">
+      {/* Row 3: Wide Memory Games bar */}
+      <div className="sm:col-span-2 w-full">
         <LinkCard
           href="/memory-games"
           title="Memory Games"
