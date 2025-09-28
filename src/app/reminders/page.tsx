@@ -11,6 +11,8 @@ type RemindersState = {
   eatFood: boolean;
   medicineDosage: string;
   medicineTimes: string[];
+  waterTimes: string[];
+  foodTimes: string[];
 };
 
 export default function RemindersPage() {
@@ -21,9 +23,13 @@ export default function RemindersPage() {
     eatFood: false,
     medicineDosage: "",
     medicineTimes: [],
+    waterTimes: [],
+    foodTimes: [],
   });
   const [saved, setSaved] = useState(false);
   const [timeInput, setTimeInput] = useState<string>("");
+  const [waterTimeInput, setWaterTimeInput] = useState<string>("");
+  const [foodTimeInput, setFoodTimeInput] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -75,6 +81,44 @@ export default function RemindersPage() {
     });
   }
 
+  function addWaterTime() {
+    if (!waterTimeInput) return;
+    setState((prev) => {
+      if (prev.waterTimes.includes(waterTimeInput)) return prev;
+      const next = { ...prev, waterTimes: [...prev.waterTimes, waterTimeInput].sort() };
+      persist(next);
+      return next;
+    });
+    setWaterTimeInput("");
+  }
+
+  function removeWaterTime(t: string) {
+    setState((prev) => {
+      const next = { ...prev, waterTimes: prev.waterTimes.filter((x) => x !== t) };
+      persist(next);
+      return next;
+    });
+  }
+
+  function addFoodTime() {
+    if (!foodTimeInput) return;
+    setState((prev) => {
+      if (prev.foodTimes.includes(foodTimeInput)) return prev;
+      const next = { ...prev, foodTimes: [...prev.foodTimes, foodTimeInput].sort() };
+      persist(next);
+      return next;
+    });
+    setFoodTimeInput("");
+  }
+
+  function removeFoodTime(t: string) {
+    setState((prev) => {
+      const next = { ...prev, foodTimes: prev.foodTimes.filter((x) => x !== t) };
+      persist(next);
+      return next;
+    });
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
@@ -103,7 +147,47 @@ export default function RemindersPage() {
               <span className="sr-only">Toggle drink water reminders</span>
             </button>
           </div>
-          <p className="mt-2 text-xs opacity-70">Turn on to get reminded to drink water regularly.</p>
+          {state.drinkWater ? (
+            <div className="mt-3">
+              <label className="block text-xs opacity-80 mb-1">Times to drink</label>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="time"
+                  value={waterTimeInput}
+                  onChange={(e) => setWaterTimeInput(e.target.value)}
+                  className="rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={addWaterTime}
+                  className="rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm hover:bg-white/15"
+                >
+                  Add
+                </button>
+              </div>
+              {state.waterTimes.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {state.waterTimes.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-xs">
+                      {t}
+                      <button
+                        type="button"
+                        onClick={() => removeWaterTime(t)}
+                        className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 hover:bg-white/30"
+                        aria-label={`Remove time ${t}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs opacity-60">No times added yet.</p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs opacity-70">Turn on to get reminded to drink water regularly.</p>
+          )}
         </section>
 
         {/* Medicine */}
@@ -188,7 +272,47 @@ export default function RemindersPage() {
               <span className="sr-only">Toggle eat food reminders</span>
             </button>
           </div>
-          <p className="mt-2 text-xs opacity-70">Turn on to get reminded about meals and snacks.</p>
+          {state.eatFood ? (
+            <div className="mt-3">
+              <label className="block text-xs opacity-80 mb-1">Meal times</label>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="time"
+                  value={foodTimeInput}
+                  onChange={(e) => setFoodTimeInput(e.target.value)}
+                  className="rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={addFoodTime}
+                  className="rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm hover:bg-white/15"
+                >
+                  Add
+                </button>
+              </div>
+              {state.foodTimes.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {state.foodTimes.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-xs">
+                      {t}
+                      <button
+                        type="button"
+                        onClick={() => removeFoodTime(t)}
+                        className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 hover:bg-white/30"
+                        aria-label={`Remove time ${t}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs opacity-60">No times added yet.</p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs opacity-70">Turn on to get reminded about meals and snacks.</p>
+          )}
         </section>
       </main>
 
