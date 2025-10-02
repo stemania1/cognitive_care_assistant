@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function SignOut() {
   const [isLoading, setIsLoading] = useState(false);
@@ -14,9 +15,11 @@ export default function SignOut() {
     setIsLoading(true);
     
     try {
-      // TODO: Implement actual sign out logic here
-      // Clear authentication tokens, user session, etc.
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Error signing out:", error);
+        return;
+      }
       
       // Set confirmed state to show success message
       setIsConfirmed(true);

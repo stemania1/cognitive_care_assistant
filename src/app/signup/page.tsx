@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -23,8 +24,11 @@ export default function SignUpPage() {
     }
     setIsLoading(true);
     try {
-      // TODO: send to API to create account
-      await new Promise((r) => setTimeout(r, 1000));
+      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (signUpError) {
+        setError(signUpError.message || "Unable to create account.");
+        return;
+      }
       router.push("/signin");
     } finally {
       setIsLoading(false);

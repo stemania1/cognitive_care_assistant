@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -18,11 +19,11 @@ export default function SignIn() {
     setError("");
 
     try {
-      // TODO: Implement actual authentication logic here
-      // For now, we'll simulate a successful sign-in
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Redirect to dashboard after successful sign-in
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        setError(signInError.message || "Invalid email or password. Please try again.");
+        return;
+      }
       router.push("/dashboard");
     } catch (err) {
       setError("Invalid email or password. Please try again.");
