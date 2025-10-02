@@ -111,7 +111,6 @@ export default function DailyQuestionsPage() {
   function setAnswer(id: string, value: string) {
     if (!startedAt) setStartedAt(Date.now());
     setAnswers((prev) => ({ ...prev, [id]: value }));
-    saveOne(id, value);
   }
 
   async function saveAll() {
@@ -205,15 +204,6 @@ export default function DailyQuestionsPage() {
               >
                 Next 3
               </button>
-              <button
-                type="button"
-                onClick={saveAll}
-                disabled={saving || !userId}
-                className="text-sm rounded-md border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15 disabled:opacity-50"
-                aria-label="Save today's answers"
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
               {saved ? (
                 <span className="text-xs text-emerald-300">Saved</span>
               ) : dbLoading ? (
@@ -258,13 +248,33 @@ export default function DailyQuestionsPage() {
               </div>
             ))}
 
-            <div className="flex items-center justify-end">
-              <Link
-                href="/questions/history"
-                className="mt-1 px-3 py-1 rounded-md border border-white/15 bg-white/10 text-xs hover:bg-white/15"
+            {/* Save Button */}
+            <div className="mt-6 flex flex-col items-center gap-4">
+              <button
+                type="button"
+                onClick={saveAll}
+                disabled={saving || !userId || answeredCount === 0}
+                className="w-full max-w-md py-4 px-6 rounded-xl bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500 text-white font-semibold text-lg hover:from-purple-600 hover:via-fuchsia-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 focus:ring-offset-black transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                aria-label="Save today's answers"
               >
-                View saved answers
-              </Link>
+                {saving ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Saving...</span>
+                  </div>
+                ) : (
+                  `Save Answers (${answeredCount}/3)`
+                )}
+              </button>
+              
+              <div className="flex items-center justify-center gap-4">
+                <Link
+                  href="/questions/history"
+                  className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
+                >
+                  View saved answers
+                </Link>
+              </div>
             </div>
           </div>
         </div>
