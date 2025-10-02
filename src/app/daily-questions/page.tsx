@@ -315,6 +315,15 @@ export default function DailyQuestionsPage() {
               </button>
               
               <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={async () => {
+                    setShowHistory(true);
+                    await Promise.all([loadSessions(), loadRecentAnswers()]);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
+                >
+                  Show Progress
+                </button>
                 <Link
                   href="/questions/history"
                   className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
@@ -324,10 +333,18 @@ export default function DailyQuestionsPage() {
               </div>
             </div>
 
-            {/* Historical Data - shown after saving */}
-            {showHistory && sessions.length > 0 && (
+            {/* Historical Data - shown after saving or when button is clicked */}
+            {showHistory && (
               <div className="mt-8 space-y-6">
                 <h2 className="text-xl font-semibold text-center">Your Progress</h2>
+                
+                {sessions.length === 0 && recentAnswers.length === 0 ? (
+                  <div className="text-center text-white/60 py-8">
+                    <p>No progress data available yet.</p>
+                    <p className="text-sm mt-2">Complete some questions and save to see your progress here.</p>
+                  </div>
+                ) : (
+                  <>
                 
                 {/* Historical Chart */}
                 <div className="rounded-lg border border-white/10 bg-white/5 p-4">
@@ -494,6 +511,8 @@ export default function DailyQuestionsPage() {
                     Hide History
                   </button>
                 </div>
+                  </>
+                )}
               </div>
             )}
           </div>
