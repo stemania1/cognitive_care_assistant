@@ -48,7 +48,7 @@ export default function DailyQuestionsPage() {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState<Array<{ id: string; created_at: string; duration_ms: number; set_start_index: number }>>([]);
-  const [recentAnswers, setRecentAnswers] = useState<Array<{ date: string; answers: Array<{ question: string; answer: string }> }>>([]);
+  const [recentAnswers, setRecentAnswers] = useState<Array<{ date: string; created_at?: string; answers: Array<{ question: string; answer: string }> }>>([]);
   const [completionTime, setCompletionTime] = useState<number | null>(null);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
@@ -497,10 +497,10 @@ export default function DailyQuestionsPage() {
                             {/* X-axis labels */}
                             {data.map((session, idx) => {
                               const x = padding + (data.length > 1 ? (idx / (data.length - 1)) * chartWidth : chartWidth / 2);
-                              // Use the local date from the session for the date display
-                              const sessionDate = new Date(session.date + 'T00:00:00');
-                              // Use created_at for the time display (this is the actual completion time)
+                              // Use created_at for both date and time display
                               const createdDate = new Date(session.created_at);
+                              // Extract just the date part for the date label
+                              const sessionDate = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate());
                               return (
                                 <g key={idx}>
                                   <text
@@ -577,7 +577,7 @@ export default function DailyQuestionsPage() {
                                       hour: '2-digit', 
                                       minute: '2-digit' 
                                     }) : 
-                                    'N/A'
+                                    'Time not available'
                                   }
                                 </div>
                               </td>
