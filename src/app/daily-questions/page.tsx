@@ -79,19 +79,12 @@ export default function DailyQuestionsPage() {
     return [0, 1, 2].map((i) => ALL_QUESTIONS[(windowStart + i) % ALL_QUESTIONS.length]);
   }, [windowStart]);
 
-  // Load answers from database when questions change
+  // Start with empty answers when questions change
   useEffect(() => {
     if (todaysQuestions.length > 0) {
-      const initialAnswers: Record<string, string> = {};
-      todaysQuestions.forEach(q => {
-        const answer = getAnswer(q.id);
-        if (answer) {
-          initialAnswers[q.id] = answer;
-        }
-      });
-      setAnswers(initialAnswers);
+      setAnswers({});
     }
-  }, [todaysQuestions, getAnswer]);
+  }, [todaysQuestions]);
 
   async function saveOne(id: string, value: string) {
     if (!userId) return;
@@ -156,7 +149,7 @@ export default function DailyQuestionsPage() {
     }
   }
 
-  const answeredCount = todaysQuestions.reduce((n, q) => (hasAnswer(q.id) ? n + 1 : n), 0);
+  const answeredCount = todaysQuestions.reduce((n, q) => (answers[q.id] ? n + 1 : n), 0);
 
   function nextThree() {
     setWindowStart((prev) => {
@@ -245,7 +238,7 @@ export default function DailyQuestionsPage() {
                         key={choice}
                         onClick={() => setAnswer(q.id, choice)}
                         className={`px-3 py-1 rounded-full text-xs transition-colors ${
-                          (answers[q.id] === choice || getAnswer(q.id) === choice) ? "bg-emerald-500 text-black" : "bg-white/10 hover:bg-white/15"
+                          answers[q.id] === choice ? "bg-emerald-500 text-black" : "bg-white/10 hover:bg-white/15"
                         }`}
                         type="button"
                       >
@@ -256,7 +249,7 @@ export default function DailyQuestionsPage() {
                 ) : (
                   <input
                     type="text"
-                    value={answers[q.id] ?? getAnswer(q.id) ?? ""}
+                    value={answers[q.id] ?? ""}
                     onChange={(e) => setAnswer(q.id, e.target.value)}
                     placeholder="Type your answer"
                     className="w-full rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none placeholder-white/40"
