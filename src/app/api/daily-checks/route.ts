@@ -82,7 +82,10 @@ export async function POST(request: NextRequest) {
 
     if (result.error) {
       console.error('Error saving daily check:', result.error);
-      return NextResponse.json({ error: 'Failed to save daily check' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Failed to save daily check', 
+        details: result.error.message || 'Unknown database error' 
+      }, { status: 500 });
     }
 
     return NextResponse.json({ data: result.data[0] });
