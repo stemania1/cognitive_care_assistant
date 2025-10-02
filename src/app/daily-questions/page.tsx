@@ -48,6 +48,7 @@ export default function DailyQuestionsPage() {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState<Array<{ created_at: string; duration_ms: number; set_start_index: number }>>([]);
+  const [recentAnswers, setRecentAnswers] = useState<Array<{ date: string; answers: Array<{ question: string; answer: string }> }>>([]);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
 
@@ -72,6 +73,40 @@ export default function DailyQuestionsPage() {
       }
     } catch (error) {
       console.error('Error loading sessions:', error);
+    }
+  };
+
+  // Load recent answers
+  const loadRecentAnswers = async () => {
+    if (!userId) return;
+    try {
+      const params = new URLSearchParams({ userId });
+      const res = await fetch(`/api/daily-checks?${params}`);
+      const json = await res.json();
+      if (res.ok) {
+        const answers = json.data || [];
+        // Group by date
+        const grouped = answers.reduce((acc: any, check: any) => {
+          const date = check.date;
+          if (!acc[date]) {
+            acc[date] = { date, answers: [] };
+          }
+          acc[date].answers.push({
+            question: check.question_text,
+            answer: check.answer
+          });
+          return acc;
+        }, {});
+        
+        // Convert to array and sort by date (newest first)
+        const sortedAnswers = Object.values(grouped).sort((a: any, b: any) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        
+        setRecentAnswers(sortedAnswers.slice(0, 5)); // Show last 5 days
+      }
+    } catch (error) {
+      console.error('Error loading answers:', error);
     }
   };
 
@@ -158,7 +193,7 @@ export default function DailyQuestionsPage() {
       }
       setSaved(true);
       setShowHistory(true);
-      await loadSessions(); // Load updated sessions
+      await Promise.all([loadSessions(), loadRecentAnswers()]); // Load updated data
       window.setTimeout(() => setSaved(false), 800);
     } catch (error) {
       console.error('Error saving answers:', error);
@@ -296,54 +331,148 @@ export default function DailyQuestionsPage() {
                 
                 {/* Historical Chart */}
                 <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                  <h3 className="text-lg font-medium mb-4">Completion Times</h3>
-                  <div className="flex items-end gap-2 h-32">
-                    {sessions.slice(0, 10).map((session, idx) => {
-                      const maxDuration = Math.max(...sessions.map(s => s.duration_ms), 1);
-                      const height = Math.max(4, Math.round((session.duration_ms / maxDuration) * 120));
-                      const seconds = Math.round(session.duration_ms / 1000);
-                      const date = new Date(session.created_at).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
-                      return (
-                        <div key={idx} className="flex flex-col items-center gap-1">
-                          <div 
-                            className="w-6 bg-gradient-to-t from-cyan-500 to-purple-500 rounded-t" 
-                            style={{ height }} 
-                            title={`${seconds}s`} 
-                          />
-                          <span className="text-xs opacity-70">{date}</span>
-                        </div>
-                      );
-                    })}
+                  <h3 className="text-lg font-medium mb-4">Completion Times (Line Chart)</h3>
+                  <div className="h-64 relative">
+                    <svg className="w-full h-full" viewBox="0 0 400 200">
+                      {sessions.length > 1 && (() => {
+                        const data = sessions.slice(0, 10).reverse(); // Show oldest to newest
+                        const maxSeconds = Math.max(...data.map(s => s.duration_ms / 1000), 1);
+                        const minSeconds = Math.min(...data.map(s => s.duration_ms / 1000), 0);
+                        const range = maxSeconds - minSeconds || 1;
+                        const padding = 20;
+                        const chartWidth = 360;
+                        const chartHeight = 160;
+                        
+                        // Create line path
+                        const points = data.map((session, idx) => {
+                          const x = padding + (idx / (data.length - 1)) * chartWidth;
+                          const y = padding + chartHeight - ((session.duration_ms / 1000 - minSeconds) / range) * chartHeight;
+                          return `${x},${y}`;
+                        }).join(' L');
+                        
+                        // Create dots
+                        const dots = data.map((session, idx) => {
+                          const x = padding + (idx / (data.length - 1)) * chartWidth;
+                          const y = padding + chartHeight - ((session.duration_ms / 1000 - minSeconds) / range) * chartHeight;
+                          return { x, y, seconds: Math.round(session.duration_ms / 1000) };
+                        });
+                        
+                        return (
+                          <>
+                            {/* Grid lines */}
+                            {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => (
+                              <g key={i}>
+                                <line
+                                  x1={padding}
+                                  y1={padding + chartHeight * ratio}
+                                  x2={padding + chartWidth}
+                                  y2={padding + chartHeight * ratio}
+                                  stroke="rgba(255,255,255,0.1)"
+                                  strokeWidth="1"
+                                />
+                                <text
+                                  x={5}
+                                  y={padding + chartHeight * ratio + 4}
+                                  fontSize="10"
+                                  fill="rgba(255,255,255,0.6)"
+                                >
+                                  {Math.round(maxSeconds - range * ratio)}s
+                                </text>
+                              </g>
+                            ))}
+                            
+                            {/* Line */}
+                            <path
+                              d={`M ${points}`}
+                              fill="none"
+                              stroke="url(#gradient)"
+                              strokeWidth="2"
+                            />
+                            
+                            {/* Gradient definition */}
+                            <defs>
+                              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stopColor="#06b6d4" />
+                                <stop offset="100%" stopColor="#8b5cf6" />
+                              </linearGradient>
+                            </defs>
+                            
+                            {/* Dots */}
+                            {dots.map((dot, idx) => (
+                              <g key={idx}>
+                                <circle
+                                  cx={dot.x}
+                                  cy={dot.y}
+                                  r="4"
+                                  fill="#06b6d4"
+                                  stroke="white"
+                                  strokeWidth="1"
+                                />
+                                <text
+                                  x={dot.x}
+                                  y={dot.y - 8}
+                                  fontSize="10"
+                                  fill="white"
+                                  textAnchor="middle"
+                                >
+                                  {dot.seconds}s
+                                </text>
+                              </g>
+                            ))}
+                            
+                            {/* X-axis labels */}
+                            {data.map((session, idx) => {
+                              const x = padding + (idx / (data.length - 1)) * chartWidth;
+                              const date = new Date(session.created_at);
+                              return (
+                                <text
+                                  key={idx}
+                                  x={x}
+                                  y={padding + chartHeight + 15}
+                                  fontSize="9"
+                                  fill="rgba(255,255,255,0.6)"
+                                  textAnchor="middle"
+                                >
+                                  {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </text>
+                              );
+                            })}
+                          </>
+                        );
+                      })()}
+                    </svg>
                   </div>
                 </div>
 
                 {/* Historical Table */}
                 <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                  <h3 className="text-lg font-medium mb-4">Recent Sessions</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-white/10">
-                          <th className="text-left py-2">Date</th>
-                          <th className="text-left py-2">Questions</th>
-                          <th className="text-left py-2">Duration</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sessions.slice(0, 5).map((session, idx) => {
-                          const date = new Date(session.created_at).toLocaleDateString();
-                          const questionRange = `${session.set_start_index + 1}-${session.set_start_index + 3}`;
-                          const duration = Math.round(session.duration_ms / 1000);
-                          return (
-                            <tr key={idx} className="border-b border-white/5">
-                              <td className="py-2">{date}</td>
-                              <td className="py-2">{questionRange}</td>
-                              <td className="py-2">{duration}s</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <h3 className="text-lg font-medium mb-4">Recent Answers</h3>
+                  <div className="space-y-4">
+                    {recentAnswers.map((dayData, dayIdx) => (
+                      <div key={dayIdx} className="border border-white/5 rounded-lg p-3">
+                        <div className="text-sm font-medium text-cyan-300 mb-2">
+                          {new Date(dayData.date).toLocaleDateString(undefined, { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </div>
+                        <div className="space-y-2">
+                          {dayData.answers.map((qa, qaIdx) => (
+                            <div key={qaIdx} className="text-sm">
+                              <div className="font-medium text-white/90 mb-1">{qa.question}</div>
+                              <div className="text-white/70 ml-2">→ {qa.answer}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {recentAnswers.length === 0 && (
+                      <div className="text-center text-white/60 py-4">
+                        No answers saved yet. Complete some questions and save to see your history here.
+                      </div>
+                    )}
                   </div>
                 </div>
 
