@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -19,6 +19,10 @@ export default function SignIn() {
     setError("");
 
     try {
+      if (!isSupabaseConfigured) {
+        setError("Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the dev server.");
+        return;
+      }
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
         setError(signInError.message || "Invalid email or password. Please try again.");
