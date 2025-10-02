@@ -120,25 +120,38 @@ export default function DailyQuestionsPage() {
       const json = await res.json();
       if (res.ok) {
         const answers = json.data || [];
-        // Group by date
+        
+        // Group by date and question set (3 questions at a time)
         const grouped = answers.reduce((acc: any, check: any) => {
           const date = check.date;
-          if (!acc[date]) {
-            acc[date] = { date, created_at: check.created_at, answers: [] };
+          const questionId = check.question_id;
+          const questionIndex = parseInt(questionId.replace('q', '')) - 1; // Convert q1, q2, etc. to 0, 1, etc.
+          const setIndex = Math.floor(questionIndex / 3); // Group every 3 questions
+          const key = `${date}-set${setIndex}`;
+          
+          if (!acc[key]) {
+            acc[key] = { 
+              date, 
+              created_at: check.created_at, 
+              setIndex,
+              answers: [] 
+            };
           }
-          acc[date].answers.push({
+          acc[key].answers.push({
             question: check.question_text,
             answer: check.answer
           });
           return acc;
         }, {});
         
-        // Convert to array and sort by date (newest first)
-        const sortedAnswers = Object.values(grouped).sort((a: any, b: any) => 
-          new Date(b.date).getTime() - new Date(a.date).getTime()
-        ) as Array<{ date: string; created_at?: string; answers: Array<{ question: string; answer: string }> }>;
+        // Convert to array and sort by date and set (newest first)
+        const sortedAnswers = Object.values(grouped).sort((a: any, b: any) => {
+          const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
+          if (dateCompare !== 0) return dateCompare;
+          return b.setIndex - a.setIndex; // Within same date, newer sets first
+        }) as Array<{ date: string; created_at?: string; setIndex: number; answers: Array<{ question: string; answer: string }> }>;
         
-        setRecentAnswers(sortedAnswers.slice(0, 5)); // Show last 5 days
+        setRecentAnswers(sortedAnswers.slice(0, 10)); // Show last 10 sets (up to 30 questions)
       }
     } catch (error) {
       console.error('Error loading answers:', error);
@@ -584,11 +597,9 @@ export default function DailyQuestionsPage() {
                         <thead>
                           <tr className="border-b border-white/10">
                             <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
-                            {recentAnswers[0]?.answers.map((qa, idx) => (
-                              <th key={idx} className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
-                                Question {idx + 1}
-                              </th>
-                            ))}
+                            <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 1</th>
+                            <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 2</th>
+                            <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 3</th>
                             <th className="text-center py-2 px-3 font-medium text-cyan-300 w-20">Actions</th>
                           </tr>
                         </thead>
@@ -613,13 +624,20 @@ export default function DailyQuestionsPage() {
                                   }
                                 </div>
                               </td>
-                              {dayData.answers.map((qa, qaIdx) => (
-                                <td key={qaIdx} className="py-3 px-3 text-white/70 max-w-48">
-                                  <div className="truncate" title={`${qa.question}: ${qa.answer}`}>
-                                    <span className="font-medium text-cyan-200">{qa.question}:</span> {qa.answer}
-                                  </div>
-                                </td>
-                              ))}
+                              {[0, 1, 2].map((qaIdx) => {
+                                const qa = dayData.answers[qaIdx];
+                                return (
+                                  <td key={qaIdx} className="py-3 px-3 text-white/70 max-w-48">
+                                    {qa ? (
+                                      <div className="truncate" title={`${qa.question}: ${qa.answer}`}>
+                                        <span className="font-medium text-cyan-200">{qa.question}:</span> {qa.answer}
+                                      </div>
+                                    ) : (
+                                      <div className="text-white/40 italic">No answer</div>
+                                    )}
+                                  </td>
+                                );
+                              })}
                               <td className="py-3 px-3 text-center">
                                 <button
                                   onClick={() => deleteDailyChecks(dayData.date)}
