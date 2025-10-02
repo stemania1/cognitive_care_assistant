@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useDailyChecks } from "@/lib/useDailyChecks";
+import { supabase } from "@/lib/supabaseClient";
 
 type Question = { id: string; text: string; choices?: string[] };
 type StoredAnswer = string | { v: string; t: string };
@@ -37,11 +39,22 @@ const ALL_QUESTIONS: Question[] = [
 
 export default function DailyQuestionsPage() {
   const today = useMemo(() => getTodayKey(), []);
-  const todayKey = useMemo(() => `dailyQuestions:${today}`, [today]);
   const windowKey = useMemo(() => `dailyQuestionsWindow:${today}`, [today]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
   const [windowStart, setWindowStart] = useState<number>(0);
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
+
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id || null);
+    };
+    getUser();
+  }, []);
 
   useEffect(() => {
     try {
@@ -64,33 +77,40 @@ export default function DailyQuestionsPage() {
     return [0, 1, 2].map((i) => ALL_QUESTIONS[(windowStart + i) % ALL_QUESTIONS.length]);
   }, [windowStart]);
 
+  // Load answers from database when questions change
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(todayKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Record<string, StoredAnswer>;
-        const initial: Record<string, string> = {};
-        for (const [id, val] of Object.entries(parsed)) {
-          if (val && typeof val === "object" && "v" in val) {
-            initial[id] = (val as { v: string }).v;
-          } else if (typeof val === "string") {
-            initial[id] = val;
-          }
+    if (todaysQuestions.length > 0) {
+      const initialAnswers: Record<string, string> = {};
+      todaysQuestions.forEach(q => {
+        const answer = getAnswer(q.id);
+        if (answer) {
+          initialAnswers[q.id] = answer;
         }
-        setAnswers(initial);
-      }
-    } catch {}
-  }, [todayKey]);
+      });
+      setAnswers(initialAnswers);
+    }
+  }, [todaysQuestions, getAnswer]);
 
-  function saveOne(id: string, value: string) {
+  async function saveOne(id: string, value: string) {
+    if (!userId) return;
+    
     try {
-      const raw = localStorage.getItem(todayKey);
-      const current: Record<string, StoredAnswer> = raw ? JSON.parse(raw) : {};
-      current[id] = { v: value, t: new Date().toISOString() };
-      localStorage.setItem(todayKey, JSON.stringify(current));
+      const question = ALL_QUESTIONS.find(q => q.id === id);
+      if (!question) return;
+
+      await saveDailyCheck({
+        questionId: id,
+        questionText: question.text,
+        answer: value,
+        answerType: question.choices ? 'choice' : 'text',
+        date: today
+      });
+      
       setSaved(true);
       window.setTimeout(() => setSaved(false), 800);
-    } catch {}
+    } catch (error) {
+      console.error('Error saving answer:', error);
+    }
   }
 
   function setAnswer(id: string, value: string) {
@@ -98,7 +118,7 @@ export default function DailyQuestionsPage() {
     saveOne(id, value);
   }
 
-  const answeredCount = todaysQuestions.reduce((n, q) => (answers[q.id]?.trim() ? n + 1 : n), 0);
+  const answeredCount = todaysQuestions.reduce((n, q) => (hasAnswer(q.id) ? n + 1 : n), 0);
 
   function nextThree() {
     setWindowStart((prev) => {
@@ -148,6 +168,8 @@ export default function DailyQuestionsPage() {
               </button>
               {saved ? (
                 <span className="text-xs text-emerald-300">Saved</span>
+              ) : dbLoading ? (
+                <span className="text-xs opacity-60">Loading...</span>
               ) : (
                 <span className="text-xs opacity-60">{answeredCount}/3 answered</span>
               )}
@@ -165,7 +187,7 @@ export default function DailyQuestionsPage() {
                         key={choice}
                         onClick={() => setAnswer(q.id, choice)}
                         className={`px-3 py-1 rounded-full text-xs transition-colors ${
-                          answers[q.id] === choice ? "bg-emerald-500 text-black" : "bg-white/10 hover:bg-white/15"
+                          (answers[q.id] === choice || getAnswer(q.id) === choice) ? "bg-emerald-500 text-black" : "bg-white/10 hover:bg-white/15"
                         }`}
                         type="button"
                       >
@@ -176,7 +198,7 @@ export default function DailyQuestionsPage() {
                 ) : (
                   <input
                     type="text"
-                    value={answers[q.id] ?? ""}
+                    value={answers[q.id] ?? getAnswer(q.id) ?? ""}
                     onChange={(e) => setAnswer(q.id, e.target.value)}
                     placeholder="Type your answer"
                     className="w-full rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none placeholder-white/40"
