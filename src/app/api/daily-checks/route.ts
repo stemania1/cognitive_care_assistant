@@ -12,9 +12,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Create a Supabase client with service role key for admin operations
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+      return NextResponse.json({ 
+        error: 'Service role key not configured', 
+        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      serviceRoleKey,
       {
         auth: {
           autoRefreshToken: false,
@@ -57,9 +65,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a Supabase client with service role key for admin operations
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+      return NextResponse.json({ 
+        error: 'Service role key not configured', 
+        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      serviceRoleKey,
       {
         auth: {
           autoRefreshToken: false,

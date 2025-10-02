@@ -40,7 +40,8 @@ export function useDailyChecks(userId: string | null) {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to fetch daily checks');
+        console.error('API Error:', result);
+        throw new Error(result.error || result.details || 'Failed to fetch daily checks');
       }
 
       // Convert array to object keyed by question_id for easy lookup
