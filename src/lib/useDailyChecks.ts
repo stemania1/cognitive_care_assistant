@@ -81,7 +81,8 @@ export function useDailyChecks(userId: string | null) {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || result.details || 'Failed to save daily check');
+        console.error('API Error:', result);
+        throw new Error(result.details || result.error || 'Failed to save daily check');
       }
 
       // Update local state

@@ -61,7 +61,15 @@ export async function POST(request: NextRequest) {
     const { userId, questionId, questionText, answer, answerType = 'text', date } = body;
 
     if (!userId || !questionId || !questionText || !answer) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      const missing = [];
+      if (!userId) missing.push('userId');
+      if (!questionId) missing.push('questionId');
+      if (!questionText) missing.push('questionText');
+      if (!answer) missing.push('answer');
+      return NextResponse.json({ 
+        error: 'Missing required fields', 
+        details: `Missing: ${missing.join(', ')}` 
+      }, { status: 400 });
     }
 
     // Create a Supabase client with service role key for admin operations
