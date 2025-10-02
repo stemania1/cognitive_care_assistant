@@ -136,7 +136,7 @@ export default function DailyQuestionsPage() {
         // Convert to array and sort by date (newest first)
         const sortedAnswers = Object.values(grouped).sort((a: any, b: any) => 
           new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
+        ) as Array<{ date: string; created_at?: string; answers: Array<{ question: string; answer: string }> }>;
         
         setRecentAnswers(sortedAnswers.slice(0, 5)); // Show last 5 days
       }
