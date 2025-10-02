@@ -45,6 +45,7 @@ export default function DailyQuestionsPage() {
   const [saving, setSaving] = useState(false);
   const [windowStart, setWindowStart] = useState<number>(0);
   const [userId, setUserId] = useState<string | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
 
@@ -115,6 +116,7 @@ export default function DailyQuestionsPage() {
   }
 
   function setAnswer(id: string, value: string) {
+    if (!startedAt) setStartedAt(Date.now());
     setAnswers((prev) => ({ ...prev, [id]: value }));
     saveOne(id, value);
   }
@@ -133,6 +135,17 @@ export default function DailyQuestionsPage() {
           answerType: q.choices ? 'choice' : 'text',
           date: today,
         });
+      }
+      if (startedAt) {
+        const durationMs = Date.now() - startedAt;
+        try {
+          await fetch('/api/daily-check-sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, date: today, setStartIndex: windowStart, durationMs })
+          });
+        } catch {}
+        setStartedAt(null);
       }
       setSaved(true);
       window.setTimeout(() => setSaved(false), 800);
@@ -173,8 +186,16 @@ export default function DailyQuestionsPage() {
       <main className="relative p-8 sm:p-16">
         <div className="mx-auto max-w-3xl">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl sm:text-3xl font-semibold">Daily Questions</h1>
+            <div className="flex flex-col">
+              <h1 className="text-2xl sm:text-3xl font-semibold">Daily Questions</h1>
+              <span className="text-xs opacity-70">Set label: Questions {((windowStart % ALL_QUESTIONS.length) + 1)}–{(((windowStart + 2) % ALL_QUESTIONS.length) + 1)} of {ALL_QUESTIONS.length}</span>
+            </div>
             <div className="flex items-center gap-2">
+              {startedAt ? (
+                <span className="text-xs opacity-70" aria-live="polite">Time: {Math.floor((Date.now() - startedAt) / 1000)}s</span>
+              ) : (
+                <span className="text-xs opacity-40">Time: 0s</span>
+              )}
               <button
                 type="button"
                 onClick={prevThree}
@@ -209,6 +230,9 @@ export default function DailyQuestionsPage() {
               )}
             </div>
           </div>
+
+          {/* Simple durations graph */}
+          <DurationsGraph userId={userId} />
 
           <div className="flex flex-col gap-3">
             {todaysQuestions.map((q) => (
@@ -256,6 +280,50 @@ export default function DailyQuestionsPage() {
       <Link href="/dashboard" className="fixed bottom-6 left-6 sm:bottom-8 sm:left-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15 transition">
         <span className="text-sm">← Back to Home</span>
       </Link>
+    </div>
+  );
+}
+
+
+function DurationsGraph({ userId }: { userId: string | null }) {
+  const [rows, setRows] = useState<Array<{ created_at: string; duration_ms: number }>>([]);
+  useEffect(() => {
+    const load = async () => {
+      if (!userId) { setRows([]); return; }
+      try {
+        const params = new URLSearchParams({ userId, limit: '10' });
+        const res = await fetch(`/api/daily-check-sessions?${params}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed');
+        const mapped = (json.data || []).map((r: any) => ({ created_at: r.created_at, duration_ms: r.duration_ms })) as Array<{ created_at: string; duration_ms: number }>;
+        setRows(mapped.reverse());
+      } catch {}
+    };
+    load();
+  }, [userId]);
+
+  if (!userId) return null;
+  if (rows.length === 0) return (
+    <div className="mb-4 text-xs opacity-60">No recent timing data.</div>
+  );
+
+  const max = Math.max(...rows.map(r => r.duration_ms), 1);
+  return (
+    <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
+      <div className="mb-2 text-xs opacity-80">Recent completion times</div>
+      <div className="flex items-end gap-2 h-24">
+        {rows.map((r, idx) => {
+          const height = Math.max(4, Math.round((r.duration_ms / max) * 88));
+          const seconds = Math.round(r.duration_ms / 1000);
+          const label = new Date(r.created_at).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
+          return (
+            <div key={idx} className="flex flex-col items-center gap-1">
+              <div className="w-6 bg-cyan-400/70" style={{ height }} title={`${seconds}s`} />
+              <span className="text-[10px] opacity-70">{label}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
