@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabaseClient";
 
 type QAItem = { date: string; entries: Array<{ q: string; a: string }> };
 
@@ -28,25 +29,40 @@ const QUESTIONS_INDEX: Record<string, string> = {
 
 export default function QuestionsHistoryPage() {
   const [items, setItems] = useState<QAItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function loadItems() {
-    const list: QAItem[] = [];
+  async function loadItems() {
     try {
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const key = localStorage.key(i) || "";
-        if (!key.startsWith("dailyQuestions:")) continue;
-        const date = key.split(":")[1] || "unknown";
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-        const parsed: Record<string, string> = JSON.parse(raw);
-        const entries = Object.entries(parsed)
-          .filter(([, a]) => a && a.trim().length > 0)
-          .map(([id, a]) => ({ q: QUESTIONS_INDEX[id] || id, a }));
-        if (entries.length > 0) list.push({ date, entries });
+      setLoading(true);
+      setError(null);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setItems([]);
+        return;
       }
-    } catch {}
-    list.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
-    setItems(list);
+      const params = new URLSearchParams({ userId: user.id });
+      const res = await fetch(`/api/daily-checks?${params}`);
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to fetch");
+      }
+      const rows: Array<{ date: string; question_text: string; question_id: string; answer: string }> = json.data || [];
+      const byDate = new Map<string, Array<{ q: string; a: string }>>();
+      for (const r of rows) {
+        const qText = r.question_text || QUESTIONS_INDEX[r.question_id] || r.question_id;
+        const list = byDate.get(r.date) || [];
+        list.push({ q: qText, a: r.answer });
+        byDate.set(r.date, list);
+      }
+      const merged: QAItem[] = Array.from(byDate.entries()).map(([date, entries]) => ({ date, entries }));
+      merged.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
+      setItems(merged);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -69,27 +85,10 @@ export default function QuestionsHistoryPage() {
 
   function exportCsv() {
     try {
-      const rows: string[][] = [["Date", "TimeSaved", "Question", "Answer"]];
-      // Re-read raw keys so we can include timestamp per answer
-      const indexMap: Record<string, string> = QUESTIONS_INDEX as any;
-      const dates: string[] = [];
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const key = localStorage.key(i) || "";
-        if (!key.startsWith("dailyQuestions:")) continue;
-        dates.push(key.split(":")[1] || "unknown");
-      }
-      dates.sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-      for (const date of dates) {
-        const raw = localStorage.getItem(`dailyQuestions:${date}`);
-        if (!raw) continue;
-        const parsed: Record<string, string | { v: string; t?: string }> = JSON.parse(raw);
-        for (const [id, val] of Object.entries(parsed)) {
-          const q = indexMap[id] || id;
-          if (typeof val === "string") {
-            rows.push([date, "", q, val]);
-          } else if (val && typeof val === "object") {
-            rows.push([date, val.t ?? "", q, val.v ?? ""]);
-          }
+      const rows: string[][] = [["Date", "Question", "Answer"]];
+      for (const item of items) {
+        for (const entry of item.entries) {
+          rows.push([item.date, entry.q, entry.a]);
         }
       }
       const csv = rows
