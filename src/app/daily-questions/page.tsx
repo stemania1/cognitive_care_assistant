@@ -46,6 +46,8 @@ export default function DailyQuestionsPage() {
   const [windowStart, setWindowStart] = useState<number>(0);
   const [userId, setUserId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [sessions, setSessions] = useState<Array<{ created_at: string; duration_ms: number; set_start_index: number }>>([]);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
 
@@ -57,6 +59,21 @@ export default function DailyQuestionsPage() {
     };
     getUser();
   }, []);
+
+  // Load historical sessions
+  const loadSessions = async () => {
+    if (!userId) return;
+    try {
+      const params = new URLSearchParams({ userId, limit: '10' });
+      const res = await fetch(`/api/daily-check-sessions?${params}`);
+      const json = await res.json();
+      if (res.ok) {
+        setSessions(json.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -140,6 +157,8 @@ export default function DailyQuestionsPage() {
         setStartedAt(null);
       }
       setSaved(true);
+      setShowHistory(true);
+      await loadSessions(); // Load updated sessions
       window.setTimeout(() => setSaved(false), 800);
     } catch (error) {
       console.error('Error saving answers:', error);
@@ -183,11 +202,6 @@ export default function DailyQuestionsPage() {
               <span className="text-xs opacity-70">Set label: Questions {((windowStart % ALL_QUESTIONS.length) + 1)}–{(((windowStart + 2) % ALL_QUESTIONS.length) + 1)} of {ALL_QUESTIONS.length}</span>
             </div>
             <div className="flex items-center gap-2">
-              {startedAt ? (
-                <span className="text-xs opacity-70" aria-live="polite">Time: {Math.floor((Date.now() - startedAt) / 1000)}s</span>
-              ) : (
-                <span className="text-xs opacity-40">Time: 0s</span>
-              )}
               <button
                 type="button"
                 onClick={prevThree}
@@ -214,8 +228,6 @@ export default function DailyQuestionsPage() {
             </div>
           </div>
 
-          {/* Simple durations graph */}
-          <DurationsGraph userId={userId} />
 
           <div className="flex flex-col gap-3">
             {todaysQuestions.map((q) => (
@@ -276,6 +288,75 @@ export default function DailyQuestionsPage() {
                 </Link>
               </div>
             </div>
+
+            {/* Historical Data - shown after saving */}
+            {showHistory && sessions.length > 0 && (
+              <div className="mt-8 space-y-6">
+                <h2 className="text-xl font-semibold text-center">Your Progress</h2>
+                
+                {/* Historical Chart */}
+                <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                  <h3 className="text-lg font-medium mb-4">Completion Times</h3>
+                  <div className="flex items-end gap-2 h-32">
+                    {sessions.slice(0, 10).map((session, idx) => {
+                      const maxDuration = Math.max(...sessions.map(s => s.duration_ms), 1);
+                      const height = Math.max(4, Math.round((session.duration_ms / maxDuration) * 120));
+                      const seconds = Math.round(session.duration_ms / 1000);
+                      const date = new Date(session.created_at).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
+                      return (
+                        <div key={idx} className="flex flex-col items-center gap-1">
+                          <div 
+                            className="w-6 bg-gradient-to-t from-cyan-500 to-purple-500 rounded-t" 
+                            style={{ height }} 
+                            title={`${seconds}s`} 
+                          />
+                          <span className="text-xs opacity-70">{date}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Historical Table */}
+                <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                  <h3 className="text-lg font-medium mb-4">Recent Sessions</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="text-left py-2">Date</th>
+                          <th className="text-left py-2">Questions</th>
+                          <th className="text-left py-2">Duration</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sessions.slice(0, 5).map((session, idx) => {
+                          const date = new Date(session.created_at).toLocaleDateString();
+                          const questionRange = `${session.set_start_index + 1}-${session.set_start_index + 3}`;
+                          const duration = Math.round(session.duration_ms / 1000);
+                          return (
+                            <tr key={idx} className="border-b border-white/5">
+                              <td className="py-2">{date}</td>
+                              <td className="py-2">{questionRange}</td>
+                              <td className="py-2">{duration}s</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <button
+                    onClick={() => setShowHistory(false)}
+                    className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
+                  >
+                    Hide History
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -288,47 +369,5 @@ export default function DailyQuestionsPage() {
 }
 
 
-function DurationsGraph({ userId }: { userId: string | null }) {
-  const [rows, setRows] = useState<Array<{ created_at: string; duration_ms: number }>>([]);
-  useEffect(() => {
-    const load = async () => {
-      if (!userId) { setRows([]); return; }
-      try {
-        const params = new URLSearchParams({ userId, limit: '10' });
-        const res = await fetch(`/api/daily-check-sessions?${params}`);
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Failed');
-        const mapped = (json.data || []).map((r: any) => ({ created_at: r.created_at, duration_ms: r.duration_ms })) as Array<{ created_at: string; duration_ms: number }>;
-        setRows(mapped.reverse());
-      } catch {}
-    };
-    load();
-  }, [userId]);
-
-  if (!userId) return null;
-  if (rows.length === 0) return (
-    <div className="mb-4 text-xs opacity-60">No recent timing data.</div>
-  );
-
-  const max = Math.max(...rows.map(r => r.duration_ms), 1);
-  return (
-    <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
-      <div className="mb-2 text-xs opacity-80">Recent completion times</div>
-      <div className="flex items-end gap-2 h-24">
-        {rows.map((r, idx) => {
-          const height = Math.max(4, Math.round((r.duration_ms / max) * 88));
-          const seconds = Math.round(r.duration_ms / 1000);
-          const label = new Date(r.created_at).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
-          return (
-            <div key={idx} className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-cyan-400/70" style={{ height }} title={`${seconds}s`} />
-              <span className="text-[10px] opacity-70">{label}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 
