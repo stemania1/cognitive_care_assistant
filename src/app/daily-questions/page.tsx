@@ -47,8 +47,9 @@ export default function DailyQuestionsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [sessions, setSessions] = useState<Array<{ created_at: string; duration_ms: number; set_start_index: number }>>([]);
+  const [sessions, setSessions] = useState<Array<{ id: string; created_at: string; duration_ms: number; set_start_index: number }>>([]);
   const [recentAnswers, setRecentAnswers] = useState<Array<{ date: string; answers: Array<{ question: string; answer: string }> }>>([]);
+  const [completionTime, setCompletionTime] = useState<number | null>(null);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
 
@@ -73,6 +74,23 @@ export default function DailyQuestionsPage() {
       }
     } catch (error) {
       console.error('Error loading sessions:', error);
+    }
+  };
+
+  // Delete a session
+  const deleteSession = async (sessionId: string) => {
+    if (!userId) return;
+    try {
+      const res = await fetch('/api/daily-check-sessions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, sessionId })
+      });
+      if (res.ok) {
+        await loadSessions(); // Reload sessions after deletion
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
     }
   };
 
@@ -135,6 +153,8 @@ export default function DailyQuestionsPage() {
   useEffect(() => {
     if (todaysQuestions.length > 0) {
       setAnswers({});
+      setCompletionTime(null); // Reset completion time for new questions
+      setShowHistory(false); // Hide history for new questions
     }
   }, [todaysQuestions]);
 
@@ -182,6 +202,8 @@ export default function DailyQuestionsPage() {
       }
       if (startedAt) {
         const durationMs = Date.now() - startedAt;
+        const durationSeconds = Math.round(durationMs / 1000);
+        setCompletionTime(durationSeconds);
         try {
           await fetch('/api/daily-check-sessions', {
             method: 'POST',
@@ -314,23 +336,30 @@ export default function DailyQuestionsPage() {
                 )}
               </button>
               
-              <div className="flex items-center justify-center gap-4">
-                <button
-                  onClick={async () => {
-                    setShowHistory(true);
-                    await Promise.all([loadSessions(), loadRecentAnswers()]);
-                  }}
-                  className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
-                >
-                  Show Progress
-                </button>
-                <Link
-                  href="/questions/history"
-                  className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
-                >
-                  View saved answers
-                </Link>
+            {/* Show completion time only after saving */}
+            {completionTime !== null && (
+              <div className="text-center text-cyan-300 text-lg font-medium mb-4">
+                Completed in {completionTime} seconds
               </div>
+            )}
+
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={async () => {
+                  setShowHistory(true);
+                  await Promise.all([loadSessions(), loadRecentAnswers()]);
+                }}
+                className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
+              >
+                Show Progress
+              </button>
+              <Link
+                href="/questions/history"
+                className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
+              >
+                View saved answers
+              </Link>
+            </div>
             </div>
 
             {/* Historical Data - shown after saving or when button is clicked */}
@@ -371,7 +400,7 @@ export default function DailyQuestionsPage() {
                         const dots = data.map((session, idx) => {
                           const x = padding + (idx / (data.length - 1)) * chartWidth;
                           const y = padding + chartHeight - ((session.duration_ms / 1000 - minSeconds) / range) * chartHeight;
-                          return { x, y, seconds: Math.round(session.duration_ms / 1000) };
+                          return { x, y, seconds: Math.round(session.duration_ms / 1000), id: session.id };
                         });
                         
                         return (
@@ -433,6 +462,28 @@ export default function DailyQuestionsPage() {
                                   textAnchor="middle"
                                 >
                                   {dot.seconds}s
+                                </text>
+                                {/* Delete button */}
+                                <circle
+                                  cx={dot.x + 12}
+                                  cy={dot.y - 8}
+                                  r="6"
+                                  fill="rgba(239, 68, 68, 0.8)"
+                                  stroke="white"
+                                  strokeWidth="1"
+                                  className="cursor-pointer hover:fill-red-500"
+                                  onClick={() => deleteSession(dot.id)}
+                                />
+                                <text
+                                  x={dot.x + 12}
+                                  y={dot.y - 5}
+                                  fontSize="8"
+                                  fill="white"
+                                  textAnchor="middle"
+                                  className="cursor-pointer"
+                                  onClick={() => deleteSession(dot.id)}
+                                >
+                                  ×
                                 </text>
                               </g>
                             ))}

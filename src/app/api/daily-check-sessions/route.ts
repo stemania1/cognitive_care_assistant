@@ -87,4 +87,45 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { userId, sessionId } = body;
+    if (!userId || !sessionId) {
+      return NextResponse.json({ error: 'User ID and Session ID are required' }, { status: 400 });
+    }
+
+    // Create a Supabase client with service role key for admin operations
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+      return NextResponse.json({ 
+        error: 'Service role key not configured', 
+        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    const { error } = await supabaseAdmin
+      .from('daily_check_sessions')
+      .delete()
+      .eq('id', sessionId)
+      .eq('user_id', userId);
+
+    if (error) return NextResponse.json({ error: 'Failed to delete session' }, { status: 500 });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 
