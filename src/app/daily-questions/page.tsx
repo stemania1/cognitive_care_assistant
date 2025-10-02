@@ -332,8 +332,8 @@ export default function DailyQuestionsPage() {
                 {/* Historical Chart */}
                 <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                   <h3 className="text-lg font-medium mb-4">Completion Times (Line Chart)</h3>
-                  <div className="h-64 relative">
-                    <svg className="w-full h-full" viewBox="0 0 400 200">
+                  <div className="h-72 relative">
+                    <svg className="w-full h-full" viewBox="0 0 400 220">
                       {sessions.length > 1 && (() => {
                         const data = sessions.slice(0, 10).reverse(); // Show oldest to newest
                         const maxSeconds = Math.max(...data.map(s => s.duration_ms / 1000), 1);
@@ -425,16 +425,26 @@ export default function DailyQuestionsPage() {
                               const x = padding + (idx / (data.length - 1)) * chartWidth;
                               const date = new Date(session.created_at);
                               return (
-                                <text
-                                  key={idx}
-                                  x={x}
-                                  y={padding + chartHeight + 15}
-                                  fontSize="9"
-                                  fill="rgba(255,255,255,0.6)"
-                                  textAnchor="middle"
-                                >
-                                  {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                </text>
+                                <g key={idx}>
+                                  <text
+                                    x={x}
+                                    y={padding + chartHeight + 15}
+                                    fontSize="9"
+                                    fill="rgba(255,255,255,0.6)"
+                                    textAnchor="middle"
+                                  >
+                                    {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                  </text>
+                                  <text
+                                    x={x}
+                                    y={padding + chartHeight + 28}
+                                    fontSize="8"
+                                    fill="rgba(255,255,255,0.5)"
+                                    textAnchor="middle"
+                                  >
+                                    {date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                  </text>
+                                </g>
                               );
                             })}
                           </>
