@@ -94,6 +94,23 @@ export default function DailyQuestionsPage() {
     }
   };
 
+  // Delete daily checks for a specific date
+  const deleteDailyChecks = async (date: string) => {
+    if (!userId) return;
+    try {
+      const res = await fetch('/api/daily-checks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, date })
+      });
+      if (res.ok) {
+        await loadRecentAnswers(); // Reload answers after deletion
+      }
+    } catch (error) {
+      console.error('Error deleting daily checks:', error);
+    }
+  };
+
   // Load recent answers
   const loadRecentAnswers = async () => {
     if (!userId) return;
@@ -540,6 +557,7 @@ export default function DailyQuestionsPage() {
                                 </div>
                               </th>
                             ))}
+                            <th className="text-center py-2 px-3 font-medium text-cyan-300 w-20">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -570,6 +588,15 @@ export default function DailyQuestionsPage() {
                                   </div>
                                 </td>
                               ))}
+                              <td className="py-3 px-3 text-center">
+                                <button
+                                  onClick={() => deleteDailyChecks(dayData.date)}
+                                  className="px-3 py-1 rounded-md bg-red-600/20 text-red-400 hover:bg-red-600/30 hover:text-red-300 transition-colors text-xs font-medium"
+                                  title="Delete this day's answers"
+                                >
+                                  Delete
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
