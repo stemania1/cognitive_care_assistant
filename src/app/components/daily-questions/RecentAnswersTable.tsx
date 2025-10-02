@@ -1,0 +1,109 @@
+import { RecentAnswer } from '@/types/daily-questions';
+import { formatDate, formatTime } from '@/utils/date';
+import { useTableScroll } from '@/hooks/useTableScroll';
+
+interface RecentAnswersTableProps {
+  recentAnswers: RecentAnswer[];
+  onDeleteDailyChecks: (date: string) => void;
+}
+
+export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: RecentAnswersTableProps) {
+  const { scrollPosition, scrollUp, scrollDown } = useTableScroll('answers-table');
+
+  if (recentAnswers.length === 0) {
+    return (
+      <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+        <h3 className="text-lg font-medium mb-4">Recent Answers</h3>
+        <div className="text-center text-white/60 py-4">
+          No answers saved yet. Complete some questions and save to see your history here.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col">
+          <h3 className="text-lg font-medium">Recent Answers</h3>
+          <div className="text-xs text-white/50 mt-1">
+            Use ↑↓ arrows or scroll buttons to navigate
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-white/50 mr-2">
+            {Math.round(scrollPosition)}%
+          </div>
+          <button
+            onClick={scrollUp}
+            className="px-3 py-1 rounded-md bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors text-sm"
+            title="Scroll up (↑)"
+          >
+            ↑
+          </button>
+          <button
+            onClick={scrollDown}
+            className="px-3 py-1 rounded-md bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors text-sm"
+            title="Scroll down (↓)"
+          >
+            ↓
+          </button>
+        </div>
+      </div>
+      
+      <div className="overflow-x-auto max-h-96 overflow-y-auto" id="answers-table">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10">
+              <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 1</th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 2</th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 3</th>
+              <th className="text-center py-2 px-3 font-medium text-cyan-300 w-20">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentAnswers.map((dayData, dayIdx) => (
+              <tr key={dayIdx} className="border-b border-white/5 hover:bg-white/5">
+                <td className="py-3 px-3 text-white/90 font-medium">
+                  <div className="text-xs">
+                    {formatDate(dayData.date)}
+                  </div>
+                  <div className="text-xs text-white/60">
+                    {dayData.created_at ? 
+                      formatTime(dayData.created_at) : 
+                      'Time not available'
+                    }
+                  </div>
+                </td>
+                {[0, 1, 2].map((qaIdx) => {
+                  const qa = dayData.answers[qaIdx];
+                  return (
+                    <td key={qaIdx} className="py-3 px-3 text-white/70 max-w-48">
+                      {qa ? (
+                        <div className="truncate" title={`${qa.question}: ${qa.answer}`}>
+                          <span className="font-medium text-cyan-200">{qa.question}:</span> {qa.answer}
+                        </div>
+                      ) : (
+                        <div className="text-white/40 italic">No answer</div>
+                      )}
+                    </td>
+                  );
+                })}
+                <td className="py-3 px-3 text-center">
+                  <button
+                    onClick={() => onDeleteDailyChecks(dayData.date)}
+                    className="px-3 py-1 rounded-md bg-red-600/20 text-red-400 hover:bg-red-600/30 hover:text-red-300 transition-colors text-xs font-medium"
+                    title="Delete this day's answers"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

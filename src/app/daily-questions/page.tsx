@@ -4,98 +4,29 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useDailyChecks } from "@/lib/useDailyChecks";
 import { supabase } from "@/lib/supabaseClient";
-
-type Question = { id: string; text: string; choices?: string[] };
-type StoredAnswer = string | { v: string; t: string };
-
-function getTodayKey(): string {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-const ALL_QUESTIONS: Question[] = [
-  { id: "favoriteColor", text: "What is your favorite color?" },
-  { id: "favoriteMeal", text: "What’s your favorite meal of the day — breakfast, lunch, or dinner?", choices: ["Breakfast", "Lunch", "Dinner"] },
-  { id: "catsDogs", text: "Do you like cats, dogs, or both?", choices: ["Cats", "Dogs", "Both"] },
-  { id: "favoriteSeat", text: "What’s your favorite place to sit at home?" },
-  { id: "favoriteAsChild", text: "What was your favorite thing to do when you were younger?" },
-  { id: "firstJob", text: "What was your first job or something you enjoyed doing?" },
-  { id: "drinkPref", text: "What do you like to drink — tea, coffee, or something else?", choices: ["Tea", "Coffee", "Something else"] },
-  { id: "smile", text: "What makes you smile?" },
-  { id: "weather", text: "What kind of weather do you enjoy?" },
-  { id: "calm", text: "What helps you feel calm?" },
-  { id: "children", text: "Do you have any children?" },
-  { id: "grandchildren", text: "Do you have any grandchildren?" },
-  { id: "parentsNames", text: "What were your parents’ names?" },
-  { id: "siblings", text: "Do you have any brothers or sisters?" },
-  { id: "fullName", text: "What is your full name?" },
-  { id: "birthday", text: "When is your birthday (or do you remember what time of year it is)?" },
-  { id: "married", text: "Were you married?" },
-  { id: "born", text: "Where were you born or where did you grow up?" },
-];
+import { getTodayKey } from "@/utils/date";
+import { ALL_QUESTIONS } from "@/constants/questions";
+import { useQuestionNavigation } from "@/hooks/useQuestionNavigation";
+import { useHistoricalData } from "@/hooks/useHistoricalData";
+import { AuthenticationGuard } from "@/app/components/daily-questions/AuthenticationGuard";
+import { QuestionCard } from "@/app/components/daily-questions/QuestionCard";
+import { QuestionNavigation } from "@/app/components/daily-questions/QuestionNavigation";
+import { CompletionChart } from "@/app/components/daily-questions/CompletionChart";
+import { RecentAnswersTable } from "@/app/components/daily-questions/RecentAnswersTable";
 
 export default function DailyQuestionsPage() {
   const today = useMemo(() => getTodayKey(), []);
-  const windowKey = useMemo(() => `dailyQuestionsWindow:${today}`, [today]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [windowStart, setWindowStart] = useState<number>(0);
   const [userId, setUserId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [sessions, setSessions] = useState<Array<{ id: string; created_at: string; duration_ms: number; set_start_index: number }>>([]);
-  const [recentAnswers, setRecentAnswers] = useState<Array<{ date: string; created_at?: string; answers: Array<{ question: string; answer: string }> }>>([]);
   const [completionTime, setCompletionTime] = useState<number | null>(null);
-  const [scrollPosition, setScrollPosition] = useState(0);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
-
-  // Keyboard navigation and scroll tracking for table
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target && (e.target as HTMLElement).closest('#answers-table')) {
-        const table = document.getElementById('answers-table');
-        if (!table) return;
-        
-        if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          table.scrollBy({ top: -50, behavior: 'smooth' });
-        } else if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          table.scrollBy({ top: 50, behavior: 'smooth' });
-        }
-      }
-    };
-
-    const handleScroll = () => {
-      const table = document.getElementById('answers-table');
-      if (table) {
-        const scrollTop = table.scrollTop;
-        const scrollHeight = table.scrollHeight - table.clientHeight;
-        const scrollPercent = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
-        setScrollPosition(scrollPercent);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    
-    // Add scroll listener to the table
-    const table = document.getElementById('answers-table');
-    if (table) {
-      table.addEventListener('scroll', handleScroll);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      if (table) {
-        table.removeEventListener('scroll', handleScroll);
-      }
-    };
-  }, [recentAnswers]); // Re-run when recentAnswers changes to attach to new table
+  const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
+  const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteDailyChecks } = useHistoricalData(userId);
 
   // Get current user
   useEffect(() => {
@@ -105,154 +36,6 @@ export default function DailyQuestionsPage() {
     };
     getUser();
   }, []);
-
-  // Load historical sessions
-  const loadSessions = async () => {
-    if (!userId) return;
-    try {
-      const params = new URLSearchParams({ userId, limit: '10' });
-      const res = await fetch(`/api/daily-check-sessions?${params}`);
-      const json = await res.json();
-      if (res.ok) {
-        setSessions(json.data || []);
-      }
-    } catch (error) {
-      console.error('Error loading sessions:', error);
-    }
-  };
-
-  // Delete a session
-  const deleteSession = async (sessionId: string) => {
-    if (!userId) return;
-    try {
-      const res = await fetch('/api/daily-check-sessions', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, sessionId })
-      });
-      if (res.ok) {
-        await loadSessions(); // Reload sessions after deletion
-      }
-    } catch (error) {
-      console.error('Error deleting session:', error);
-    }
-  };
-
-  // Delete daily checks for a specific date
-  const deleteDailyChecks = async (date: string) => {
-    if (!userId) return;
-    try {
-      const res = await fetch('/api/daily-checks', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, date })
-      });
-      if (res.ok) {
-        await loadRecentAnswers(); // Reload answers after deletion
-      }
-    } catch (error) {
-      console.error('Error deleting daily checks:', error);
-    }
-  };
-
-  // Load recent answers
-  const loadRecentAnswers = async () => {
-    if (!userId) return;
-    try {
-      const params = new URLSearchParams({ userId });
-      const res = await fetch(`/api/daily-checks?${params}`);
-      const json = await res.json();
-      if (res.ok) {
-        const answers = json.data || [];
-        
-        // Group by date and question set (3 questions at a time)
-        const grouped = answers.reduce((acc: any, check: any) => {
-          const date = check.date;
-          const questionId = check.question_id;
-          const questionIndex = parseInt(questionId.replace('q', '')) - 1; // Convert q1, q2, etc. to 0, 1, etc.
-          const setIndex = Math.floor(questionIndex / 3); // Group every 3 questions
-          const key = `${date}-set${setIndex}`;
-          
-          if (!acc[key]) {
-            acc[key] = { 
-              date, 
-              created_at: check.created_at, 
-              setIndex,
-              answers: [] 
-            };
-          }
-          acc[key].answers.push({
-            question: check.question_text,
-            answer: check.answer
-          });
-          return acc;
-        }, {});
-        
-        // Convert to array and sort by date and set (newest first)
-        const sortedAnswers = Object.values(grouped).sort((a: any, b: any) => {
-          const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
-          if (dateCompare !== 0) return dateCompare;
-          return b.setIndex - a.setIndex; // Within same date, newer sets first
-        }) as Array<{ date: string; created_at?: string; setIndex: number; answers: Array<{ question: string; answer: string }> }>;
-        
-        setRecentAnswers(sortedAnswers.slice(0, 10)); // Show last 10 sets (up to 30 questions)
-      }
-    } catch (error) {
-      console.error('Error loading answers:', error);
-    }
-  };
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(windowKey);
-      if (raw != null) {
-        const parsed = Number(raw);
-        if (!Number.isNaN(parsed)) {
-          setWindowStart(parsed % ALL_QUESTIONS.length);
-          return;
-        }
-      }
-      const base = Math.floor(Date.now() / 86400000);
-      const start = base % ALL_QUESTIONS.length;
-      setWindowStart(start);
-      localStorage.setItem(windowKey, String(start));
-    } catch {}
-  }, [windowKey]);
-
-  const todaysQuestions = useMemo(() => {
-    return [0, 1, 2].map((i) => ALL_QUESTIONS[(windowStart + i) % ALL_QUESTIONS.length]);
-  }, [windowStart]);
-
-  // Start with empty answers when questions change
-  useEffect(() => {
-    if (todaysQuestions.length > 0) {
-      setAnswers({});
-      setCompletionTime(null); // Reset completion time for new questions
-      setShowHistory(false); // Hide history for new questions
-    }
-  }, [todaysQuestions]);
-
-  async function saveOne(id: string, value: string) {
-    if (!userId) return;
-    
-    try {
-      const question = ALL_QUESTIONS.find(q => q.id === id);
-      if (!question) return;
-
-      await saveDailyCheck({
-        questionId: id,
-        questionText: question.text,
-        answer: value,
-        answerType: question.choices ? 'choice' : 'text',
-        date: today
-      });
-      
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 800);
-    } catch (error) {
-      console.error('Error saving answer:', error);
-    }
-  }
 
   function setAnswer(id: string, value: string) {
     if (!startedAt) setStartedAt(Date.now());
@@ -287,45 +70,29 @@ export default function DailyQuestionsPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, date: today, setStartIndex: windowStart, durationMs })
           });
-        } catch {}
-        setStartedAt(null);
+        } catch (error) {
+          console.error('Error saving session:', error);
+        }
       }
       setSaved(true);
       setShowHistory(true);
-      await Promise.all([loadSessions(), loadRecentAnswers()]); // Load updated data
-      window.setTimeout(() => setSaved(false), 800);
+      await loadSessions();
+      await loadRecentAnswers();
     } catch (error) {
-      console.error('Error saving answers:', error);
+      console.error('Error saving:', error);
     } finally {
       setSaving(false);
     }
   }
 
-  const answeredCount = todaysQuestions.reduce((n, q) => (answers[q.id] ? n + 1 : n), 0);
-
-  function nextThree() {
-    setWindowStart((prev) => {
-      const next = (prev + 3) % ALL_QUESTIONS.length;
-      try {
-        localStorage.setItem(windowKey, String(next));
-      } catch {}
-      return next;
-    });
+  function showProgress() {
+    setShowHistory(true);
+    loadSessions();
+    loadRecentAnswers();
   }
 
-  function prevThree() {
-    setWindowStart((prev) => {
-      const next = (prev - 3 + ALL_QUESTIONS.length) % ALL_QUESTIONS.length;
-      try {
-        localStorage.setItem(windowKey, String(next));
-      } catch {}
-      return next;
-    });
-  }
-
-  // Show sign-in message if user is not authenticated
-  if (!userId) {
-    return (
+  return (
+    <AuthenticationGuard userId={userId}>
       <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
         <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
@@ -335,435 +102,84 @@ export default function DailyQuestionsPage() {
             <div className="mb-6 flex items-center justify-between">
               <div className="flex flex-col">
                 <h1 className="text-2xl sm:text-3xl font-semibold">Daily Questions</h1>
+                <span className="text-xs opacity-70">Set label: Questions {((windowStart % ALL_QUESTIONS.length) + 1)}–{(((windowStart + 2) % ALL_QUESTIONS.length) + 1)} of {ALL_QUESTIONS.length}</span>
               </div>
-              <Link href="/dashboard" className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20">
-                Back to Home
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={showProgress}
+                  className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
+                  type="button"
+                >
+                  Show Progress
+                </button>
+                <Link href="/dashboard" className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20">
+                  Back to Home
+                </Link>
+              </div>
             </div>
-            
-            <div className="rounded-lg border border-white/10 bg-white/5 p-8 text-center">
-              <h2 className="text-xl font-semibold mb-4">Please Sign In</h2>
-              <p className="text-white/70 mb-6">You need to be signed in to access the daily questions feature.</p>
-              <Link href="/signin" className="inline-flex items-center rounded-full bg-cyan-500 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-cyan-600">
-                Sign In
-              </Link>
-            </div>
+
+            {dbLoading ? (
+              <div className="text-center py-8">
+                <div className="text-white/60">Loading...</div>
+              </div>
+            ) : (
+              <>
+                {/* Questions */}
+                <div className="space-y-4 mb-6">
+                  {todaysQuestions.map((q) => (
+                    <QuestionCard
+                      key={q.id}
+                      question={q}
+                      value={answers[q.id] ?? getAnswer(q.id) ?? ""}
+                      onChange={(value) => setAnswer(q.id, value)}
+                    />
+                  ))}
+                </div>
+
+                {/* Navigation */}
+                <QuestionNavigation
+                  windowStart={windowStart}
+                  totalQuestions={ALL_QUESTIONS.length}
+                  onPrevious={prevThree}
+                  onNext={nextThree}
+                />
+
+                {/* Save Button */}
+                <div className="mt-6 text-center">
+                  <button
+                    onClick={saveAll}
+                    disabled={saving}
+                    className="rounded-full bg-cyan-500 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    type="button"
+                  >
+                    {saving ? 'Saving...' : 'Save Answers'}
+                  </button>
+                </div>
+
+                {/* Completion Time */}
+                {completionTime && (
+                  <div className="mt-4 text-center">
+                    <div className="text-sm text-white/70">
+                      Completed in {completionTime} seconds
+                    </div>
+                  </div>
+                )}
+
+                {/* Historical Data */}
+                {showHistory && (
+                  <div className="mt-8 space-y-6">
+                    <CompletionChart sessions={sessions} />
+                    <RecentAnswersTable 
+                      recentAnswers={recentAnswers} 
+                      onDeleteDailyChecks={deleteDailyChecks}
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </main>
       </div>
-    );
-  }
-
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
-      <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
-
-      <main className="relative p-8 sm:p-16">
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-6 flex items-center justify-between">
-            <div className="flex flex-col">
-              <h1 className="text-2xl sm:text-3xl font-semibold">Daily Questions</h1>
-              <span className="text-xs opacity-70">Set label: Questions {((windowStart % ALL_QUESTIONS.length) + 1)}–{(((windowStart + 2) % ALL_QUESTIONS.length) + 1)} of {ALL_QUESTIONS.length}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={prevThree}
-                className="text-sm rounded-md border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15"
-                aria-label="Show previous three questions"
-              >
-                Prev 3
-              </button>
-              <button
-                type="button"
-                onClick={nextThree}
-                className="text-sm rounded-md border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15"
-                aria-label="Show next three questions"
-              >
-                Next 3
-              </button>
-              {saved ? (
-                <span className="text-xs text-emerald-300">Saved</span>
-              ) : dbLoading ? (
-                <span className="text-xs opacity-60">Loading...</span>
-              ) : (
-                <span className="text-xs opacity-60">{answeredCount}/3 answered</span>
-              )}
-            </div>
-          </div>
-
-
-          <div className="flex flex-col gap-3">
-            {todaysQuestions.map((q) => (
-              <div key={q.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
-                <p className="text-sm mb-2">{q.text}</p>
-                {q.choices ? (
-                  <div className="flex gap-2 flex-wrap">
-                    {q.choices.map((choice) => (
-                      <button
-                        key={choice}
-                        onClick={() => setAnswer(q.id, choice)}
-                        className={`px-3 py-1 rounded-full text-xs transition-colors ${
-                          answers[q.id] === choice ? "bg-emerald-500 text-black" : "bg-white/10 hover:bg-white/15"
-                        }`}
-                        type="button"
-                      >
-                        {choice}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <input
-                    type="text"
-                    value={answers[q.id] ?? ""}
-                    onChange={(e) => setAnswer(q.id, e.target.value)}
-                    placeholder="Type your answer"
-                    className="w-full rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none placeholder-white/40"
-                  />
-                )}
-              </div>
-            ))}
-
-            {/* Save Button */}
-            <div className="mt-6 flex flex-col items-center gap-4">
-              <button
-                type="button"
-                onClick={saveAll}
-                disabled={saving || !userId || answeredCount === 0}
-                className="w-full max-w-md py-4 px-6 rounded-xl bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500 text-white font-semibold text-lg hover:from-purple-600 hover:via-fuchsia-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 focus:ring-offset-black transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                aria-label="Save today's answers"
-              >
-                {saving ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Saving...</span>
-                  </div>
-                ) : (
-                  `Save Answers (${answeredCount}/3)`
-                )}
-              </button>
-              
-            {/* Show completion time only after saving */}
-            {completionTime !== null && (
-              <div className="text-center text-cyan-300 text-lg font-medium mb-4">
-                Completed in {completionTime} seconds
-              </div>
-            )}
-
-            <div className="flex items-center justify-center gap-4">
-              <button
-                onClick={async () => {
-                  setShowHistory(true);
-                  await Promise.all([loadSessions(), loadRecentAnswers()]);
-                }}
-                className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
-              >
-                Show Progress
-              </button>
-              <Link
-                href="/questions/history"
-                className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
-              >
-                View saved answers
-              </Link>
-            </div>
-            </div>
-
-            {/* Historical Data - shown after saving or when button is clicked */}
-            {showHistory && (
-              <div className="mt-8 space-y-6">
-                <h2 className="text-xl font-semibold text-center">Your Progress</h2>
-                
-                {sessions.length === 0 && recentAnswers.length === 0 ? (
-                  <div className="text-center text-white/60 py-8">
-                    <p>No progress data available yet.</p>
-                    <p className="text-sm mt-2">Complete some questions and save to see your progress here.</p>
-                  </div>
-                ) : (
-                  <>
-                
-                {/* Historical Chart */}
-                <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                  <h3 className="text-lg font-medium mb-4">Completion Times (Line Chart)</h3>
-                  <div className="h-72 relative">
-                    <svg className="w-full h-full" viewBox="0 0 400 220">
-                      {sessions.length > 0 ? (() => {
-                        const data = sessions.slice(0, 10).reverse(); // Show oldest to newest
-                        const maxSeconds = Math.max(...data.map(s => s.duration_ms / 1000), 1);
-                        const minSeconds = Math.min(...data.map(s => s.duration_ms / 1000), 0);
-                        const range = maxSeconds - minSeconds || 1;
-                        const padding = 20;
-                        const chartWidth = 360;
-                        const chartHeight = 160;
-                        
-                        // Create line path
-                        const points = data.map((session, idx) => {
-                          const x = padding + (data.length > 1 ? (idx / (data.length - 1)) * chartWidth : chartWidth / 2);
-                          const y = padding + chartHeight - ((session.duration_ms / 1000 - minSeconds) / range) * chartHeight;
-                          return `${x},${y}`;
-                        }).join(' L');
-                        
-                        // Create dots
-                        const dots = data.map((session, idx) => {
-                          const x = padding + (data.length > 1 ? (idx / (data.length - 1)) * chartWidth : chartWidth / 2);
-                          const y = padding + chartHeight - ((session.duration_ms / 1000 - minSeconds) / range) * chartHeight;
-                          return { x, y, seconds: Math.round(session.duration_ms / 1000), id: session.id };
-                        });
-                        
-                        return (
-                          <>
-                            {/* Grid lines */}
-                            {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => (
-                              <g key={i}>
-                                <line
-                                  x1={padding}
-                                  y1={padding + chartHeight * ratio}
-                                  x2={padding + chartWidth}
-                                  y2={padding + chartHeight * ratio}
-                                  stroke="rgba(255,255,255,0.1)"
-                                  strokeWidth="1"
-                                />
-                                <text
-                                  x={5}
-                                  y={padding + chartHeight * ratio + 4}
-                                  fontSize="10"
-                                  fill="rgba(255,255,255,0.6)"
-                                >
-                                  {Math.round(maxSeconds - range * ratio)}s
-                                </text>
-                              </g>
-                            ))}
-                            
-                            {/* Line */}
-                            <path
-                              d={`M ${points}`}
-                              fill="none"
-                              stroke="url(#gradient)"
-                              strokeWidth="2"
-                            />
-                            
-                            {/* Gradient definition */}
-                            <defs>
-                              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stopColor="#06b6d4" />
-                                <stop offset="100%" stopColor="#8b5cf6" />
-                              </linearGradient>
-                            </defs>
-                            
-                            {/* Dots */}
-                            {dots.map((dot, idx) => (
-                              <g key={idx}>
-                                {/* Main data point circle */}
-                                <circle
-                                  cx={dot.x}
-                                  cy={dot.y}
-                                  r="6"
-                                  fill="#06b6d4"
-                                  stroke="white"
-                                  strokeWidth="2"
-                                />
-                                {/* Inner highlight */}
-                                <circle
-                                  cx={dot.x}
-                                  cy={dot.y}
-                                  r="3"
-                                  fill="white"
-                                  opacity="0.3"
-                                />
-                                {/* Time label */}
-                                <text
-                                  x={dot.x}
-                                  y={dot.y - 12}
-                                  fontSize="11"
-                                  fill="white"
-                                  textAnchor="middle"
-                                  fontWeight="bold"
-                                >
-                                  {dot.seconds}s
-                                </text>
-                              </g>
-                            ))}
-                            
-                            {/* X-axis labels */}
-                            {data.map((session, idx) => {
-                              const x = padding + (data.length > 1 ? (idx / (data.length - 1)) * chartWidth : chartWidth / 2);
-                              // Use created_at for both date and time display
-                              const createdDate = new Date(session.created_at);
-                              // Extract just the date part for the date label
-                              const sessionDate = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate());
-                              return (
-                                <g key={idx}>
-                                  <text
-                                    x={x}
-                                    y={padding + chartHeight + 15}
-                                    fontSize="9"
-                                    fill="rgba(255,255,255,0.6)"
-                                    textAnchor="middle"
-                                  >
-                                    {sessionDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                  </text>
-                                  <text
-                                    x={x}
-                                    y={padding + chartHeight + 28}
-                                    fontSize="8"
-                                    fill="rgba(255,255,255,0.5)"
-                                    textAnchor="middle"
-                                  >
-                                    {createdDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                                  </text>
-                                </g>
-                              );
-                            })}
-                          </>
-                        );
-                      })() : (
-                        <text
-                          x="200"
-                          y="110"
-                          fontSize="14"
-                          fill="rgba(255,255,255,0.6)"
-                          textAnchor="middle"
-                        >
-                          No completion data available yet
-                        </text>
-                      )}
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Historical Table */}
-                <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex flex-col">
-                      <h3 className="text-lg font-medium">Recent Answers</h3>
-                      {recentAnswers.length > 0 && (
-                        <div className="text-xs text-white/50 mt-1">
-                          Use ↑↓ arrows or scroll buttons to navigate
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs text-white/50 mr-2">
-                        {Math.round(scrollPosition)}%
-                      </div>
-                      <button
-                        onClick={() => {
-                          const table = document.getElementById('answers-table');
-                          if (table) {
-                            table.scrollBy({ top: -50, behavior: 'smooth' });
-                          }
-                        }}
-                        className="px-3 py-1 rounded-md bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors text-sm"
-                        title="Scroll up (↑)"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        onClick={() => {
-                          const table = document.getElementById('answers-table');
-                          if (table) {
-                            table.scrollBy({ top: 50, behavior: 'smooth' });
-                          }
-                        }}
-                        className="px-3 py-1 rounded-md bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors text-sm"
-                        title="Scroll down (↓)"
-                      >
-                        ↓
-                      </button>
-                    </div>
-                  </div>
-                  {recentAnswers.length > 0 ? (
-                    <div className="overflow-x-auto max-h-96 overflow-y-auto" id="answers-table">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-white/10">
-                            <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
-                            <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 1</th>
-                            <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 2</th>
-                            <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 3</th>
-                            <th className="text-center py-2 px-3 font-medium text-cyan-300 w-20">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {recentAnswers.map((dayData, dayIdx) => (
-                            <tr key={dayIdx} className="border-b border-white/5 hover:bg-white/5">
-                              <td className="py-3 px-3 text-white/90 font-medium">
-                                <div className="text-xs">
-                                  {new Date(dayData.date).toLocaleDateString(undefined, { 
-                                    month: 'short', 
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                  })}
-                                </div>
-                                <div className="text-xs text-white/60">
-                                  {dayData.created_at ? 
-                                    new Date(dayData.created_at).toLocaleTimeString(undefined, { 
-                                      hour: '2-digit', 
-                                      minute: '2-digit' 
-                                    }) : 
-                                    'Time not available'
-                                  }
-                                </div>
-                              </td>
-                              {[0, 1, 2].map((qaIdx) => {
-                                const qa = dayData.answers[qaIdx];
-                                return (
-                                  <td key={qaIdx} className="py-3 px-3 text-white/70 max-w-48">
-                                    {qa ? (
-                                      <div className="truncate" title={`${qa.question}: ${qa.answer}`}>
-                                        <span className="font-medium text-cyan-200">{qa.question}:</span> {qa.answer}
-                                      </div>
-                                    ) : (
-                                      <div className="text-white/40 italic">No answer</div>
-                                    )}
-                                  </td>
-                                );
-                              })}
-                              <td className="py-3 px-3 text-center">
-                                <button
-                                  onClick={() => deleteDailyChecks(dayData.date)}
-                                  className="px-3 py-1 rounded-md bg-red-600/20 text-red-400 hover:bg-red-600/30 hover:text-red-300 transition-colors text-xs font-medium"
-                                  title="Delete this day's answers"
-                                >
-                                  Delete
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="text-center text-white/60 py-4">
-                      No answers saved yet. Complete some questions and save to see your history here.
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-center">
-                  <button
-                    onClick={() => setShowHistory(false)}
-                    className="px-4 py-2 rounded-lg border border-white/15 bg-white/10 text-sm hover:bg-white/15 transition-colors"
-                  >
-                    Hide History
-                  </button>
-                </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-
-      <Link href="/dashboard" className="fixed bottom-6 left-6 sm:bottom-8 sm:left-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15 transition">
-        <span className="text-sm">← Back to Home</span>
-      </Link>
-    </div>
+    </AuthenticationGuard>
   );
 }
-
-
-
-
