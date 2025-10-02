@@ -586,9 +586,7 @@ export default function DailyQuestionsPage() {
                             <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
                             {recentAnswers[0]?.answers.map((qa, idx) => (
                               <th key={idx} className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
-                                <div className="truncate" title={qa.question}>
-                                  {qa.question}
-                                </div>
+                                Question {idx + 1}
                               </th>
                             ))}
                             <th className="text-center py-2 px-3 font-medium text-cyan-300 w-20">Actions</th>
@@ -617,8 +615,8 @@ export default function DailyQuestionsPage() {
                               </td>
                               {dayData.answers.map((qa, qaIdx) => (
                                 <td key={qaIdx} className="py-3 px-3 text-white/70 max-w-48">
-                                  <div className="truncate" title={qa.answer}>
-                                    {qa.answer}
+                                  <div className="truncate" title={`${qa.question}: ${qa.answer}`}>
+                                    <span className="font-medium text-cyan-200">{qa.question}:</span> {qa.answer}
                                   </div>
                                 </td>
                               ))}
