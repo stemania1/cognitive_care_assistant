@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { GameSession } from '@/types/memory-games';
+import { saveGameSession, getRecentSessions } from '@/utils/memory-games-tracking';
+import { GameStatsChart } from '@/app/components/memory-games/GameStatsChart';
 
 function Tabs({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const tabs = [
@@ -50,6 +53,7 @@ function MemoryCards() {
   const [showAward, setShowAward] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
   const [incorrectCount, setIncorrectCount] = useState(0);
+  const [startTime, setStartTime] = useState<number | null>(null);
 
   useEffect(() => {
     try {
@@ -88,6 +92,12 @@ function MemoryCards() {
   function handleFlip(idx: number) {
     if (lock) return;
     if (flipped.includes(idx)) return;
+    
+    // Start timing on first flip
+    if (!startTime) {
+      setStartTime(Date.now());
+    }
+    
     const next = [...flipped, idx];
     setFlipped(next);
     if (next.length === 2) {
@@ -120,6 +130,20 @@ function MemoryCards() {
       setBurst(true);
       window.setTimeout(() => setBurst(false), 1800);
       setShowAward(true);
+      
+      // Save session data
+      if (startTime) {
+        const endTime = Date.now();
+        saveGameSession('memory', {
+          gameType: 'memory',
+          startTime: new Date(startTime).toISOString(),
+          endTime: new Date(endTime).toISOString(),
+          durationMs: endTime - startTime,
+          incorrectAttempts: incorrectCount,
+          completed: true
+        });
+      }
+      
       setCompletedCount((prev) => {
         const next = prev + 1;
         try { localStorage.setItem("games:memory:completed", String(next)); } catch {}
@@ -128,13 +152,14 @@ function MemoryCards() {
     } else if (!allMatched && wasCompleteRef.current) {
       wasCompleteRef.current = false;
     }
-  }, [allMatched]);
+  }, [allMatched, startTime, incorrectCount]);
 
   function playAgain() {
     setShowAward(false);
     setMatched(new Set());
     setFlipped([]);
     setIncorrectCount(0);
+    setStartTime(null);
     setShuffleKey((k) => k + 1);
   }
 
@@ -249,6 +274,8 @@ function Jigsaw3x3() {
   const [showAward, setShowAward] = useState(false);
   const [burst, setBurst] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
+  const [incorrectAttempts, setIncorrectAttempts] = useState(0);
+  const [startTime, setStartTime] = useState<number | null>(null);
   const wasSolvedRef = useRef(false);
 
   useEffect(() => {
@@ -273,10 +300,23 @@ function Jigsaw3x3() {
   }
   function onDrop(targetIndex: number) {
     if (dragging == null) return;
+    
+    // Start timing on first move
+    if (!startTime) {
+      setStartTime(Date.now());
+    }
+    
     setOrder((prev) => {
       const next = [...prev];
       const fromIdx = next.indexOf(dragging);
       const toIdx = targetIndex;
+      
+      // Check if this is an incorrect move (not solving the puzzle)
+      const isCorrectMove = dragging === toIdx;
+      if (!isCorrectMove) {
+        setIncorrectAttempts(prev => prev + 1);
+      }
+      
       [next[fromIdx], next[toIdx]] = [next[toIdx], next[fromIdx]];
       return next;
     });
@@ -291,6 +331,20 @@ function Jigsaw3x3() {
       setBurst(true);
       window.setTimeout(() => setBurst(false), 1800);
       setShowAward(true);
+      
+      // Save session data
+      if (startTime) {
+        const endTime = Date.now();
+        saveGameSession('jigsaw', {
+          gameType: 'jigsaw',
+          startTime: new Date(startTime).toISOString(),
+          endTime: new Date(endTime).toISOString(),
+          durationMs: endTime - startTime,
+          incorrectAttempts: incorrectAttempts,
+          completed: true
+        });
+      }
+      
       setCompletedCount((prev) => {
         const next = prev + 1;
         try { localStorage.setItem("games:jigsaw:completed", String(next)); } catch {}
@@ -299,7 +353,7 @@ function Jigsaw3x3() {
     } else if (!solved && wasSolvedRef.current) {
       wasSolvedRef.current = false;
     }
-  }, [solved]);
+  }, [solved, startTime, incorrectAttempts]);
 
   function shuffle() {
     setOrder((prev) => {
@@ -310,6 +364,8 @@ function Jigsaw3x3() {
       }
       return arr;
     });
+    setIncorrectAttempts(0);
+    setStartTime(null);
   }
 
   return (
@@ -385,6 +441,20 @@ function Jigsaw3x3() {
 
 export default function MemoryGamesPage() {
   const [tab, setTab] = useState<string>("memory");
+  const [memorySessions, setMemorySessions] = useState<GameSession[]>([]);
+  const [jigsawSessions, setJigsawSessions] = useState<GameSession[]>([]);
+
+  // Load session data
+  useEffect(() => {
+    setMemorySessions(getRecentSessions('memory', 20));
+    setJigsawSessions(getRecentSessions('jigsaw', 20));
+  }, []);
+
+  // Refresh data when tab changes (in case new games were completed)
+  useEffect(() => {
+    setMemorySessions(getRecentSessions('memory', 20));
+    setJigsawSessions(getRecentSessions('jigsaw', 20));
+  }, [tab]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
@@ -400,8 +470,20 @@ export default function MemoryGamesPage() {
 
           <Tabs value={tab} onChange={setTab} />
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-6">
             {tab === "memory" ? <MemoryCards /> : <Jigsaw3x3 />}
+          </div>
+
+          {/* Performance Charts */}
+          <div className="space-y-6">
+            <GameStatsChart 
+              sessions={memorySessions} 
+              gameType="memory" 
+            />
+            <GameStatsChart 
+              sessions={jigsawSessions} 
+              gameType="jigsaw" 
+            />
           </div>
         </div>
       </main>
