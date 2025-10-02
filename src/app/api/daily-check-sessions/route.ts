@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +8,27 @@ export async function GET(request: NextRequest) {
     const limit = Number(searchParams.get('limit') || '14');
     if (!userId) return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
 
-    const { data, error } = await supabase
+    // Create a Supabase client with service role key for admin operations
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+      return NextResponse.json({ 
+        error: 'Service role key not configured', 
+        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    const { data, error } = await supabaseAdmin
       .from('daily_check_sessions')
       .select('*')
       .eq('user_id', userId)
@@ -30,7 +50,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    // Create a Supabase client with service role key for admin operations
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+      return NextResponse.json({ 
+        error: 'Service role key not configured', 
+        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    const { data, error } = await supabaseAdmin
       .from('daily_check_sessions')
       .insert({
         user_id: userId,
