@@ -474,33 +474,56 @@ export default function DailyQuestionsPage() {
                 {/* Historical Table */}
                 <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                   <h3 className="text-lg font-medium mb-4">Recent Answers</h3>
-                  <div className="space-y-4">
-                    {recentAnswers.map((dayData, dayIdx) => (
-                      <div key={dayIdx} className="border border-white/5 rounded-lg p-3">
-                        <div className="text-sm font-medium text-cyan-300 mb-2">
-                          {new Date(dayData.date).toLocaleDateString(undefined, { 
-                            weekday: 'long', 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
-                          })}
-                        </div>
-                        <div className="space-y-2">
-                          {dayData.answers.map((qa, qaIdx) => (
-                            <div key={qaIdx} className="text-sm">
-                              <div className="font-medium text-white/90 mb-1">{qa.question}</div>
-                              <div className="text-white/70 ml-2">→ {qa.answer}</div>
-                            </div>
+                  {recentAnswers.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-white/10">
+                            <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
+                            {recentAnswers[0]?.answers.map((qa, idx) => (
+                              <th key={idx} className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
+                                <div className="truncate" title={qa.question}>
+                                  {qa.question}
+                                </div>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentAnswers.map((dayData, dayIdx) => (
+                            <tr key={dayIdx} className="border-b border-white/5 hover:bg-white/5">
+                              <td className="py-3 px-3 text-white/90 font-medium">
+                                <div className="text-xs">
+                                  {new Date(dayData.date).toLocaleDateString(undefined, { 
+                                    month: 'short', 
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })}
+                                </div>
+                                <div className="text-xs text-white/60">
+                                  {new Date(dayData.date).toLocaleTimeString(undefined, { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                </div>
+                              </td>
+                              {dayData.answers.map((qa, qaIdx) => (
+                                <td key={qaIdx} className="py-3 px-3 text-white/70 max-w-48">
+                                  <div className="truncate" title={qa.answer}>
+                                    {qa.answer}
+                                  </div>
+                                </td>
+                              ))}
+                            </tr>
                           ))}
-                        </div>
-                      </div>
-                    ))}
-                    {recentAnswers.length === 0 && (
-                      <div className="text-center text-white/60 py-4">
-                        No answers saved yet. Complete some questions and save to see your history here.
-                      </div>
-                    )}
-                  </div>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center text-white/60 py-4">
+                      No answers saved yet. Complete some questions and save to see your history here.
+                    </div>
+                  )}
                 </div>
 
                 <div className="text-center">
