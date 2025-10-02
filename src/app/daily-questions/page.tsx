@@ -42,6 +42,7 @@ export default function DailyQuestionsPage() {
   const windowKey = useMemo(() => `dailyQuestionsWindow:${today}`, [today]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [windowStart, setWindowStart] = useState<number>(0);
   const [userId, setUserId] = useState<string | null>(null);
   
@@ -118,6 +119,30 @@ export default function DailyQuestionsPage() {
     saveOne(id, value);
   }
 
+  async function saveAll() {
+    if (!userId) return;
+    try {
+      setSaving(true);
+      for (const q of todaysQuestions) {
+        const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
+        if (!value) continue;
+        await saveDailyCheck({
+          questionId: q.id,
+          questionText: q.text,
+          answer: value,
+          answerType: q.choices ? 'choice' : 'text',
+          date: today,
+        });
+      }
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 800);
+    } catch (error) {
+      console.error('Error saving answers:', error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const answeredCount = todaysQuestions.reduce((n, q) => (hasAnswer(q.id) ? n + 1 : n), 0);
 
   function nextThree() {
@@ -165,6 +190,15 @@ export default function DailyQuestionsPage() {
                 aria-label="Show next three questions"
               >
                 Next 3
+              </button>
+              <button
+                type="button"
+                onClick={saveAll}
+                disabled={saving || !userId}
+                className="text-sm rounded-md border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15 disabled:opacity-50"
+                aria-label="Save today's answers"
+              >
+                {saving ? 'Saving…' : 'Save'}
               </button>
               {saved ? (
                 <span className="text-xs text-emerald-300">Saved</span>
