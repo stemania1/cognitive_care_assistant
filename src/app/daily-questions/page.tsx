@@ -107,7 +107,7 @@ export default function DailyQuestionsPage() {
         const grouped = answers.reduce((acc: any, check: any) => {
           const date = check.date;
           if (!acc[date]) {
-            acc[date] = { date, answers: [] };
+            acc[date] = { date, created_at: check.created_at, answers: [] };
           }
           acc[date].answers.push({
             question: check.question_text,
@@ -491,7 +491,10 @@ export default function DailyQuestionsPage() {
                             {/* X-axis labels */}
                             {data.map((session, idx) => {
                               const x = padding + (idx / (data.length - 1)) * chartWidth;
-                              const date = new Date(session.created_at);
+                              // Use the local date from the session for the date display
+                              const sessionDate = new Date(session.date + 'T00:00:00');
+                              // Use created_at for the time display (this is the actual completion time)
+                              const createdDate = new Date(session.created_at);
                               return (
                                 <g key={idx}>
                                   <text
@@ -501,7 +504,7 @@ export default function DailyQuestionsPage() {
                                     fill="rgba(255,255,255,0.6)"
                                     textAnchor="middle"
                                   >
-                                    {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    {sessionDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                   </text>
                                   <text
                                     x={x}
@@ -510,7 +513,7 @@ export default function DailyQuestionsPage() {
                                     fill="rgba(255,255,255,0.5)"
                                     textAnchor="middle"
                                   >
-                                    {date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                    {createdDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                                   </text>
                                 </g>
                               );
@@ -552,10 +555,13 @@ export default function DailyQuestionsPage() {
                                   })}
                                 </div>
                                 <div className="text-xs text-white/60">
-                                  {new Date(dayData.date).toLocaleTimeString(undefined, { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
-                                  })}
+                                  {dayData.created_at ? 
+                                    new Date(dayData.created_at).toLocaleTimeString(undefined, { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    }) : 
+                                    'N/A'
+                                  }
                                 </div>
                               </td>
                               {dayData.answers.map((qa, qaIdx) => (
