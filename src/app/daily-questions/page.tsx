@@ -474,28 +474,6 @@ export default function DailyQuestionsPage() {
                                 >
                                   {dot.seconds}s
                                 </text>
-                                {/* Delete button */}
-                                <circle
-                                  cx={dot.x + 16}
-                                  cy={dot.y - 12}
-                                  r="8"
-                                  fill="rgba(239, 68, 68, 0.9)"
-                                  stroke="white"
-                                  strokeWidth="1"
-                                  className="cursor-pointer hover:fill-red-500"
-                                  onClick={() => deleteSession(dot.id)}
-                                />
-                                <text
-                                  x={dot.x + 16}
-                                  y={dot.y - 8}
-                                  fontSize="10"
-                                  fill="white"
-                                  textAnchor="middle"
-                                  className="cursor-pointer font-bold"
-                                  onClick={() => deleteSession(dot.id)}
-                                >
-                                  ×
-                                </text>
                               </g>
                             ))}
                             
