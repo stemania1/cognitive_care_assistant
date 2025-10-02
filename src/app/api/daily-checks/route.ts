@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +11,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    const query = supabase
+    // Create a Supabase client with service role key for admin operations
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    const query = supabaseAdmin
       .from('daily_checks')
       .select('*')
       .eq('user_id', userId)
@@ -44,8 +56,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // Create a Supabase client with service role key for admin operations
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     // Check if answer already exists for this user, question, and date
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from('daily_checks')
       .select('id')
       .eq('user_id', userId)
@@ -56,7 +80,7 @@ export async function POST(request: NextRequest) {
     let result;
     if (existing) {
       // Update existing answer
-      result = await supabase
+      result = await supabaseAdmin
         .from('daily_checks')
         .update({
           answer,
@@ -67,7 +91,7 @@ export async function POST(request: NextRequest) {
         .select();
     } else {
       // Insert new answer
-      result = await supabase
+      result = await supabaseAdmin
         .from('daily_checks')
         .insert({
           user_id: userId,
