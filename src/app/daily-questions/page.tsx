@@ -380,7 +380,7 @@ export default function DailyQuestionsPage() {
                   <h3 className="text-lg font-medium mb-4">Completion Times (Line Chart)</h3>
                   <div className="h-72 relative">
                     <svg className="w-full h-full" viewBox="0 0 400 220">
-                      {sessions.length > 1 && (() => {
+                      {sessions.length > 0 ? (() => {
                         const data = sessions.slice(0, 10).reverse(); // Show oldest to newest
                         const maxSeconds = Math.max(...data.map(s => s.duration_ms / 1000), 1);
                         const minSeconds = Math.min(...data.map(s => s.duration_ms / 1000), 0);
@@ -391,14 +391,14 @@ export default function DailyQuestionsPage() {
                         
                         // Create line path
                         const points = data.map((session, idx) => {
-                          const x = padding + (idx / (data.length - 1)) * chartWidth;
+                          const x = padding + (data.length > 1 ? (idx / (data.length - 1)) * chartWidth : chartWidth / 2);
                           const y = padding + chartHeight - ((session.duration_ms / 1000 - minSeconds) / range) * chartHeight;
                           return `${x},${y}`;
                         }).join(' L');
                         
                         // Create dots
                         const dots = data.map((session, idx) => {
-                          const x = padding + (idx / (data.length - 1)) * chartWidth;
+                          const x = padding + (data.length > 1 ? (idx / (data.length - 1)) * chartWidth : chartWidth / 2);
                           const y = padding + chartHeight - ((session.duration_ms / 1000 - minSeconds) / range) * chartHeight;
                           return { x, y, seconds: Math.round(session.duration_ms / 1000), id: session.id };
                         });
@@ -446,41 +446,52 @@ export default function DailyQuestionsPage() {
                             {/* Dots */}
                             {dots.map((dot, idx) => (
                               <g key={idx}>
+                                {/* Main data point circle */}
                                 <circle
                                   cx={dot.x}
                                   cy={dot.y}
-                                  r="4"
+                                  r="6"
                                   fill="#06b6d4"
                                   stroke="white"
-                                  strokeWidth="1"
+                                  strokeWidth="2"
                                 />
+                                {/* Inner highlight */}
+                                <circle
+                                  cx={dot.x}
+                                  cy={dot.y}
+                                  r="3"
+                                  fill="white"
+                                  opacity="0.3"
+                                />
+                                {/* Time label */}
                                 <text
                                   x={dot.x}
-                                  y={dot.y - 8}
-                                  fontSize="10"
+                                  y={dot.y - 12}
+                                  fontSize="11"
                                   fill="white"
                                   textAnchor="middle"
+                                  fontWeight="bold"
                                 >
                                   {dot.seconds}s
                                 </text>
                                 {/* Delete button */}
                                 <circle
-                                  cx={dot.x + 12}
-                                  cy={dot.y - 8}
-                                  r="6"
-                                  fill="rgba(239, 68, 68, 0.8)"
+                                  cx={dot.x + 16}
+                                  cy={dot.y - 12}
+                                  r="8"
+                                  fill="rgba(239, 68, 68, 0.9)"
                                   stroke="white"
                                   strokeWidth="1"
                                   className="cursor-pointer hover:fill-red-500"
                                   onClick={() => deleteSession(dot.id)}
                                 />
                                 <text
-                                  x={dot.x + 12}
-                                  y={dot.y - 5}
-                                  fontSize="8"
+                                  x={dot.x + 16}
+                                  y={dot.y - 8}
+                                  fontSize="10"
                                   fill="white"
                                   textAnchor="middle"
-                                  className="cursor-pointer"
+                                  className="cursor-pointer font-bold"
                                   onClick={() => deleteSession(dot.id)}
                                 >
                                   ×
@@ -490,7 +501,7 @@ export default function DailyQuestionsPage() {
                             
                             {/* X-axis labels */}
                             {data.map((session, idx) => {
-                              const x = padding + (idx / (data.length - 1)) * chartWidth;
+                              const x = padding + (data.length > 1 ? (idx / (data.length - 1)) * chartWidth : chartWidth / 2);
                               // Use the local date from the session for the date display
                               const sessionDate = new Date(session.date + 'T00:00:00');
                               // Use created_at for the time display (this is the actual completion time)
@@ -520,7 +531,17 @@ export default function DailyQuestionsPage() {
                             })}
                           </>
                         );
-                      })()}
+                      })() : (
+                        <text
+                          x="200"
+                          y="110"
+                          fontSize="14"
+                          fill="rgba(255,255,255,0.6)"
+                          textAnchor="middle"
+                        >
+                          No completion data available yet
+                        </text>
+                      )}
                     </svg>
                   </div>
                 </div>
