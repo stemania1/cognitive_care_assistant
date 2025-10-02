@@ -50,8 +50,52 @@ export default function DailyQuestionsPage() {
   const [sessions, setSessions] = useState<Array<{ id: string; created_at: string; duration_ms: number; set_start_index: number }>>([]);
   const [recentAnswers, setRecentAnswers] = useState<Array<{ date: string; created_at?: string; answers: Array<{ question: string; answer: string }> }>>([]);
   const [completionTime, setCompletionTime] = useState<number | null>(null);
+  const [scrollPosition, setScrollPosition] = useState(0);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
+
+  // Keyboard navigation and scroll tracking for table
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target && (e.target as HTMLElement).closest('#answers-table')) {
+        const table = document.getElementById('answers-table');
+        if (!table) return;
+        
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          table.scrollBy({ top: -50, behavior: 'smooth' });
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          table.scrollBy({ top: 50, behavior: 'smooth' });
+        }
+      }
+    };
+
+    const handleScroll = () => {
+      const table = document.getElementById('answers-table');
+      if (table) {
+        const scrollTop = table.scrollTop;
+        const scrollHeight = table.scrollHeight - table.clientHeight;
+        const scrollPercent = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+        setScrollPosition(scrollPercent);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    
+    // Add scroll listener to the table
+    const table = document.getElementById('answers-table');
+    if (table) {
+      table.addEventListener('scroll', handleScroll);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (table) {
+        table.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [recentAnswers]); // Re-run when recentAnswers changes to attach to new table
 
   // Get current user
   useEffect(() => {
@@ -590,9 +634,47 @@ export default function DailyQuestionsPage() {
 
                 {/* Historical Table */}
                 <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                  <h3 className="text-lg font-medium mb-4">Recent Answers</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-col">
+                      <h3 className="text-lg font-medium">Recent Answers</h3>
+                      {recentAnswers.length > 0 && (
+                        <div className="text-xs text-white/50 mt-1">
+                          Use ↑↓ arrows or scroll buttons to navigate
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-white/50 mr-2">
+                        {Math.round(scrollPosition)}%
+                      </div>
+                      <button
+                        onClick={() => {
+                          const table = document.getElementById('answers-table');
+                          if (table) {
+                            table.scrollBy({ top: -50, behavior: 'smooth' });
+                          }
+                        }}
+                        className="px-3 py-1 rounded-md bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors text-sm"
+                        title="Scroll up (↑)"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => {
+                          const table = document.getElementById('answers-table');
+                          if (table) {
+                            table.scrollBy({ top: 50, behavior: 'smooth' });
+                          }
+                        }}
+                        className="px-3 py-1 rounded-md bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors text-sm"
+                        title="Scroll down (↓)"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </div>
                   {recentAnswers.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto max-h-96 overflow-y-auto" id="answers-table">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-white/10">
