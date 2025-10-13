@@ -17,6 +17,7 @@ import { RecentAnswersTable } from "@/app/components/daily-questions/RecentAnswe
 export default function DailyQuestionsPage() {
   const today = useMemo(() => getTodayKey(), []);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -42,6 +43,10 @@ export default function DailyQuestionsPage() {
     setAnswers((prev) => ({ ...prev, [id]: value }));
   }
 
+  function setPhotoUrl(id: string, url: string) {
+    setPhotoUrls((prev) => ({ ...prev, [id]: url }));
+  }
+
   async function saveAll() {
     if (!userId) {
       alert('Please sign in to save your answers.');
@@ -52,12 +57,14 @@ export default function DailyQuestionsPage() {
       for (const q of todaysQuestions) {
         const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
         if (!value) continue;
+        const photoUrl = photoUrls[q.id];
         await saveDailyCheck({
           questionId: q.id,
           questionText: q.text,
           answer: value,
           answerType: q.choices ? 'choice' : 'text',
           date: today,
+          photoUrl: photoUrl || undefined,
         });
       }
       if (startedAt) {
@@ -102,7 +109,7 @@ export default function DailyQuestionsPage() {
             <div className="mb-6 flex items-center justify-between">
               <div className="flex flex-col">
                 <h1 className="text-2xl sm:text-3xl font-semibold">Daily Questions</h1>
-                <span className="text-xs opacity-70">Set label: Questions {((windowStart % ALL_QUESTIONS.length) + 1)}–{(((windowStart + 2) % ALL_QUESTIONS.length) + 1)} of {ALL_QUESTIONS.length}</span>
+                <span className="text-xs opacity-70">Set label: Questions {((windowStart % ALL_QUESTIONS.length) + 1)}–{(((windowStart + 3) % ALL_QUESTIONS.length) + 1)} of {ALL_QUESTIONS.length}</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -132,6 +139,9 @@ export default function DailyQuestionsPage() {
                       question={q}
                       value={answers[q.id] ?? getAnswer(q.id) ?? ""}
                       onChange={(value) => setAnswer(q.id, value)}
+                      photoUrl={photoUrls[q.id]}
+                      onPhotoChange={(url) => setPhotoUrl(q.id, url)}
+                      userId={userId || undefined}
                     />
                   ))}
                 </div>

@@ -19,7 +19,7 @@ export function useQuestionNavigation(today: string) {
 
   const nextThree = () => {
     setWindowStart((prev) => {
-      const next = (prev + 3) % ALL_QUESTIONS.length;
+      const next = (prev + 4) % ALL_QUESTIONS.length;
       try {
         localStorage.setItem(windowKey, String(next));
       } catch {}
@@ -29,7 +29,7 @@ export function useQuestionNavigation(today: string) {
 
   const prevThree = () => {
     setWindowStart((prev) => {
-      const next = (prev - 3 + ALL_QUESTIONS.length) % ALL_QUESTIONS.length;
+      const next = (prev - 4 + ALL_QUESTIONS.length) % ALL_QUESTIONS.length;
       try {
         localStorage.setItem(windowKey, String(next));
       } catch {}
@@ -37,7 +37,7 @@ export function useQuestionNavigation(today: string) {
     });
   };
 
-  const todaysQuestions = ALL_QUESTIONS.slice(windowStart, windowStart + 3);
+  const todaysQuestions = ALL_QUESTIONS.slice(windowStart, windowStart + 4);
 
   return {
     windowStart,

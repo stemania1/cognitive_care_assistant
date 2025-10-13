@@ -2,6 +2,7 @@ export interface Question {
   id: string;
   text: string;
   choices?: string[];
+  allowPhoto?: boolean; // Allow photo upload for this question
 }
 
 export interface StoredAnswer {
@@ -23,6 +24,7 @@ export interface RecentAnswer {
   answers: Array<{
     question: string;
     answer: string;
+    photo_url?: string;
   }>;
 }
 

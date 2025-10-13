@@ -22,9 +22,10 @@ interface ThermalData {
 interface ThermalVisualizationProps {
   isActive: boolean;
   onDataReceived: (data: ThermalData) => void;
+  onConnectionStatusChange?: (connected: boolean) => void;
 }
 
-export default function ThermalVisualization({ isActive, onDataReceived }: ThermalVisualizationProps) {
+export default function ThermalVisualization({ isActive, onDataReceived, onConnectionStatusChange }: ThermalVisualizationProps) {
   const [thermalData, setThermalData] = useState<number[][]>([]);
   const [sensorInfo, setSensorInfo] = useState<any>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'discovering'>('disconnected');
@@ -32,6 +33,15 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
   const [discoveredIP, setDiscoveredIP] = useState<string | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lastConnectionStatus = useRef<string>('disconnected');
+
+  // Notify parent component of connection status changes
+  useEffect(() => {
+    if (onConnectionStatusChange) {
+      const isConnected = connectionStatus === 'connected';
+      onConnectionStatusChange(isConnected);
+    }
+  }, [connectionStatus, onConnectionStatusChange]);
 
   // Auto-discover Raspberry Pi when component becomes active
   useEffect(() => {
@@ -77,13 +87,30 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
         const ws = new WebSocket(wsUrl);
         websocketRef.current = ws;
 
+        // Set a timeout to check if we receive data
+        let dataTimeout: NodeJS.Timeout;
+        
         ws.onopen = () => {
-          setConnectionStatus('connected');
-          console.log('WebSocket connected to thermal sensor at', wsUrl);
+          if (lastConnectionStatus.current !== 'connected') {
+            lastConnectionStatus.current = 'connected';
+            setConnectionStatus('connected');
+            console.log('✅ WebSocket connected to thermal sensor at', wsUrl);
+          }
+          
+          dataTimeout = setTimeout(() => {
+            console.warn('⚠️ No data received within 10 seconds of WebSocket connection');
+          }, 10000);
         };
 
         ws.onmessage = (event) => {
           try {
+            // Clear the data timeout since we received data
+            if (dataTimeout) {
+              clearTimeout(dataTimeout);
+            }
+            
+            console.log('📊 Received WebSocket data:', event.data.substring(0, 100) + '...');
+            
             const data: ThermalData = JSON.parse(event.data);
             if (data.type === 'thermal_data') {
               setThermalData(data.thermal_data);
@@ -96,24 +123,35 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
           }
         };
 
-        ws.onclose = () => {
-          const code = (ws as any).closeCode || (ws as any).code;
-          const reason = (ws as any).closeReason || (ws as any).reason;
-          console.error('WebSocket closed', { wsUrl, code, reason });
-          setConnectionStatus('disconnected');
+        ws.onclose = (event) => {
+          console.log('WebSocket closed', { 
+            wsUrl, 
+            code: event.code, 
+            reason: event.reason,
+            wasClean: event.wasClean 
+          });
+          if (lastConnectionStatus.current !== 'disconnected') {
+            lastConnectionStatus.current = 'disconnected';
+            setConnectionStatus('disconnected');
+          }
+          
+          // Auto-reconnect after a delay if connection was not clean
+          if (!event.wasClean && isActive) {
+            console.log('Attempting to reconnect in 3 seconds...');
+            setTimeout(() => {
+              if (isActive && discoveredIP) {
+                connectWebSocket();
+              }
+            }, 3000);
+          }
         };
 
         ws.onerror = (error) => {
-          try {
-            // Browser ErrorEvent often hides details; log target state
-            const ev = error as unknown as ErrorEvent;
-            const target: any = ev?.target;
-            const ready = target?.readyState;
-            console.error('WebSocket error', { wsUrl, readyState: ready, error: ev?.message || error });
-          } catch (_) {
-            console.error('WebSocket error (raw):', error);
+          // Silently handle WebSocket errors - HTTP polling will handle data retrieval
+          if (lastConnectionStatus.current !== 'disconnected') {
+            lastConnectionStatus.current = 'disconnected';
+            setConnectionStatus('disconnected');
           }
-          setConnectionStatus('disconnected');
         };
       } catch (error) {
         console.error('Failed to create WebSocket', { error, discoveredIP, port: SENSOR_CONFIG.WEBSOCKET_PORT });
@@ -131,7 +169,12 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
     };
   }, [isActive, onDataReceived]);
 
-  // Canvas rendering
+  // Calculate average temperature
+  const averageTemperature = thermalData.length > 0 
+    ? thermalData.flat().reduce((sum, temp) => sum + temp, 0) / (thermalData.length * thermalData[0].length)
+    : 0;
+
+  // Canvas rendering with 32x32 upscaling and color blending
   useEffect(() => {
     if (!canvasRef.current || thermalData.length === 0) return;
 
@@ -139,75 +182,115 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const width = canvas.width;
-    const height = canvas.height;
-    const cellWidth = width / 8;
-    const cellHeight = height / 8;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-
-    // Find temperature range for color mapping
-    let minTemp = Math.min(...thermalData.flat());
-    let maxTemp = Math.max(...thermalData.flat());
-    const tempRange = maxTemp - minTemp;
-
-    // Draw thermal grid
-    thermalData.forEach((row, y) => {
-      row.forEach((temp, x) => {
-        const normalizedTemp = tempRange > 0 ? (temp - minTemp) / tempRange : 0.5;
-        
-        // Color mapping: blue (cold) to red (hot)
-        let r, g, b;
-        if (normalizedTemp < 0.5) {
-          // Blue to cyan
-          r = 0;
-          g = Math.floor(255 * normalizedTemp * 2);
-          b = 255;
-        } else {
-          // Cyan to red
-          r = Math.floor(255 * (normalizedTemp - 0.5) * 2);
-          g = 255;
-          b = Math.floor(255 * (1 - (normalizedTemp - 0.5) * 2));
-        }
-
-        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-        ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
-
-        // Draw temperature text
-        ctx.fillStyle = 'white';
-        ctx.font = '10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(
-          `${temp.toFixed(1)}°`,
-          x * cellWidth + cellWidth / 2,
-          y * cellHeight + cellHeight / 2 + 3
-        );
-      });
-    });
-
-    // Draw grid lines
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
+    // Set canvas size to 32x32 for upscaling
+    const GRID_SIZE = 32;
     
-    for (let i = 0; i <= 8; i++) {
-      // Vertical lines
-      ctx.beginPath();
-      ctx.moveTo(i * cellWidth, 0);
-      ctx.lineTo(i * cellWidth, height);
-      ctx.stroke();
+    // Get the container size and set canvas to fit properly
+    const container = canvas.parentElement;
+    if (container) {
+      const containerRect = container.getBoundingClientRect();
+      const size = Math.min(containerRect.width, containerRect.height);
+      const pixelSize = Math.floor(size / GRID_SIZE);
+      const actualSize = pixelSize * GRID_SIZE;
       
-      // Horizontal lines
-      ctx.beginPath();
-      ctx.moveTo(0, i * cellHeight);
-      ctx.lineTo(width, i * cellHeight);
-      ctx.stroke();
+      canvas.width = actualSize;
+      canvas.height = actualSize;
+      canvas.style.width = `${actualSize}px`;
+      canvas.style.height = `${actualSize}px`;
+    } else {
+      // Fallback to default size
+      canvas.width = GRID_SIZE;
+      canvas.height = GRID_SIZE;
     }
+
+    // Use requestAnimationFrame for smooth rendering
+    const renderFrame = () => {
+      // Find temperature range for color mapping
+      const allTemps = thermalData.flat();
+      const minTemp = Math.min(...allTemps);
+      const maxTemp = Math.max(...allTemps);
+      const tempRange = maxTemp - minTemp;
+
+      // Create upscaled thermal data (32x32 from 8x8)
+      const upscaledData: number[][] = [];
+      for (let y = 0; y < GRID_SIZE; y++) {
+        upscaledData[y] = [];
+        for (let x = 0; x < GRID_SIZE; x++) {
+          // Map 32x32 coordinates to 8x8 coordinates with interpolation
+          const sourceX = (x / GRID_SIZE) * 8;
+          const sourceY = (y / GRID_SIZE) * 8;
+          
+          const x1 = Math.floor(sourceX);
+          const y1 = Math.floor(sourceY);
+          const x2 = Math.min(x1 + 1, 7);
+          const y2 = Math.min(y1 + 1, 7);
+          
+          const fx = sourceX - x1;
+          const fy = sourceY - y1;
+          
+          // Bilinear interpolation
+          const temp = 
+            thermalData[y1][x1] * (1 - fx) * (1 - fy) +
+            thermalData[y1][x2] * fx * (1 - fy) +
+            thermalData[y2][x1] * (1 - fx) * fy +
+            thermalData[y2][x2] * fx * fy;
+          
+          upscaledData[y][x] = temp;
+        }
+      }
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Calculate pixel size for drawing
+      const pixelSize = Math.floor(canvas.width / GRID_SIZE);
+
+      // Draw upscaled thermal grid
+      upscaledData.forEach((row, y) => {
+        row.forEach((temp, x) => {
+          const normalizedTemp = tempRange > 0 ? (temp - minTemp) / tempRange : 0.5;
+          
+          // Enhanced color mapping: blue (cold) to red (hot) with better contrast
+          let r, g, b;
+          
+          // Use a more vibrant color scheme
+          if (normalizedTemp < 0.33) {
+            // Blue to cyan
+            const factor = normalizedTemp / 0.33;
+            r = Math.floor(0);
+            g = Math.floor(255 * factor);
+            b = Math.floor(255);
+          } else if (normalizedTemp < 0.66) {
+            // Cyan to yellow
+            const factor = (normalizedTemp - 0.33) / 0.33;
+            r = Math.floor(255 * factor);
+            g = Math.floor(255);
+            b = Math.floor(255 * (1 - factor));
+          } else {
+            // Yellow to red
+            const factor = (normalizedTemp - 0.66) / 0.34;
+            r = Math.floor(255);
+            g = Math.floor(255 * (1 - factor));
+            b = Math.floor(0);
+          }
+
+          ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+          ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+        });
+      });
+    };
+
+    // Use requestAnimationFrame for smooth updates
+    const animationId = requestAnimationFrame(renderFrame);
+    
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
   }, [thermalData]);
 
   // Fallback to HTTP polling via Next.js API proxy (avoids CORS/mixed content)
   useEffect(() => {
-    if (!isActive || connectionStatus === 'connected') return;
+    if (!isActive) return;
 
     const pollData = async () => {
       try {
@@ -219,15 +302,31 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
           setSensorInfo(data.sensor_info);
           setLastUpdate(new Date());
           onDataReceived(data);
+          
+          // Update connection status to connected when we successfully receive data
+          if (lastConnectionStatus.current !== 'connected') {
+            lastConnectionStatus.current = 'connected';
+            setConnectionStatus('connected');
+          }
+        } else {
+          // Update connection status to disconnected if response is not ok
+          if (lastConnectionStatus.current !== 'disconnected') {
+            lastConnectionStatus.current = 'disconnected';
+            setConnectionStatus('disconnected');
+          }
         }
       } catch (error) {
-        console.error('HTTP polling failed:', error);
+        // Update connection status to disconnected on error
+        if (lastConnectionStatus.current !== 'disconnected') {
+          lastConnectionStatus.current = 'disconnected';
+          setConnectionStatus('disconnected');
+        }
       }
     };
 
-    const interval = setInterval(pollData, 2000); // Poll every 2 seconds
+    const interval = setInterval(pollData, 3000); // Poll every 3 seconds
     return () => clearInterval(interval);
-  }, [isActive, connectionStatus, discoveredIP, onDataReceived]);
+  }, [isActive, discoveredIP, onDataReceived]);
 
   const getStatusColor = () => {
     switch (connectionStatus) {
@@ -272,17 +371,24 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
           <div>Sensor: {sensorInfo.type}</div>
           <div>Status: {sensorInfo.status}</div>
           {sensorInfo.bus !== 'none' && <div>Bus: {sensorInfo.bus}</div>}
+          {thermalData.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-gray-600">
+              <div>Current Temperature: <span className="text-blue-400 font-semibold">{averageTemperature.toFixed(1)}°C</span></div>
+              <div>Range: {Math.min(...thermalData.flat()).toFixed(1)}°C - {Math.max(...thermalData.flat()).toFixed(1)}°C</div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Thermal Visualization */}
       <div className="relative">
-        <canvas
-          ref={canvasRef}
-          width={320}
-          height={320}
-          className="w-full h-auto rounded-lg border border-white/20 bg-gray-900"
-        />
+        <div className="aspect-square max-w-lg mx-auto flex items-center justify-center">
+          <canvas
+            ref={canvasRef}
+            className="rounded-lg border border-white/20 bg-gray-900"
+            style={{ imageRendering: 'pixelated' }}
+          />
+        </div>
         
         {/* Temperature Legend */}
         <div className="mt-3 flex items-center justify-center gap-4 text-xs">
@@ -291,7 +397,11 @@ export default function ThermalVisualization({ isActive, onDataReceived }: Therm
             <span className="text-gray-300">Cold</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <div className="w-3 h-3 bg-cyan-400 rounded"></div>
+            <span className="text-gray-300">Cool</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-yellow-400 rounded"></div>
             <span className="text-gray-300">Warm</span>
           </div>
           <div className="flex items-center gap-1">

@@ -5,6 +5,13 @@ import Link from "next/link";
 
 type ReminderKey = "drinkWater" | "takeMedicine" | "eatFood";
 
+type CustomReminder = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  times: string[];
+};
+
 type RemindersState = {
   drinkWater: boolean;
   takeMedicine: boolean;
@@ -13,10 +20,11 @@ type RemindersState = {
   medicineTimes: string[];
   waterTimes: string[];
   foodTimes: string[];
+  customReminders: CustomReminder[];
 };
 
 export default function RemindersPage() {
-  const storageKey = "reminders:v1";
+  const storageKey = "reminders:v2";
   const [state, setState] = useState<RemindersState>({
     drinkWater: false,
     takeMedicine: false,
@@ -25,11 +33,13 @@ export default function RemindersPage() {
     medicineTimes: [],
     waterTimes: [],
     foodTimes: [],
+    customReminders: [],
   });
   const [saved, setSaved] = useState(false);
   const [timeInput, setTimeInput] = useState<string>("");
   const [waterTimeInput, setWaterTimeInput] = useState<string>("");
   const [foodTimeInput, setFoodTimeInput] = useState<string>("");
+  const [customTimeInputs, setCustomTimeInputs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     try {
@@ -114,6 +124,91 @@ export default function RemindersPage() {
   function removeFoodTime(t: string) {
     setState((prev) => {
       const next = { ...prev, foodTimes: prev.foodTimes.filter((x) => x !== t) };
+      persist(next);
+      return next;
+    });
+  }
+
+  function addCustomReminder() {
+    setState((prev) => {
+      const newReminder: CustomReminder = {
+        id: Date.now().toString(),
+        name: "",
+        enabled: true,
+        times: [],
+      };
+      const next = { ...prev, customReminders: [...prev.customReminders, newReminder] };
+      persist(next);
+      return next;
+    });
+  }
+
+  function deleteCustomReminder(id: string) {
+    setState((prev) => {
+      const next = { ...prev, customReminders: prev.customReminders.filter((r) => r.id !== id) };
+      persist(next);
+      return next;
+    });
+    // Clean up time input for this reminder
+    setCustomTimeInputs((prev) => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
+  }
+
+  function toggleCustomReminder(id: string) {
+    setState((prev) => {
+      const next = {
+        ...prev,
+        customReminders: prev.customReminders.map((r) =>
+          r.id === id ? { ...r, enabled: !r.enabled } : r
+        ),
+      };
+      persist(next);
+      return next;
+    });
+  }
+
+  function updateCustomReminderName(id: string, value: string) {
+    setState((prev) => {
+      const next = {
+        ...prev,
+        customReminders: prev.customReminders.map((r) =>
+          r.id === id ? { ...r, name: value } : r
+        ),
+      };
+      persist(next);
+      return next;
+    });
+  }
+
+  function addCustomTime(id: string) {
+    const timeInput = customTimeInputs[id];
+    if (!timeInput) return;
+    setState((prev) => {
+      const next = {
+        ...prev,
+        customReminders: prev.customReminders.map((r) => {
+          if (r.id === id && !r.times.includes(timeInput)) {
+            return { ...r, times: [...r.times, timeInput].sort() };
+          }
+          return r;
+        }),
+      };
+      persist(next);
+      return next;
+    });
+    setCustomTimeInputs((prev) => ({ ...prev, [id]: "" }));
+  }
+
+  function removeCustomTime(reminderId: string, time: string) {
+    setState((prev) => {
+      const next = {
+        ...prev,
+        customReminders: prev.customReminders.map((r) =>
+          r.id === reminderId ? { ...r, times: r.times.filter((t) => t !== time) } : r
+        ),
+      };
       persist(next);
       return next;
     });
@@ -259,7 +354,7 @@ export default function RemindersPage() {
         </section>
 
         {/* Eat Food */}
-        <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <section className="rounded-xl border border-white/10 bg-white/5 p-4 mb-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium">Eat Food</h2>
             <button
@@ -314,6 +409,101 @@ export default function RemindersPage() {
             <p className="mt-2 text-xs opacity-70">Turn on to get reminded about meals and snacks.</p>
           )}
         </section>
+
+        {/* Custom Reminders Section */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Custom Reminders</h2>
+            <button
+              type="button"
+              onClick={addCustomReminder}
+              className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium hover:bg-cyan-500/20 transition-colors"
+            >
+              + Add Custom Reminder
+            </button>
+          </div>
+
+          {state.customReminders.length === 0 ? (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-center">
+              <p className="text-sm opacity-70">No custom reminders yet. Click the button above to add one!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {state.customReminders.map((reminder) => (
+                <section key={reminder.id} className="rounded-xl border border-cyan-400/30 bg-cyan-500/5 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3 flex-1">
+                      <button
+                        type="button"
+                        aria-pressed={reminder.enabled}
+                        onClick={() => toggleCustomReminder(reminder.id)}
+                        className={`relative h-6 w-11 rounded-full transition-colors flex-shrink-0 ${reminder.enabled ? "bg-cyan-400" : "bg-white/15"}`}
+                      >
+                        <span className={`absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white transition-all ${reminder.enabled ? "right-1" : "left-1"}`} />
+                        <span className="sr-only">Toggle reminder</span>
+                      </button>
+                      <input
+                        type="text"
+                        value={reminder.name}
+                        onChange={(e) => updateCustomReminderName(reminder.id, e.target.value)}
+                        placeholder="What do you want to be reminded about?"
+                        className="flex-1 rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none placeholder-white/40"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteCustomReminder(reminder.id)}
+                      className="ml-2 rounded-full bg-red-500/20 hover:bg-red-500/30 px-3 py-2 text-xs text-red-300 transition-colors"
+                      aria-label="Delete reminder"
+                    >
+                      Delete
+                    </button>
+                  </div>
+
+                  {reminder.enabled && (
+                    <div>
+                      <label className="block text-xs opacity-80 mb-2">Reminder times</label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="time"
+                          value={customTimeInputs[reminder.id] || ""}
+                          onChange={(e) => setCustomTimeInputs((prev) => ({ ...prev, [reminder.id]: e.target.value }))}
+                          className="rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addCustomTime(reminder.id)}
+                          className="rounded-md border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm hover:bg-cyan-500/20"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {reminder.times.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {reminder.times.map((t) => (
+                            <span key={t} className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-xs">
+                              {t}
+                              <button
+                                type="button"
+                                onClick={() => removeCustomTime(reminder.id, t)}
+                                className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 hover:bg-white/30"
+                                aria-label={`Remove time ${t}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs opacity-60">No times added yet.</p>
+                      )}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
       <Link href="/dashboard" className="fixed bottom-6 left-6 sm:bottom-8 sm:left-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15 transition">

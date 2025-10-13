@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, questionId, questionText, answer, answerType = 'text', date } = body;
+    const { userId, questionId, questionText, answer, answerType = 'text', date, photoUrl } = body;
 
     if (!userId || !questionId || !questionText || !answer) {
       const missing = [];
@@ -104,27 +104,35 @@ export async function POST(request: NextRequest) {
     let result;
     if (existing) {
       // Update existing answer
+      const updateData: any = {
+        answer,
+        answer_type: answerType,
+        updated_at: new Date().toISOString()
+      };
+      if (photoUrl !== undefined) {
+        updateData.photo_url = photoUrl;
+      }
       result = await supabaseAdmin
         .from('daily_checks')
-        .update({
-          answer,
-          answer_type: answerType,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', existing.id)
         .select();
     } else {
       // Insert new answer
+      const insertData: any = {
+        user_id: userId,
+        question_id: questionId,
+        question_text: questionText,
+        answer,
+        answer_type: answerType,
+        date: date || new Date().toISOString().split('T')[0]
+      };
+      if (photoUrl) {
+        insertData.photo_url = photoUrl;
+      }
       result = await supabaseAdmin
         .from('daily_checks')
-        .insert({
-          user_id: userId,
-          question_id: questionId,
-          question_text: questionText,
-          answer,
-          answer_type: answerType,
-          date: date || new Date().toISOString().split('T')[0]
-        })
+        .insert(insertData)
         .select();
     }
 

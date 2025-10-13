@@ -11,6 +11,7 @@ export interface DailyCheck {
   date: string;
   created_at: string;
   updated_at: string;
+  photo_url?: string;
 }
 
 export interface DailyCheckInput {
@@ -19,6 +20,7 @@ export interface DailyCheckInput {
   answer: string;
   answerType?: 'text' | 'choice';
   date?: string;
+  photoUrl?: string;
 }
 
 export function useDailyChecks(userId: string | null) {
@@ -63,19 +65,25 @@ export function useDailyChecks(userId: string | null) {
     if (!userId) return;
 
     try {
+      const body: any = {
+        userId,
+        questionId: input.questionId,
+        questionText: input.questionText,
+        answer: input.answer,
+        answerType: input.answerType || 'text',
+        date: input.date || new Date().toISOString().split('T')[0],
+      };
+      
+      if (input.photoUrl) {
+        body.photoUrl = input.photoUrl;
+      }
+
       const response = await fetch('/api/daily-checks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          userId,
-          questionId: input.questionId,
-          questionText: input.questionText,
-          answer: input.answer,
-          answerType: input.answerType || 'text',
-          date: input.date || new Date().toISOString().split('T')[0],
-        }),
+        body: JSON.stringify(body),
       });
 
       const result = await response.json();

@@ -20,16 +20,56 @@ export default function SleepBehaviors() {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [thermalData, setThermalData] = useState<ThermalData | null>(null);
   const [sessionData, setSessionData] = useState<ThermalData[]>([]);
+  const [tempAlerts, setTempAlerts] = useState<string[]>([]);
+  const [baselineTemp, setBaselineTemp] = useState<number | null>(null);
+  const [isSensorConnected, setIsSensorConnected] = useState<boolean>(false);
+  const [lastDataTime, setLastDataTime] = useState<number>(0);
+
+  // Handle sensor connection status changes
+  const handleConnectionStatusChange = (connected: boolean) => {
+    setIsSensorConnected(connected);
+  };
 
   // Handle real thermal data from sensor
   const handleThermalDataReceived = (data: ThermalData) => {
     setThermalData(data);
+    setLastDataTime(Date.now());
     
     // Update current temperature (average of all pixels)
     if (data.thermal_data && data.thermal_data.length > 0) {
       const allTemps = data.thermal_data.flat();
       const avgTemp = allTemps.reduce((sum, temp) => sum + temp, 0) / allTemps.length;
       setCurrentTemp(avgTemp);
+      
+      // Set baseline temperature after first 10 readings
+      if (baselineTemp === null && sessionData.length >= 10) {
+        const recentTemps = sessionData.slice(-10).map(d => {
+          const temps = d.thermal_data.flat();
+          return temps.reduce((sum, temp) => sum + temp, 0) / temps.length;
+        });
+        const baseline = recentTemps.reduce((sum, temp) => sum + temp, 0) / recentTemps.length;
+        setBaselineTemp(baseline);
+      }
+      
+      // Check for temperature alerts
+      if (baselineTemp !== null) {
+        const tempDiff = avgTemp - baselineTemp;
+        const now = new Date().toLocaleTimeString();
+        
+        if (tempDiff > 2.0) {
+          const alert = `🔥 High temperature detected at ${now}: ${avgTemp.toFixed(1)}°C (${tempDiff.toFixed(1)}°C above baseline)`;
+          setTempAlerts(prev => {
+            const newAlerts = [...prev, alert];
+            return newAlerts.slice(-5); // Keep only last 5 alerts
+          });
+        } else if (tempDiff < -2.0) {
+          const alert = `❄️ Low temperature detected at ${now}: ${avgTemp.toFixed(1)}°C (${Math.abs(tempDiff).toFixed(1)}°C below baseline)`;
+          setTempAlerts(prev => {
+            const newAlerts = [...prev, alert];
+            return newAlerts.slice(-5); // Keep only last 5 alerts
+          });
+        }
+      }
     }
     
     // Store session data if recording
@@ -47,6 +87,24 @@ export default function SleepBehaviors() {
       return () => clearInterval(interval);
     }
   }, [isRecording]);
+
+  // Check if sensor is connected based on recent data
+  useEffect(() => {
+    const checkConnection = () => {
+      const now = Date.now();
+      const timeSinceLastData = now - lastDataTime;
+      const isActuallyConnected = lastDataTime > 0 && timeSinceLastData < 10000; // 10 seconds
+      
+      if (isActuallyConnected && !isSensorConnected) {
+        setIsSensorConnected(true);
+      } else if (!isActuallyConnected && isSensorConnected && lastDataTime > 0) {
+        setIsSensorConnected(false);
+      }
+    };
+
+    const interval = setInterval(checkConnection, 2000);
+    return () => clearInterval(interval);
+  }, [lastDataTime, isSensorConnected]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -125,6 +183,7 @@ export default function SleepBehaviors() {
                       <ThermalVisualization 
                         isActive={isThermalActive}
                         onDataReceived={handleThermalDataReceived}
+                        onConnectionStatusChange={handleConnectionStatusChange}
                       />
                     </div>
                   ) : (
@@ -197,21 +256,6 @@ export default function SleepBehaviors() {
               </div>
             </div>
 
-                         {/* Quick Actions */}
-             <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
-               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-emerald-500/10 via-teal-500/5 to-cyan-500/10 blur-xl" />
-               <div className="relative">
-                 <h3 className="text-lg font-medium mb-4">Quick Actions</h3>
-                 <div className="space-y-3">
-                   <Link
-                     href="/sensors"
-                     className="block w-full py-2 px-4 rounded-lg border border-white/20 bg-white/10 text-white text-sm hover:bg-white/15 transition-colors duration-200 text-center"
-                   >
-                     View Sensors
-                   </Link>
-                 </div>
-               </div>
-             </div>
           </div>
         </div>
 

@@ -1,22 +1,41 @@
 import { Question } from '@/types/daily-questions';
 
 export const ALL_QUESTIONS: Question[] = [
-  { id: "favoriteColor", text: "What is your favorite color?" },
-  { id: "favoriteMeal", text: "What's your favorite meal of the day — breakfast, lunch, or dinner?", choices: ["Breakfast", "Lunch", "Dinner"] },
-  { id: "catsDogs", text: "Do you like cats, dogs, or both?", choices: ["Cats", "Dogs", "Both"] },
-  { id: "favoriteSeat", text: "What's your favorite place to sit at home?" },
-  { id: "favoriteAsChild", text: "What was your favorite thing to do when you were younger?" },
-  { id: "firstJob", text: "What was your first job or something you enjoyed doing?" },
-  { id: "drinkPref", text: "What do you like to drink — tea, coffee, or something else?", choices: ["Tea", "Coffee", "Something else"] },
-  { id: "smile", text: "What makes you smile?" },
-  { id: "weather", text: "What kind of weather do you enjoy?" },
-  { id: "calm", text: "What helps you feel calm?" },
-  { id: "children", text: "Do you have any children?" },
-  { id: "grandchildren", text: "Do you have any grandchildren?" },
+  // Daily Experience with Photo
+  { 
+    id: "todayExperience", 
+    text: "How was your day today? You can add a photo to help you remember.", 
+    allowPhoto: true 
+  },
+  
+  // Simple Personal Preferences
+  { id: "favoriteColor", text: "What color do you like best?" },
+  { id: "favoriteMeal", text: "Which meal do you like most?", choices: ["Breakfast", "Lunch", "Dinner"] },
+  { id: "catsDogs", text: "Do you like cats or dogs?", choices: ["Cats", "Dogs", "Both"] },
+  { id: "drinkPref", text: "What do you like to drink?", choices: ["Tea", "Coffee", "Water", "Juice"] },
+  
+  // Daily Feelings (Simple)
+  { id: "smile", text: "What made you happy today?" },
+  { id: "weather", text: "Do you like sunny days or rainy days?", choices: ["Sunny", "Rainy", "Both"] },
+  { id: "calm", text: "What makes you feel calm and peaceful?" },
+  
+  // Home and Comfort
+  { id: "favoriteSeat", text: "Where do you like to sit at home?" },
+  { id: "favoriteRoom", text: "Which room in your home do you like best?" },
+  
+  // Memories from the Past (Simple)
+  { id: "favoriteAsChild", text: "What did you like to do when you were young?" },
+  { id: "firstJob", text: "What kind of work did you do?" },
+  
+  // Family (Simple and Clear)
+  { id: "children", text: "Do you have children?", choices: ["Yes", "No"] },
+  { id: "grandchildren", text: "Do you have grandchildren?", choices: ["Yes", "No"] },
+  { id: "siblings", text: "Do you have brothers or sisters?", choices: ["Yes", "No"] },
+  
+  // Basic Identity
+  { id: "fullName", text: "What is your name?" },
+  { id: "birthday", text: "When is your birthday?" },
+  { id: "born", text: "Where were you born?" },
   { id: "parentsNames", text: "What were your parents' names?" },
-  { id: "siblings", text: "Do you have any brothers or sisters?" },
-  { id: "fullName", text: "What is your full name?" },
-  { id: "birthday", text: "When is your birthday (or do you remember what time of year it is)?" },
-  { id: "married", text: "Were you married?" },
-  { id: "born", text: "Where were you born or where did you grow up?" },
+  { id: "married", text: "Are you married or were you married?", choices: ["Yes", "No", "Was married"] },
 ];

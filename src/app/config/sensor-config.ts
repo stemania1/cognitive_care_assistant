@@ -4,16 +4,17 @@
 export const SENSOR_CONFIG = {
   // Raspberry Pi IP address on your local network
   // Try these common IP addresses first:
-  RASPBERRY_PI_IP: '192.168.254.16', // UPDATE THIS TO YOUR PI'S IP
+  RASPBERRY_PI_IP: '192.168.254.16', // Your Raspberry Pi IP
   
   // Common IP ranges to try (update the one that works)
   COMMON_IPS: [
-    '192.168.1.100',  // Common for Netgear/Linksys routers
-    '192.168.0.100',  // Common for TP-Link/Asus routers
-    '192.168.1.50',   // Alternative
-    '192.168.0.50',   // Alternative
-    '10.0.0.100',     // Some business networks
-    '172.16.0.100',   // Some home networks
+    '192.168.254.16',  // Your Raspberry Pi IP
+    '192.168.1.100',   // Common for Netgear/Linksys routers
+    '192.168.0.100',   // Common for TP-Link/Asus routers
+    '192.168.1.50',    // Alternative
+    '192.168.0.50',    // Alternative
+    '10.0.0.100',      // Some business networks
+    '172.16.0.100',    // Some home networks
   ],
   
   // Server ports
