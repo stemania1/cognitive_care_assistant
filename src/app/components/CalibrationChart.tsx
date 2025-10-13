@@ -28,7 +28,7 @@ export default function CalibrationChart({ isCalibrating, onCalibrationComplete,
   const [progress, setProgress] = useState<number>(0);
   const [isUsingFallback, setIsUsingFallback] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
 
   // Fetch calibration data when calibrating
   useEffect(() => {
@@ -272,7 +272,7 @@ export default function CalibrationChart({ isCalibrating, onCalibrationComplete,
             <div className="text-xs text-gray-400 mb-1">Baseline</div>
             <div className="text-lg font-bold text-yellow-400">
               {calibrationData.length > 0 && calibrationData[calibrationData.length - 1].baseline 
-                ? calibrationData[calibrationData.length - 1].baseline.toFixed(1) 
+                ? calibrationData[calibrationData.length - 1].baseline?.toFixed(1) 
                 : '---'}
             </div>
           </div>
@@ -283,7 +283,7 @@ export default function CalibrationChart({ isCalibrating, onCalibrationComplete,
             <div className="text-xs text-gray-400 mb-1">🫀 Heart Rate Component</div>
             <div className="text-lg font-bold text-red-400">
               {calibrationData.length > 0 && calibrationData[calibrationData.length - 1].heartRateComponent 
-                ? calibrationData[calibrationData.length - 1].heartRateComponent.toFixed(1) 
+                ? calibrationData[calibrationData.length - 1].heartRateComponent?.toFixed(1) 
                 : '---'}
             </div>
           </div>
@@ -299,7 +299,7 @@ export default function CalibrationChart({ isCalibrating, onCalibrationComplete,
             <div className="text-xs text-gray-400 mb-1">💪 Muscle Activity</div>
             <div className="text-lg font-bold text-green-400">
               {calibrationData.length > 0 && calibrationData[calibrationData.length - 1].muscleActivity 
-                ? calibrationData[calibrationData.length - 1].muscleActivity.toFixed(1) 
+                ? calibrationData[calibrationData.length - 1].muscleActivity?.toFixed(1) 
                 : '---'}
             </div>
           </div>
