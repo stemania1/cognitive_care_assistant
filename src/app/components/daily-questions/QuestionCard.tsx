@@ -65,6 +65,7 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
         .from('daily-check-photos')
         .getPublicUrl(fileName);
 
+      console.log('Photo uploaded successfully! URL:', publicUrl);
       onPhotoChange(publicUrl);
     } catch (error) {
       console.error('Error uploading photo:', error);
@@ -119,13 +120,22 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
           </label>
           
           {photoUrl ? (
-            <div className="relative rounded-lg overflow-hidden border border-white/20">
+            <div className="relative rounded-lg overflow-hidden border border-white/20 bg-white/5">
               <Image
                 src={photoUrl}
                 alt="Your photo"
                 width={400}
                 height={300}
                 className="w-full h-auto object-cover"
+                unoptimized
+                onError={(e) => {
+                  console.error('Error loading image:', photoUrl);
+                  setUploadError('Could not display photo. The image may not be accessible.');
+                }}
+                onLoad={() => {
+                  console.log('Photo loaded successfully');
+                  setUploadError(null);
+                }}
               />
               <button
                 onClick={removePhoto}
