@@ -50,7 +50,15 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
           upsert: false
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase storage error:', error);
+        if (error.message.includes('bucket') || error.message.includes('not found')) {
+          setUploadError('Storage not set up. Please run the database migration first.');
+        } else {
+          setUploadError(`Upload failed: ${error.message}`);
+        }
+        return;
+      }
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
