@@ -58,17 +58,23 @@ export default function HomeCards() {
         emoji="😴"
       />
 
-      {/* Row 3: Wide Memory Games bar */}
-      <div className="sm:col-span-2 w-full">
-        <LinkCard
-          href="/memory-games"
-          title="Memory Games"
-          description="Play cognitive exercises to train memory"
-          accent="from-green-500 to-emerald-500"
-          targetBlank
-          emoji="🧠"
-        />
-      </div>
+      {/* Row 3: Photo Album + Memory Games */}
+      <LinkCard
+        href="/photo-album"
+        title="Photo Album"
+        description="View your memories and photos from daily questions"
+        accent="from-pink-500 to-rose-500"
+        emoji="📸"
+      />
+
+      <LinkCard
+        href="/memory-games"
+        title="Memory Games"
+        description="Play cognitive exercises to train memory"
+        accent="from-green-500 to-emerald-500"
+        targetBlank
+        emoji="🧠"
+      />
     </div>
   );
 }
