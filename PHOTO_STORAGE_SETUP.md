@@ -89,9 +89,29 @@ After setup, verify it works:
 - Follow the setup steps above
 
 ### Error: "Upload failed: new row violates row-level security"
-- Storage policies aren't set up correctly
-- Check that you're signed in
-- Verify the policies in Step 3 above
+This is the most common error! It means storage policies aren't configured.
+
+**Quick Fix:**
+1. Go to Supabase Dashboard → SQL Editor
+2. Copy and paste ALL contents from `FIX_PHOTO_UPLOAD.sql`
+3. Click "Run"
+4. You should see "Bucket created: 1" and "Policies created: 4"
+5. Try uploading again - it will work! ✅
+
+**Alternative Fix (Manual):**
+1. Go to Storage → daily-check-photos → Policies
+2. Make sure bucket is **Public** (toggle at top)
+3. Delete ALL existing policies
+4. Add a new policy:
+   - Name: "Public Access"
+   - Allowed operation: SELECT
+   - Target roles: public
+   - Policy definition: `bucket_id = 'daily-check-photos'`
+5. Add another policy:
+   - Name: "Authenticated users can upload"
+   - Allowed operation: INSERT
+   - Target roles: authenticated
+   - Policy definition: `bucket_id = 'daily-check-photos'`
 
 ### Error: "Photo is too big"
 - Maximum file size is 5MB
