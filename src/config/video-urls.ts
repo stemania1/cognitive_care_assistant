@@ -18,8 +18,11 @@ export const LOCAL_VIDEO_URLS = {
 export const getVideoUrl = (exerciseId: string): string => {
   const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
   
-  if (isProduction && SUPABASE_VIDEO_URLS[exerciseId as keyof typeof SUPABASE_VIDEO_URLS]) {
-    return SUPABASE_VIDEO_URLS[exerciseId as keyof typeof SUPABASE_VIDEO_URLS];
+  if (isProduction) {
+    const supabaseUrl = SUPABASE_VIDEO_URLS[exerciseId as keyof typeof SUPABASE_VIDEO_URLS];
+    if (supabaseUrl && supabaseUrl.trim() !== '') {
+      return supabaseUrl;
+    }
   }
   
   return LOCAL_VIDEO_URLS[exerciseId as keyof typeof LOCAL_VIDEO_URLS] || '';

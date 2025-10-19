@@ -44,7 +44,7 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
     myoWareSuitable: true,
     myoWareReason: 'Track arm swing intensity and rhythm consistency',
     sensorPlacement: 'Place on upper arm (bicep) to monitor arm movement patterns',
-    videoUrl: '/videos/workouts/chair_arm_swings.mp4'
+    videoUrl: undefined // Will use getVideoUrl() to get Supabase URL in production
   },
   {
     id: 'balance_posture',
@@ -63,7 +63,7 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
     myoWareSuitable: false,
     myoWareReason: 'This workout focuses on leg and balance movements, not arm muscles',
     sensorPlacement: 'Not recommended - focus on leg exercises',
-    videoUrl: '/videos/workouts/balance_posture.mp4'
+    videoUrl: undefined // Will use getVideoUrl() to get Supabase URL in production
   },
   {
     id: 'finger_wrist_hand',
@@ -82,7 +82,7 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
     myoWareSuitable: true,
     myoWareReason: 'Monitor forearm muscle activation during finger and wrist movements',
     sensorPlacement: 'Place on forearm to track fine motor muscle activity',
-    videoUrl: '/videos/workouts/finger_wrist_hand.mp4'
+    videoUrl: undefined // Will use getVideoUrl() to get Supabase URL in production
   },
   {
     id: 'leg_foot_movement',
@@ -281,7 +281,7 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
     myoWareSuitable: true,
     myoWareReason: 'Monitor arm muscle activation during overhead reaches and shoulder rolls',
     sensorPlacement: 'Place on upper arm (bicep) to track arm movement intensity',
-    videoUrl: '/videos/workouts/seated_stretch_breathe.mp4'
+    videoUrl: undefined // Will use getVideoUrl() to get Supabase URL in production
   }
 ];
 

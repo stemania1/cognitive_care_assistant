@@ -38,6 +38,10 @@ TOTAL_PIXELS = GRID_WIDTH * GRID_HEIGHT
 # Update interval
 UPDATE_INTERVAL = 0.5  # Update every 500ms
 
+# Smoothing configuration
+SMOOTHING_FACTOR = 0.3  # Lower = more smoothing (0.1 = very smooth, 0.9 = less smooth)
+last_thermal_data = None
+
 # AMG8833 I2C configuration
 AMG8833_ADDR = 0x69  # Default I2C address
 AMG8833_TTHL = 0x0E  # Thermistor temperature register
@@ -125,6 +129,29 @@ def pixels_to_grid(pixels):
     
     return grid
 
+def smooth_thermal_data(new_data):
+    """Apply smoothing to thermal data to reduce jumpiness"""
+    global last_thermal_data
+    
+    if last_thermal_data is None:
+        last_thermal_data = new_data
+        return new_data
+    
+    # Apply exponential smoothing
+    smoothed_data = []
+    for y in range(GRID_HEIGHT):
+        row = []
+        for x in range(GRID_WIDTH):
+            # Smooth each pixel
+            old_value = last_thermal_data[y][x]
+            new_value = new_data[y][x]
+            smoothed_value = old_value + SMOOTHING_FACTOR * (new_value - old_value)
+            row.append(round(smoothed_value, 1))
+        smoothed_data.append(row)
+    
+    last_thermal_data = smoothed_data
+    return smoothed_data
+
 def generate_thermal_data():
     """Get actual thermal data from AMG8833 sensor or fallback to simulation"""
     if SENSOR_AVAILABLE:
@@ -132,13 +159,14 @@ def generate_thermal_data():
         if pixels is not None:
             grid = pixels_to_grid(pixels)
             if grid is not None:
-                return grid
+                return smooth_thermal_data(grid)
     
     # Fallback to simulation
-    return generate_simulation_data()
+    simulation_data = generate_simulation_data()
+    return smooth_thermal_data(simulation_data)
 
 def generate_simulation_data():
-    """Generate simulation data as fallback"""
+    """Generate simulation data as fallback with smoothing"""
     current_time = time.time()
     
     # Create 8x8 thermal grid with realistic patterns
@@ -152,17 +180,20 @@ def generate_simulation_data():
             center_x, center_y = GRID_WIDTH // 2, GRID_HEIGHT // 2
             distance_from_center = math.sqrt((x - center_x)**2 + (y - center_y)**2)
             
-            # Base temperature with center bias
-            center_bias = max(0, (3 - distance_from_center) * 2.0)
+            # Base temperature with center bias (more gradual)
+            center_bias = max(0, (3 - distance_from_center) * 1.5)
             
-            # Add some time-based variation
-            time_variation = math.sin(current_time + x * 0.5 + y * 0.3) * 1.5
+            # Add very subtle time-based variation (much smaller and slower)
+            time_variation = math.sin(current_time * 0.1 + x * 0.2 + y * 0.15) * 0.3
+            
+            # Add some spatial variation for realism
+            spatial_variation = math.sin(x * 0.8) * math.cos(y * 0.6) * 0.5
             
             # Calculate final temperature
-            temperature = 20.0 + center_bias + time_variation
+            temperature = 22.0 + center_bias + time_variation + spatial_variation
             
             # Clamp to reasonable range
-            temperature = max(15.0, min(35.0, temperature))
+            temperature = max(18.0, min(28.0, temperature))
             
             row.append(round(temperature, 1))
         
@@ -304,4 +335,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
