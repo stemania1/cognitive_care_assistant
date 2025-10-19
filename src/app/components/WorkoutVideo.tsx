@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { getVideoUrl } from '@/config/video-urls';
 
 interface WorkoutVideoProps {
   videoUrl?: string;
@@ -20,15 +21,8 @@ export default function WorkoutVideo({
   const [showOverlay, setShowOverlay] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Local video paths for the workout videos
-  const localVideos: { [key: string]: string } = {
-    'chair_arm_swings': '/videos/workouts/chair_arm_swings.mp4',
-    'balance_posture': '/videos/workouts/balance_posture.mp4',
-    'finger_wrist_hand': '/videos/workouts/finger_wrist_hand.mp4',
-    'seated_stretch_breathe': '/videos/workouts/seated_stretch_breathe.mp4'
-  };
-
-  const videoSource = videoUrl || localVideos[exerciseId];
+  // Get video URL from Supabase or local fallback
+  const videoSource = videoUrl || getVideoUrl(exerciseId);
 
   const handleLoad = () => {
     setIsLoading(false);
@@ -99,7 +93,7 @@ export default function WorkoutVideo({
   return (
     <div className={`relative ${className}`}>
       {/* Video Element - Always rendered */}
-      {videoSource.startsWith('/videos/') ? (
+      {(videoSource.startsWith('/videos/') || videoSource.startsWith('https://')) ? (
         <div className="relative rounded-lg overflow-hidden border border-white/20 bg-black">
           <video
             ref={videoRef}
