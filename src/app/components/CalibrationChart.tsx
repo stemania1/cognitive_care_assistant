@@ -21,7 +21,7 @@ interface CalibrationChartProps {
   serverUrl?: string;
 }
 
-export default function CalibrationChart({ isCalibrating, onCalibrationComplete, serverUrl = 'http://localhost:3000' }: CalibrationChartProps) {
+export default function CalibrationChart({ isCalibrating, onCalibrationComplete, serverUrl = `http://localhost:${typeof window !== 'undefined' ? window.location.port : '3000'}` }: CalibrationChartProps) {
   const [calibrationData, setCalibrationData] = useState<CalibrationData[]>([]);
   const [currentMin, setCurrentMin] = useState<number>(4095);
   const [currentMax, setCurrentMax] = useState<number>(0);

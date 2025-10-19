@@ -4,7 +4,7 @@ export const ALL_QUESTIONS: Question[] = [
   // Daily Experience with Photo
   { 
     id: "todayExperience", 
-    text: "How was your day today? You can add a photo to help you remember.", 
+    text: "Describe your day and attach a photo", 
     allowPhoto: true 
   },
   

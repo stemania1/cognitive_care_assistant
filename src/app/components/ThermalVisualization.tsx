@@ -34,6 +34,30 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
   const websocketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastConnectionStatus = useRef<string>('disconnected');
+  const lastThermalData = useRef<number[][]>([]);
+  const smoothingFactor = 0.3; // Lower = more smoothing
+
+  // Smooth thermal data to reduce jumpiness
+  const smoothThermalData = (newData: number[][]) => {
+    if (lastThermalData.current.length === 0) {
+      lastThermalData.current = newData;
+      return newData;
+    }
+
+    const smoothedData: number[][] = [];
+    for (let y = 0; y < newData.length; y++) {
+      smoothedData[y] = [];
+      for (let x = 0; x < newData[y].length; x++) {
+        const oldValue = lastThermalData.current[y]?.[x] || newData[y][x];
+        const newValue = newData[y][x];
+        const smoothedValue = oldValue + smoothingFactor * (newValue - oldValue);
+        smoothedData[y][x] = Math.round(smoothedValue * 10) / 10; // Round to 1 decimal
+      }
+    }
+    
+    lastThermalData.current = smoothedData;
+    return smoothedData;
+  };
 
   // Notify parent component of connection status changes
   useEffect(() => {
@@ -113,7 +137,8 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
             
             const data: ThermalData = JSON.parse(event.data);
             if (data.type === 'thermal_data') {
-              setThermalData(data.thermal_data);
+              const smoothedData = smoothThermalData(data.thermal_data);
+              setThermalData(smoothedData);
               setSensorInfo(data.sensor_info);
               setLastUpdate(new Date());
               onDataReceived(data);
@@ -298,7 +323,8 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
         const response = await fetch(`/api/thermal${query}`, { cache: 'no-store' });
         if (response.ok) {
           const data: ThermalData = await response.json();
-          setThermalData(data.thermal_data);
+          const smoothedData = smoothThermalData(data.thermal_data);
+          setThermalData(smoothedData);
           setSensorInfo(data.sensor_info);
           setLastUpdate(new Date());
           onDataReceived(data);
@@ -391,7 +417,7 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
         </div>
         
         {/* Temperature Legend */}
-        <div className="mt-3 flex items-center justify-center gap-4 text-xs">
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 bg-blue-500 rounded"></div>
             <span className="text-gray-300">Cold</span>

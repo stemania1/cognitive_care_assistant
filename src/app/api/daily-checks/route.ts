@@ -153,10 +153,12 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { userId, date } = body;
-    if (!userId || !date) {
-      return NextResponse.json({ error: 'User ID and date are required' }, { status: 400 });
+    const { searchParams } = new URL(request.url);
+    const entryId = searchParams.get('entryId');
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
     // Create a Supabase client with service role key for admin operations
@@ -179,15 +181,76 @@ export async function DELETE(request: NextRequest) {
       }
     );
 
-    const { error } = await supabaseAdmin
-      .from('daily_checks')
-      .delete()
-      .eq('user_id', userId)
-      .eq('date', date);
+    if (entryId) {
+      // Delete specific entry (for photo deletion)
+      const { data: entry, error: fetchError } = await supabaseAdmin
+        .from('daily_checks')
+        .select('photo_url, user_id')
+        .eq('id', entryId)
+        .eq('user_id', userId)
+        .single();
 
-    if (error) return NextResponse.json({ error: 'Failed to delete daily checks' }, { status: 500 });
-    return NextResponse.json({ success: true });
+      if (fetchError) {
+        return NextResponse.json({ error: 'Entry not found or access denied' }, { status: 404 });
+      }
+
+      // Delete photo from storage if it exists
+      if (entry.photo_url) {
+        try {
+          // Extract file path from URL
+          const url = new URL(entry.photo_url);
+          const pathParts = url.pathname.split('/');
+          const bucketIndex = pathParts.findIndex(part => part === 'daily-check-photos');
+          if (bucketIndex !== -1 && bucketIndex < pathParts.length - 1) {
+            const filePath = pathParts.slice(bucketIndex + 1).join('/');
+            
+            const { error: storageError } = await supabaseAdmin.storage
+              .from('daily-check-photos')
+              .remove([filePath]);
+
+            if (storageError) {
+              console.warn('Failed to delete photo from storage:', storageError);
+              // Continue with database deletion even if storage deletion fails
+            }
+          }
+        } catch (error) {
+          console.warn('Error parsing photo URL for deletion:', error);
+          // Continue with database deletion
+        }
+      }
+
+      // Delete the database entry
+      const { error: deleteError } = await supabaseAdmin
+        .from('daily_checks')
+        .delete()
+        .eq('id', entryId)
+        .eq('user_id', userId);
+
+      if (deleteError) {
+        return NextResponse.json({ error: 'Failed to delete entry' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    } else {
+      // Legacy behavior: delete all entries for a date (keeping for backward compatibility)
+      const body = await request.json();
+      const { date } = body;
+      
+      if (!date) {
+        return NextResponse.json({ error: 'Date is required for bulk deletion' }, { status: 400 });
+      }
+
+      const { error } = await supabaseAdmin
+        .from('daily_checks')
+        .delete()
+        .eq('user_id', userId)
+        .eq('date', date);
+
+      if (error) return NextResponse.json({ error: 'Failed to delete daily checks' }, { status: 500 });
+      return NextResponse.json({ success: true });
+    }
   } catch (e) {
+    console.error('Error in daily checks DELETE:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

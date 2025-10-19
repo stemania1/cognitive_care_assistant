@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from "next/link";
 import MyoWareClient from '../components/MyoWareClient';
 import EMGChart from '../components/EMGChart';
+import WorkoutVideo from '../components/WorkoutVideo';
 
 interface EMGData {
   timestamp: number;
@@ -22,27 +23,10 @@ interface WorkoutExercise {
   myoWareSuitable: boolean; // Whether this workout benefits from MyoWare monitoring
   myoWareReason: string; // Why MyoWare is useful for this workout
   sensorPlacement: string; // Where to place the MyoWare sensor
+  videoUrl?: string; // Optional demonstration video URL
 }
 
 const WORKOUT_ROUTINES: WorkoutExercise[] = [
-  {
-    id: 'seated_stretch_breathe',
-    name: 'Seated Stretch & Breathe',
-    duration: 300, // 5 minutes
-    targetMuscles: ['leftBicep', 'rightBicep'],
-    description: 'A calming routine with deep breaths, shoulder rolls, and gentle seated twists',
-    instructions: [
-      'Sit comfortably with feet flat on floor',
-      'Take 3 deep breaths, inhaling through nose',
-      'Roll shoulders backward 5 times',
-      'Gently twist torso left, then right',
-      'Reach arms overhead and stretch',
-      'End with 3 more deep breaths'
-    ],
-    myoWareSuitable: true,
-    myoWareReason: 'Monitor arm muscle activation during overhead reaches and shoulder rolls',
-    sensorPlacement: 'Place on upper arm (bicep) to track arm movement intensity'
-  },
   {
     id: 'chair_arm_swings',
     name: 'Chair & Arm Swings',
@@ -59,7 +43,8 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
     ],
     myoWareSuitable: true,
     myoWareReason: 'Track arm swing intensity and rhythm consistency',
-    sensorPlacement: 'Place on upper arm (bicep) to monitor arm movement patterns'
+    sensorPlacement: 'Place on upper arm (bicep) to monitor arm movement patterns',
+    videoUrl: '/videos/workouts/chair_arm_swings.mp4'
   },
   {
     id: 'balance_posture',
@@ -77,7 +62,8 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
     ],
     myoWareSuitable: false,
     myoWareReason: 'This workout focuses on leg and balance movements, not arm muscles',
-    sensorPlacement: 'Not recommended - focus on leg exercises'
+    sensorPlacement: 'Not recommended - focus on leg exercises',
+    videoUrl: '/videos/workouts/balance_posture.mp4'
   },
   {
     id: 'finger_wrist_hand',
@@ -95,7 +81,8 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
     ],
     myoWareSuitable: true,
     myoWareReason: 'Monitor forearm muscle activation during finger and wrist movements',
-    sensorPlacement: 'Place on forearm to track fine motor muscle activity'
+    sensorPlacement: 'Place on forearm to track fine motor muscle activity',
+    videoUrl: '/videos/workouts/finger_wrist_hand.mp4'
   },
   {
     id: 'leg_foot_movement',
@@ -276,6 +263,25 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
     myoWareSuitable: true,
     myoWareReason: 'Monitor gentle arm movements synchronized with breathing',
     sensorPlacement: 'Place on upper arm (bicep) to track breathing movements'
+  },
+  {
+    id: 'seated_stretch_breathe',
+    name: 'Seated Stretch & Breathe',
+    duration: 300, // 5 minutes
+    targetMuscles: ['leftBicep', 'rightBicep'],
+    description: 'A calming routine with deep breaths, shoulder rolls, and gentle seated twists',
+    instructions: [
+      'Sit comfortably with feet flat on floor',
+      'Take 3 deep breaths, inhaling through nose',
+      'Roll shoulders backward 5 times',
+      'Gently twist torso left, then right',
+      'Reach arms overhead and stretch',
+      'End with 3 more deep breaths'
+    ],
+    myoWareSuitable: true,
+    myoWareReason: 'Monitor arm muscle activation during overhead reaches and shoulder rolls',
+    sensorPlacement: 'Place on upper arm (bicep) to track arm movement intensity',
+    videoUrl: '/videos/workouts/seated_stretch_breathe.mp4'
   }
 ];
 
@@ -691,12 +697,12 @@ export default function EMGPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-4 max-w-7xl">
         {/* Header */}
         <div className="mb-4">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
             <div>
-              <h1 className="text-4xl font-bold text-white mb-2">EMG Workout</h1>
+              <h1 className="text-3xl lg:text-4xl font-bold text-white mb-2">EMG Workout</h1>
               <p className="text-gray-300">Monitor muscle activation during exercises</p>
             </div>
             <div className="flex items-center gap-4">
@@ -714,7 +720,7 @@ export default function EMGPage() {
           </div>
           
           {/* MyoWare Guidance */}
-          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-4">
+          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-3">
             <div className="flex items-start gap-3">
               <div className="text-blue-400 text-xl">💡</div>
               <div>
@@ -729,7 +735,7 @@ export default function EMGPage() {
           </div>
           
           {/* Connection Controls */}
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
             {!isMyoWareConnected ? (
               <div className="px-6 py-3 bg-gray-600 text-gray-300 rounded-lg font-medium">
                 Waiting for MyoWare Device...
@@ -764,51 +770,53 @@ export default function EMGPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
           {/* MyoWare Client */}
-          <div className="lg:col-span-1">
-            <MyoWareClient 
-              onDataReceived={handleMyoWareData}
-              onConnectionChange={handleMyoWareConnection}
-              deviceConnected={isMyoWareConnected}
-            />
-            
-            {/* Device Help */}
-            <div className="mt-4 p-4 bg-gray-800 rounded-lg">
-              <h3 className="text-lg font-semibold text-white mb-2">Device Connection Help</h3>
-              <div className="text-xs text-gray-400 space-y-1">
-                <p>• Power on the MyoWare device</p>
-                <p>• Ensure it is connected to the same WiFi network</p>
-                <p>• The device must POST to /api/emg/ws with type "heartbeat" and "emg_data"</p>
+          <div className="xl:col-span-1">
+            <div className="sticky top-6">
+              <MyoWareClient 
+                onDataReceived={handleMyoWareData}
+                onConnectionChange={handleMyoWareConnection}
+                deviceConnected={isMyoWareConnected}
+              />
+              
+              {/* Device Help */}
+              <div className="mt-3 p-3 bg-gray-800 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-2">Device Connection Help</h3>
+                <div className="text-xs text-gray-400 space-y-1">
+                  <p>• Power on the MyoWare device</p>
+                  <p>• Ensure it is connected to the same WiFi network</p>
+                  <p>• The device must POST to /api/emg/ws with type "heartbeat" and "emg_data"</p>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Workout Selection */}
-          <div className="lg:col-span-1">
-            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-4">
+          <div className="xl:col-span-1">
+            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-3">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-blue-500/10 via-purple-500/5 to-pink-500/10 blur-xl" />
               <div className="relative">
-                <h2 className="text-xl font-semibold mb-6">Select Workout</h2>
+                <h2 className="text-xl font-semibold mb-4">Select Workout</h2>
                 
                 {/* Current Workout Display */}
-                <div className="p-4 rounded-lg border border-white/20 bg-white/10 mb-4">
-                  <div className="text-center mb-4">
+                <div className="p-3 rounded-lg border border-white/20 bg-white/10 mb-3">
+                  <div className="text-center mb-3">
                     <div className="text-sm text-gray-400 mb-2">
                       Workout {currentWorkoutIndex + 1} of {WORKOUT_ROUTINES.length}
                     </div>
                     <h3 className="text-xl font-semibold text-white mb-2">
                       {WORKOUT_ROUTINES[currentWorkoutIndex].name}
                     </h3>
-                    <p className="text-sm text-gray-300 mb-4">
+                    <p className="text-sm text-gray-300 mb-3">
                       {WORKOUT_ROUTINES[currentWorkoutIndex].description}
                     </p>
-                    <div className="text-xs text-gray-400 mb-4">
+                    <div className="text-xs text-gray-400 mb-3">
                       Duration: {formatTime(WORKOUT_ROUTINES[currentWorkoutIndex].duration)}
                     </div>
                     
                     {/* MyoWare Suitability Indicator */}
-                    <div className={`p-3 rounded-lg mb-4 ${
+                    <div className={`p-3 rounded-lg mb-3 ${
                       WORKOUT_ROUTINES[currentWorkoutIndex].myoWareSuitable 
                         ? 'bg-green-500/20 border border-green-500/30' 
                         : 'bg-orange-500/20 border border-orange-500/30'
@@ -936,7 +944,7 @@ export default function EMGPage() {
           </div>
 
           {/* EMG Visualization */}
-          <div className="lg:col-span-2">
+          <div className="xl:col-span-2">
             <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-4">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-sky-500/5 to-blue-500/10 blur-xl" />
               <div className="relative">
@@ -996,14 +1004,14 @@ export default function EMGPage() {
                       )}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {/* Raw MyoWare 2.0 Data */}
                       <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                        <div className="text-lg font-medium text-white mb-4">Raw Sensor Data</div>
+                        <div className="text-lg font-medium text-white mb-3">Raw Sensor Data</div>
                         <div className="text-3xl font-bold text-blue-400 mb-2">
                           {currentData.muscleActivity}
                         </div>
-                        <div className="text-sm text-gray-400 mb-4">Analog Value (0-1023)</div>
+                        <div className="text-sm text-gray-400 mb-3">Analog Value (0-1023)</div>
                         <div className="w-full bg-gray-700 rounded-full h-3">
                           <div 
                             className="bg-gradient-to-r from-blue-400 to-cyan-500 h-3 rounded-full transition-all duration-200"
@@ -1017,11 +1025,11 @@ export default function EMGPage() {
                       
                       {/* Processed Percentage */}
                       <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                        <div className="text-lg font-medium text-white mb-4">Muscle Activation</div>
-                        <div className="text-4xl font-bold text-green-400 mb-2">
+                        <div className="text-lg font-medium text-white mb-3">Muscle Activation</div>
+                        <div className="text-3xl font-bold text-green-400 mb-2">
                           {currentData.muscleActivityProcessed.toFixed(1)}%
                         </div>
-                        <div className="text-sm text-gray-400 mb-4">Processed Percentage</div>
+                        <div className="text-sm text-gray-400 mb-3">Processed Percentage</div>
                         <div className="w-full bg-gray-700 rounded-full h-3">
                           <div 
                             className="bg-gradient-to-r from-green-400 to-emerald-500 h-3 rounded-full transition-all duration-200"
@@ -1044,10 +1052,11 @@ export default function EMGPage() {
                   />
                 </div>
 
+
                 {/* Workout Instructions */}
                 <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
                   <h3 className="font-medium text-white mb-3">
-                    {currentWorkout ? 'Exercise Instructions' : 'Workout Preview'}
+                    {currentWorkout ? 'Exercise Instructions' : 'Workout Instructions'}
                   </h3>
                   <ul className="space-y-2">
                     {(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).instructions.map((instruction, index) => (
@@ -1066,6 +1075,19 @@ export default function EMGPage() {
                       </p>
                     </div>
                   )}
+                </div>
+
+                {/* Workout Demonstration Video */}
+                <div className="mb-4">
+                  <h3 className="font-medium text-white mb-3">
+                    {currentWorkout ? 'Exercise Demonstration' : 'Workout Preview'}
+                  </h3>
+                  <WorkoutVideo
+                    videoUrl={(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).videoUrl}
+                    exerciseId={(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).id}
+                    exerciseName={(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).name}
+                    className="w-full"
+                  />
                 </div>
 
                 {/* Workout Controls */}
@@ -1092,28 +1114,24 @@ export default function EMGPage() {
 
         {/* Workout History */}
         {workoutHistory.length > 0 && (
-          <div className="mt-8">
-            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+          <div className="mt-6">
+            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-4">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-purple-500/10 via-fuchsia-500/5 to-pink-500/10 blur-xl" />
               <div className="relative">
-                <h2 className="text-xl font-semibold mb-6">Workout History</h2>
-                <div className="space-y-4">
-                  {workoutHistory.slice(0, 5).map((session) => (
+                <h2 className="text-xl font-semibold mb-4">Workout History</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {workoutHistory.slice(0, 6).map((session) => (
                     <div key={session.id} className="p-4 rounded-lg border border-white/10 bg-white/5">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-medium text-white">{session.exercise.name}</h3>
-                          <p className="text-sm text-gray-300">
-                            {formatTime(session.duration)} • {session.dataPoints} data points
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            Avg Activation: {session.avgMuscleActivation.toFixed(1)}%
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm text-gray-400">
-                            {new Date(session.timestamp).toLocaleTimeString()}
-                          </div>
+                      <div className="flex flex-col gap-2">
+                        <h3 className="font-medium text-white text-sm">{session.exercise.name}</h3>
+                        <p className="text-xs text-gray-300">
+                          {formatTime(session.duration)} • {session.dataPoints} points
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Avg: {session.avgMuscleActivation.toFixed(1)}%
+                        </p>
+                        <div className="text-xs text-gray-500">
+                          {new Date(session.timestamp).toLocaleTimeString()}
                         </div>
                       </div>
                     </div>
@@ -1125,14 +1143,14 @@ export default function EMGPage() {
         )}
 
         {/* Navigation */}
-        <div className="mt-8 flex justify-center">
+        <div className="mt-6 flex justify-center">
           <Link
             href="/dashboard"
-            className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-6 py-4 hover:bg-white/10 transition-all duration-200"
+            className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-6 py-3 hover:bg-white/10 transition-all duration-200"
           >
             <div className="flex items-center justify-center gap-3">
-              <span className="text-lg font-medium">Return to Dashboard</span>
-              <span className="text-xl opacity-60 transition-transform group-hover:translate-x-1">→</span>
+              <span className="text-base font-medium">Return to Dashboard</span>
+              <span className="text-lg opacity-60 transition-transform group-hover:translate-x-1">→</span>
             </div>
           </Link>
         </div>

@@ -212,13 +212,26 @@ export default function Sensors() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const canvasWidth = canvas.width;
-    const canvasHeight = canvas.height;
-    const cellWidth = canvasWidth / GRID_SIZE;
-    const cellHeight = canvasHeight / GRID_SIZE;
+    // Get the actual displayed size of the canvas
+    const rect = canvas.getBoundingClientRect();
+    const displayWidth = rect.width;
+    const displayHeight = rect.height;
+    
+    // Use the smaller dimension to ensure square aspect ratio
+    const size = Math.min(displayWidth, displayHeight);
+    const cellWidth = size / GRID_SIZE;
+    const cellHeight = size / GRID_SIZE;
+    
+    // Set canvas internal resolution to match display size
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+    ctx.scale(dpr, dpr);
 
     // Clear canvas
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    ctx.clearRect(0, 0, size, size);
 
     // Draw grid cells
     for (let y = 0; y < GRID_SIZE; y++) {
@@ -256,13 +269,13 @@ export default function Sensors() {
       // Vertical lines
       ctx.beginPath();
       ctx.moveTo(i * cellWidth, 0);
-      ctx.lineTo(i * cellWidth, canvasHeight);
+      ctx.lineTo(i * cellWidth, size);
       ctx.stroke();
       
       // Horizontal lines
       ctx.beginPath();
       ctx.moveTo(0, i * cellHeight);
-      ctx.lineTo(canvasWidth, i * cellHeight);
+      ctx.lineTo(size, i * cellHeight);
       ctx.stroke();
     }
   };
@@ -271,6 +284,18 @@ export default function Sensors() {
     if (thermalData) {
       drawHeatmap();
     }
+  }, [thermalData]);
+
+  // Redraw on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (thermalData) {
+        drawHeatmap();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [thermalData]);
 
   const getTemperatureStats = () => {
@@ -364,7 +389,7 @@ export default function Sensors() {
           <div className="lg:col-span-2">
             <div className="relative">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-sky-500/5 to-blue-500/10 blur-xl" />
-              <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6">
+              <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6 min-h-[500px]">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold text-white">Thermal Heatmap</h2>
                   <div className="text-sm text-gray-400">
@@ -373,28 +398,29 @@ export default function Sensors() {
                 </div>
                 
                 {/* Canvas Container */}
-                <div className="flex justify-center">
-                  <div className="relative">
+                <div className="flex justify-center items-center py-4">
+                  <div className="relative w-full max-w-md">
                     <canvas
                       ref={canvasRef}
                       width={400}
                       height={400}
-                      className="border border-white/20 rounded-lg bg-black/20"
+                      className="w-full h-auto max-w-full max-h-80 border border-white/20 rounded-lg bg-black/20"
+                      style={{ aspectRatio: '1/1' }}
                     />
                     
                     {/* Temperature Scale */}
-                    <div className="mt-4 flex items-center justify-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 bg-blue-500 rounded"></div>
-                        <span className="text-sm text-gray-300">Cold ({MIN_TEMP}°C)</span>
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:gap-4">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></div>
+                        <span className="text-xs sm:text-sm text-gray-300">Cold ({MIN_TEMP}°C)</span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 bg-green-500 rounded"></div>
-                        <span className="text-sm text-gray-300">Warm</span>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded"></div>
+                        <span className="text-xs sm:text-sm text-gray-300">Warm</span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 bg-red-500 rounded"></div>
-                        <span className="text-sm text-gray-300">Hot ({MAX_TEMP}°C)</span>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded"></div>
+                        <span className="text-xs sm:text-sm text-gray-300">Hot ({MAX_TEMP}°C)</span>
                       </div>
                     </div>
                   </div>

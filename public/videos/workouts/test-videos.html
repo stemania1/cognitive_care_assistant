@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Workout Videos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            padding: 20px;
+        }
+        .video-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #2a2a2a;
+        }
+        video {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+        }
+        .error {
+            color: #ff6b6b;
+            background: #3a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #51cf66;
+            background: #1a3a1a;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Workout Videos Test</h1>
+    <p>Testing if the workout videos can be loaded and played.</p>
+
+    <div class="video-container">
+        <h3>1. Balance Posture Video</h3>
+        <video controls preload="metadata">
+            <source src="balance_posture.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <div id="balance-status"></div>
+    </div>
+
+    <div class="video-container">
+        <h3>2. Chair Arm Swings Video</h3>
+        <video controls preload="metadata">
+            <source src="chair_arm_swings.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <div id="chair-status"></div>
+    </div>
+
+    <div class="video-container">
+        <h3>3. Finger Wrist Hand Video</h3>
+        <video controls preload="metadata">
+            <source src="finger_wrist_hand.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <div id="finger-status"></div>
+    </div>
+
+    <script>
+        // Test each video
+        const videos = document.querySelectorAll('video');
+        const statusDivs = ['balance-status', 'chair-status', 'finger-status'];
+        
+        videos.forEach((video, index) => {
+            video.addEventListener('loadedmetadata', () => {
+                const statusDiv = document.getElementById(statusDivs[index]);
+                statusDiv.innerHTML = `<div class="success">✅ Video loaded successfully! Duration: ${Math.round(video.duration)}s</div>`;
+            });
+            
+            video.addEventListener('error', (e) => {
+                const statusDiv = document.getElementById(statusDivs[index]);
+                statusDiv.innerHTML = `<div class="error">❌ Error loading video: ${e.message || 'Unknown error'}</div>`;
+            });
+            
+            video.addEventListener('canplay', () => {
+                console.log(`Video ${index + 1} can play`);
+            });
+        });
+    </script>
+</body>
+</html>

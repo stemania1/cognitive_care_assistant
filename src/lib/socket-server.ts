@@ -9,7 +9,7 @@ export const initializeSocketServer = (httpServer: NetServer) => {
       cors: {
         origin: process.env.NODE_ENV === 'production' 
           ? "https://cognitive-care-assistant.vercel.app"
-          : "http://localhost:3000",
+          : `http://localhost:${process.env.PORT || 3002}`,
         methods: ["GET", "POST"]
       }
     });

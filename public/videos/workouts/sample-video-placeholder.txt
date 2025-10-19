@@ -1,0 +1,38 @@
+This is a placeholder file for workout demonstration videos.
+
+To add real videos:
+
+1. RECORD VIDEOS:
+   - Use your phone or camera to record 30-60 second demonstrations
+   - Show proper form for each exercise
+   - Keep the camera steady and well-lit
+   - Include clear audio instructions if possible
+
+2. CONVERT TO MP4:
+   - Use any video converter (HandBrake, VLC, etc.)
+   - Format: MP4 with H.264 codec
+   - Resolution: 720p or 1080p
+   - Duration: 30-60 seconds per exercise
+
+3. RENAME FILES:
+   - Use the exact exercise ID as filename
+   - Example: seated_stretch_breathe.mp4
+   - Example: chair_arm_swings.mp4
+
+4. PLACE IN THIS DIRECTORY:
+   - All videos go in: public/videos/workouts/
+   - The system will automatically detect them
+
+5. TEST:
+   - Run: node scripts/add-workout-videos.js
+   - Check your EMG workout page
+   - Videos should appear in the workout selection
+
+SAMPLE EXERCISES TO RECORD:
+- Seated Stretch & Breathe: Show deep breathing and gentle arm movements
+- Chair Arm Swings: Demonstrate seated marching with arm swings
+- Seated Arm Circles: Show forward and backward arm circles
+- Seated Shoulder Rolls: Demonstrate shoulder rolling movements
+- Seated Leg Lifts: Show seated leg lifting exercises
+
+The system will show a placeholder message if videos are missing.

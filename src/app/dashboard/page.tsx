@@ -9,9 +9,9 @@ export default function Dashboard() {
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.2),transparent)]" />
       <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/40 via-purple-500/35 to-cyan-500/40 blur-3xl -z-10" />
 
-      <main className="relative mx-auto max-w-5xl px-6 sm:px-10 py-12 sm:py-20">
+      <main className="relative mx-auto max-w-5xl px-6 sm:px-10 py-8 sm:py-12">
         {/* Hero */}
-        <div className="flex flex-col items-center text-center gap-4 sm:gap-6 mb-8 sm:mb-12">
+        <div className="flex flex-col items-center text-center gap-3 sm:gap-4 mb-6 sm:mb-8">
           <Link href="/about" className="relative cursor-pointer select-none" title="Learn why we built Cognitive Care" role="button">
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/40 via-purple-500/30 to-cyan-500/40 blur-xl" />
             <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-4">

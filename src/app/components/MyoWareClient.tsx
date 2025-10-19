@@ -47,7 +47,7 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
     const isProduction = window.location.hostname !== 'localhost';
     const url = isProduction 
       ? 'https://cognitive-care-assistant.vercel.app'
-      : 'http://localhost:3000';
+      : `http://localhost:${window.location.port}`;
     setServerUrl(url);
     
     // Auto-discover devices on mount
