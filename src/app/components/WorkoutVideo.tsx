@@ -24,15 +24,6 @@ export default function WorkoutVideo({
   // Get video URL from Supabase or local fallback
   const videoSource = videoUrl || getVideoUrl(exerciseId);
 
-  console.log('WorkoutVideo Debug:', {
-    exerciseId,
-    exerciseName,
-    videoUrl,
-    videoSource,
-    hasError,
-    isTextPlaceholder: videoSource ? isTextPlaceholder(videoSource) : false
-  });
-
   const handleLoad = () => {
     setIsLoading(false);
     setHasError(false);
