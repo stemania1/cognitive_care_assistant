@@ -14,16 +14,13 @@ export const LOCAL_VIDEO_URLS = {
   'seated_stretch_breathe': '/videos/workouts/seated_stretch_breathe.mp4'
 };
 
-// Get video URL - prefers Supabase in production, local in development
+// Get video URL - always uses Supabase URLs for consistency
 export const getVideoUrl = (exerciseId: string): string => {
-  const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
-  
-  if (isProduction) {
-    const supabaseUrl = SUPABASE_VIDEO_URLS[exerciseId as keyof typeof SUPABASE_VIDEO_URLS];
-    if (supabaseUrl && supabaseUrl.trim() !== '') {
-      return supabaseUrl;
-    }
+  const supabaseUrl = SUPABASE_VIDEO_URLS[exerciseId as keyof typeof SUPABASE_VIDEO_URLS];
+  if (supabaseUrl && supabaseUrl.trim() !== '') {
+    return supabaseUrl;
   }
   
+  // Fallback to local if no Supabase URL available
   return LOCAL_VIDEO_URLS[exerciseId as keyof typeof LOCAL_VIDEO_URLS] || '';
 };
