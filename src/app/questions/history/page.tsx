@@ -59,27 +59,30 @@ export default function QuestionsHistoryPage() {
     sessionsCount: sessions.length,
     recentAnswersCount: recentAnswers.length,
     sessions: sessions,
-    recentAnswers: recentAnswers
+    recentAnswers: recentAnswers,
+    questionnaireDataCount: questionnaireData.length
   });
 
-  // Group answers by session/date for display
-  const questionnaireData = recentAnswers.map(answer => {
-    const session = sessions.find(s => s.date === answer.date);
-    const completionTime = session?.duration_ms ? Math.round(session.duration_ms / 1000) : 0;
+  // Group answers by session for display (each session represents a complete questionnaire)
+  const questionnaireData = sessions.map(session => {
+    // Find all answers for this session (by date)
+    const sessionAnswers = recentAnswers.filter(answer => answer.date === session.date);
     
     // Create a map of question_id to answer for easy lookup
     const answersMap = new Map();
-    answer.answers.forEach(a => {
-      if (a.question_id) {
-        answersMap.set(a.question_id, a.answer);
-      }
+    sessionAnswers.forEach(answerGroup => {
+      answerGroup.answers.forEach(a => {
+        if (a.question_id) {
+          answersMap.set(a.question_id, a.answer);
+        }
+      });
     });
 
     return {
-      date: answer.date,
-      sessionId: session?.id, // Store the actual session ID (UUID)
-      createdAt: answer.created_at || session?.created_at || '',
-      completionTime,
+      date: session.date,
+      sessionId: session.id,
+      createdAt: session.created_at,
+      completionTime: session.duration_ms ? Math.round(session.duration_ms / 1000) : 0,
       answers: answersMap
     };
   }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
