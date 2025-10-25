@@ -27,6 +27,7 @@ export default function DailyQuestionsPage() {
   const [currentlyFocusedQuestion, setCurrentlyFocusedQuestion] = useState<string | null>(null);
   const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
   const [forceFreshStart, setForceFreshStart] = useState(false);
+  const [autoNavigating, setAutoNavigating] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, clearChecks, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
@@ -85,6 +86,30 @@ export default function DailyQuestionsPage() {
     setPhotoUrls((prev) => ({ ...prev, [id]: url }));
   }
 
+  function checkAndAutoNavigate() {
+    // Check if all questions on current page have answers
+    const allQuestionsAnswered = todaysQuestions.every(q => {
+      const hasLocalAnswer = answers[q.id] && answers[q.id].trim();
+      const hasSavedAnswer = getAnswer(q.id) && getAnswer(q.id).trim();
+      return hasLocalAnswer || hasSavedAnswer;
+    });
+
+    if (allQuestionsAnswered) {
+      // Check if there's a next page available
+      const nextWindowStart = windowStart + todaysQuestions.length;
+      if (nextWindowStart < ALL_QUESTIONS.length) {
+        // Show auto-navigation indicator
+        setAutoNavigating(true);
+        
+        // Auto-navigate to next page after a short delay
+        setTimeout(() => {
+          nextThree();
+          setAutoNavigating(false);
+        }, 1500); // 1.5 second delay to show the completion
+      }
+    }
+  }
+
   async function saveIndividualAnswer(questionId: string) {
     if (!userId) {
       alert('Please sign in to save your answers.');
@@ -116,6 +141,9 @@ export default function DailyQuestionsPage() {
       
       // Mark question as saved for visual feedback
       setSavedQuestions(prev => new Set(prev).add(questionId));
+      
+      // Check if all questions on current page are answered and auto-navigate
+      checkAndAutoNavigate();
       
       // Show success feedback
       console.log(`Answer saved for question: ${question.text}`);
@@ -242,22 +270,22 @@ export default function DailyQuestionsPage() {
   }
 
   // Handle focus changes for auto-save
-  const handleQuestionFocus = (questionId: string) => {
+  const handleQuestionFocus = async (questionId: string) => {
     // If there was a previously focused question with an answer, save it
     if (currentlyFocusedQuestion && currentlyFocusedQuestion !== questionId) {
       const previousAnswer = answers[currentlyFocusedQuestion];
       if (previousAnswer && previousAnswer.trim()) {
-        saveIndividualAnswer(currentlyFocusedQuestion);
+        await saveIndividualAnswer(currentlyFocusedQuestion);
       }
     }
     setCurrentlyFocusedQuestion(questionId);
   };
 
-  const handleQuestionBlur = (questionId: string) => {
+  const handleQuestionBlur = async (questionId: string) => {
     // Save the current question when it loses focus
     const currentAnswer = answers[questionId];
     if (currentAnswer && currentAnswer.trim()) {
-      saveIndividualAnswer(questionId);
+      await saveIndividualAnswer(questionId);
     }
   };
 
@@ -301,6 +329,7 @@ export default function DailyQuestionsPage() {
     setCurrentlyFocusedQuestion(null);
     setShowHistory(false);
     setForceFreshStart(false);
+    setAutoNavigating(false);
   };
 
   async function showProgress() {
@@ -352,6 +381,16 @@ export default function DailyQuestionsPage() {
                 </button>
               </div>
             </div>
+
+            {/* Auto-Navigation Indicator */}
+            {autoNavigating && (
+              <div className="mb-4 rounded-lg bg-green-500/20 border border-green-400/30 p-4 text-center">
+                <div className="flex items-center justify-center gap-2 text-green-300">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-300 border-t-transparent"></div>
+                  <span className="font-medium">All questions completed! Moving to next page...</span>
+                </div>
+              </div>
+            )}
 
             {/* Start Questionnaire Section */}
             {!questionnaireStarted && !questionnaireSaved && (
