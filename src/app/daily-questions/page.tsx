@@ -161,6 +161,18 @@ export default function DailyQuestionsPage() {
               </div>
             </div>
 
+            {/* Save Button - Moved to top */}
+            <div className="mb-6 text-center">
+              <button
+                onClick={saveAll}
+                disabled={saving}
+                className="rounded-full bg-cyan-500 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+              >
+                {saving ? 'Saving...' : 'Save Answers'}
+              </button>
+            </div>
+
             {dbLoading ? (
               <div className="text-center py-8">
                 <div className="text-white/60">Loading...</div>
@@ -189,18 +201,6 @@ export default function DailyQuestionsPage() {
                   onPrevious={prevThree}
                   onNext={nextThree}
                 />
-
-                {/* Save Button */}
-                <div className="mt-6 text-center">
-                  <button
-                    onClick={saveAll}
-                    disabled={saving}
-                    className="rounded-full bg-cyan-500 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                    type="button"
-                  >
-                    {saving ? 'Saving...' : 'Save Answers'}
-                  </button>
-                </div>
 
                 {/* Completion Time */}
                 {completionTime && (
