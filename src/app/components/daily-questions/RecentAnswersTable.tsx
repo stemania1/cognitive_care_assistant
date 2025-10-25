@@ -1,6 +1,4 @@
 import { RecentAnswer } from '@/types/daily-questions';
-import { formatDate, formatTime } from '@/utils/date';
-import { useTableScroll } from '@/hooks/useTableScroll';
 import { useRef } from 'react';
 import { ALL_QUESTIONS } from '@/constants/questions';
 
@@ -10,7 +8,6 @@ interface RecentAnswersTableProps {
 }
 
 export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: RecentAnswersTableProps) {
-  const { scrollPosition, scrollUp, scrollDown } = useTableScroll('answers-table');
   const tableRef = useRef<HTMLDivElement>(null);
 
   if (recentAnswers.length === 0) {
@@ -33,38 +30,8 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
       </div>
       
       <div className="relative">
-        {/* Frozen first column */}
-        <div className="absolute left-0 top-0 z-10 bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] border-r border-white/10">
-          <div className="overflow-x-auto max-h-96 overflow-y-auto" id="answers-table">
-            <table className="text-sm">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left py-2 px-3 font-medium text-cyan-300 w-32">Question</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentAnswers.map((dayData, dayIdx) => (
-                  <tr key={dayIdx} className="border-b border-white/5 hover:bg-white/5">
-                    <td className="py-3 px-3 text-white/90 font-medium">
-                      <div className="text-xs">
-                        {formatDate(dayData.date)}
-                      </div>
-                      <div className="text-xs text-white/60">
-                        {dayData.created_at ? 
-                          formatTime(dayData.created_at) : 
-                          'Time not available'
-                        }
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
         {/* Scrollable content */}
-        <div className="overflow-x-auto max-h-96 overflow-y-auto ml-32" ref={tableRef}>
+        <div className="overflow-x-auto max-h-96 overflow-y-auto" ref={tableRef}>
           <table className="text-sm min-w-[1200px]">
             <thead>
               <tr className="border-b border-white/10">
