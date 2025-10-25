@@ -29,6 +29,7 @@ export default function DailyQuestionsPage() {
   const [forceFreshStart, setForceFreshStart] = useState(false);
   const [autoNavigating, setAutoNavigating] = useState(false);
   const [hasAutoNavigated, setHasAutoNavigated] = useState(false);
+  const [showPriorResponses, setShowPriorResponses] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, clearChecks, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree, resetToStart, navigateToPage } = useQuestionNavigation(today);
@@ -371,6 +372,7 @@ export default function DailyQuestionsPage() {
     setForceFreshStart(false);
     setAutoNavigating(false);
     setHasAutoNavigated(false);
+    setShowPriorResponses(false);
   };
 
   async function showProgress() {
@@ -412,6 +414,17 @@ export default function DailyQuestionsPage() {
                   type="button"
                 >
                   Show Answers
+                </button>
+                <button
+                  onClick={() => setShowPriorResponses(!showPriorResponses)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    showPriorResponses 
+                      ? 'bg-purple-500 text-white hover:bg-purple-600' 
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+                  type="button"
+                >
+                  Show Prior Responses
                 </button>
                 <button
                   onClick={handleBackToHome}
@@ -541,6 +554,70 @@ export default function DailyQuestionsPage() {
                         );
                       }
                     })()}
+                  </div>
+                )}
+
+                {/* Prior Responses Section */}
+                {showPriorResponses && (
+                  <div className="mb-6 space-y-6">
+                    <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 p-6">
+                      <h2 className="text-xl font-semibold text-purple-300 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Prior Questionnaire Responses
+                      </h2>
+                      
+                      {sessions.length === 0 ? (
+                        <div className="text-center py-8">
+                          <div className="text-purple-300/70 mb-2">
+                            <svg className="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <p className="text-purple-300/70 text-lg font-medium">No Prior Responses</p>
+                          <p className="text-purple-300/50 text-sm mt-2">Complete and save a questionnaire to see your responses here.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {sessions.map((session, index) => (
+                            <div key={session.id} className="rounded-lg border border-purple-400/20 bg-purple-500/5 p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-lg font-medium text-purple-200">
+                                  Questionnaire #{sessions.length - index}
+                                </h3>
+                                <div className="text-sm text-purple-300/70">
+                                  {new Date(session.date).toLocaleDateString()} at {new Date(session.created_at).toLocaleTimeString()}
+                                </div>
+                              </div>
+                              
+                              <div className="grid gap-3">
+                                {session.answers.map((answer, answerIndex) => {
+                                  const question = ALL_QUESTIONS.find(q => q.id === answer.question_id);
+                                  return (
+                                    <div key={answerIndex} className="flex flex-col sm:flex-row sm:items-start gap-2 p-3 rounded-md bg-purple-500/10 border border-purple-400/10">
+                                      <div className="sm:w-1/3">
+                                        <div className="text-sm font-medium text-purple-300">
+                                          Q{ALL_QUESTIONS.findIndex(q => q.id === answer.question_id) + 1}
+                                        </div>
+                                        <div className="text-xs text-purple-300/70 mt-1">
+                                          {question?.text || 'Unknown Question'}
+                                        </div>
+                                      </div>
+                                      <div className="sm:w-2/3">
+                                        <div className="text-sm text-white/90 bg-white/5 rounded p-2">
+                                          {answer.answer}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
