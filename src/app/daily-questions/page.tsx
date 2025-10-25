@@ -237,8 +237,10 @@ export default function DailyQuestionsPage() {
                   
                   if (sessions.length === 0 && recentAnswers.length === 0) {
                     console.log('Rendering empty state message');
+                    // Add alert to confirm this is working
+                    alert('🚨 NO PROGRESS DATA YET! You need to complete some questions first.');
                     return (
-                      <div className="rounded-lg border-2 border-red-500 bg-red-500/10 p-8 mb-8">
+                      <div className="rounded-lg border-2 border-red-500 bg-red-500/10 p-8 mb-8" style={{zIndex: 9999, position: 'relative'}}>
                         <div className="text-center">
                           <div className="mb-6">
                             <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-r from-red-500/30 to-orange-500/30 flex items-center justify-center mb-4">
