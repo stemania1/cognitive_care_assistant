@@ -3,25 +3,47 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('Daily checks GET request received');
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
     const userId = searchParams.get('userId');
 
+    console.log('Request params:', { date, userId });
+
     if (!userId) {
+      console.log('Missing userId parameter');
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
     // Create a Supabase client with service role key for admin operations
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    
+    console.log('Environment check:', {
+      hasServiceRoleKey: !!serviceRoleKey,
+      hasSupabaseUrl: !!supabaseUrl,
+      serviceRoleKeyLength: serviceRoleKey?.length || 0
+    });
+
     if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+      console.log('Service role key not configured properly');
       return NextResponse.json({ 
         error: 'Service role key not configured', 
-        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+        details: 'Please create .env.local file with SUPABASE_SERVICE_ROLE_KEY. See README for setup instructions.' 
       }, { status: 500 });
     }
 
+    if (!supabaseUrl) {
+      console.log('Supabase URL not configured');
+      return NextResponse.json({ 
+        error: 'Supabase URL not configured', 
+        details: 'Please create .env.local file with NEXT_PUBLIC_SUPABASE_URL. See README for setup instructions.' 
+      }, { status: 500 });
+    }
+
+    console.log('Creating Supabase admin client');
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      supabaseUrl,
       serviceRoleKey,
       {
         auth: {
@@ -31,6 +53,7 @@ export async function GET(request: NextRequest) {
       }
     );
 
+    console.log('Building query for daily_checks table');
     const query = supabaseAdmin
       .from('daily_checks')
       .select('*')
@@ -41,17 +64,25 @@ export async function GET(request: NextRequest) {
       query.eq('date', date);
     }
 
+    console.log('Executing Supabase query');
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching daily checks:', error);
-      return NextResponse.json({ error: 'Failed to fetch daily checks' }, { status: 500 });
+      console.error('Supabase query error:', error);
+      return NextResponse.json({ 
+        error: 'Failed to fetch daily checks', 
+        details: error.message || 'Database query failed' 
+      }, { status: 500 });
     }
 
-    return NextResponse.json({ data });
+    console.log('Query successful, returning data:', data?.length || 0, 'records');
+    return NextResponse.json({ data: data || [] });
   } catch (error) {
-    console.error('Error in daily checks GET:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Unexpected error in daily checks GET:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
   }
 }
 
