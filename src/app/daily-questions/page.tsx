@@ -115,6 +115,72 @@ export default function DailyQuestionsPage() {
     }
   }
 
+  async function saveQuestionnaire() {
+    if (!userId) {
+      alert('Please sign in to save your questionnaire.');
+      return;
+    }
+
+    // Check if any questions are answered
+    const hasAnyAnswers = todaysQuestions.some(q => {
+      const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
+      return value.length > 0;
+    });
+
+    if (!hasAnyAnswers) {
+      alert('Please answer at least one question before saving the questionnaire.');
+      return;
+    }
+
+    try {
+      // Save all answered questions
+      for (const q of todaysQuestions) {
+        const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
+        if (!value) continue;
+        
+        const photoUrl = photoUrls[q.id];
+        await saveDailyCheck({
+          questionId: q.id,
+          questionText: q.text,
+          answer: value,
+          answerType: q.choices ? 'choice' : 'text',
+          date: today,
+          photoUrl: photoUrl || undefined,
+        });
+      }
+
+      // Save session data if we have timing info
+      if (startedAt) {
+        const durationMs = Date.now() - startedAt;
+        const durationSeconds = Math.round(durationMs / 1000);
+        setCompletionTime(durationSeconds);
+        try {
+          await fetch('/api/daily-check-sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, date: today, setStartIndex: windowStart, durationMs })
+          });
+        } catch (error) {
+          console.error('Error saving session:', error);
+        }
+      }
+
+      // Reset all answers and state
+      setAnswers({});
+      setPhotoUrls({});
+      setStartedAt(null);
+      setCompletionTime(null);
+      
+      // Refresh recent answers data
+      await loadRecentAnswers();
+      
+      alert('Questionnaire saved successfully! All answers have been reset.');
+    } catch (error) {
+      console.error('Error saving questionnaire:', error);
+      alert('Failed to save questionnaire. Please try again.');
+    }
+  }
+
 
   async function showProgress() {
     setShowHistory(!showHistory);
@@ -221,6 +287,20 @@ export default function DailyQuestionsPage() {
               </div>
             ) : (
               <>
+                {/* Save Questionnaire Tile */}
+                <div className="mb-6">
+                  <button
+                    onClick={saveQuestionnaire}
+                    className="w-full py-4 px-6 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                    type="button"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span className="text-lg">Save Questionnaire</span>
+                  </button>
+                </div>
+
                 {/* Questions */}
                 <div className="space-y-4 mb-6">
                 {todaysQuestions.map((q, index) => (
