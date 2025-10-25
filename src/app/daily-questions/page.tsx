@@ -22,6 +22,7 @@ export default function DailyQuestionsPage() {
   const [completionTime, setCompletionTime] = useState<number | null>(null);
   const [questionnaireSaved, setQuestionnaireSaved] = useState(false);
   const [questionnaireStarted, setQuestionnaireStarted] = useState(false);
+  const [currentlyFocusedQuestion, setCurrentlyFocusedQuestion] = useState<string | null>(null);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
   const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteDailyChecks } = useHistoricalData(userId);
@@ -227,6 +228,26 @@ export default function DailyQuestionsPage() {
     await loadRecentAnswers();
   }
 
+  // Handle focus changes for auto-save
+  const handleQuestionFocus = (questionId: string) => {
+    // If there was a previously focused question with an answer, save it
+    if (currentlyFocusedQuestion && currentlyFocusedQuestion !== questionId) {
+      const previousAnswer = answers[currentlyFocusedQuestion];
+      if (previousAnswer && previousAnswer.trim()) {
+        saveIndividualAnswer(currentlyFocusedQuestion);
+      }
+    }
+    setCurrentlyFocusedQuestion(questionId);
+  };
+
+  const handleQuestionBlur = (questionId: string) => {
+    // Save the current question when it loses focus
+    const currentAnswer = answers[questionId];
+    if (currentAnswer && currentAnswer.trim()) {
+      saveIndividualAnswer(questionId);
+    }
+  };
+
 
   async function showProgress() {
     setShowHistory(!showHistory);
@@ -399,6 +420,8 @@ export default function DailyQuestionsPage() {
                     questionNumber={index + 1}
                     onSave={saveIndividualAnswer}
                     readOnly={questionnaireSaved}
+                    onFocus={handleQuestionFocus}
+                    onBlur={handleQuestionBlur}
                   />
                 ))}
                 </div>

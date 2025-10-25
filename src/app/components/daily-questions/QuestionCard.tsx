@@ -15,9 +15,11 @@ interface QuestionCardProps {
   questionNumber?: number;
   onSave?: (questionId: string) => void;
   readOnly?: boolean;
+  onFocus?: (questionId: string) => void;
+  onBlur?: (questionId: string) => void;
 }
 
-export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChange, userId, questionNumber, onSave, readOnly = false }: QuestionCardProps) {
+export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChange, userId, questionNumber, onSave, readOnly = false, onFocus, onBlur }: QuestionCardProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -130,6 +132,8 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
             <button
               key={choice}
               onClick={() => !readOnly && onChange(choice)}
+              onFocus={() => onFocus?.(question.id)}
+              onBlur={() => onBlur?.(question.id)}
               className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
                 value === choice
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
@@ -146,6 +150,8 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
         <textarea
           value={value}
           onChange={(e) => !readOnly && onChange(e.target.value)}
+          onFocus={() => onFocus?.(question.id)}
+          onBlur={() => onBlur?.(question.id)}
           placeholder={readOnly ? "Answer saved" : "Type your answer here..."}
           rows={3}
           className={`w-full rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none placeholder-white/40 resize-none ${
