@@ -19,6 +19,7 @@ interface QuestionCardProps {
 export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChange, userId, questionNumber, onSave }: QuestionCardProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -83,8 +84,25 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
     }
   };
 
+  const handleSave = async () => {
+    if (onSave) {
+      try {
+        await onSave(question.id);
+        setSaved(true);
+        // Reset saved state after 3 seconds
+        setTimeout(() => setSaved(false), 3000);
+      } catch (error) {
+        console.error('Error saving answer:', error);
+      }
+    }
+  };
+
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+    <div className={`rounded-lg border p-4 transition-all duration-300 ${
+      saved 
+        ? 'border-green-500/50 bg-green-500/5' 
+        : 'border-white/10 bg-white/5'
+    }`}>
       {questionNumber && (
         <div className="text-yellow-400 font-bold text-lg mb-2">Question {questionNumber}</div>
       )}
@@ -196,15 +214,22 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
       {onSave && value.trim() && (
         <div className="mt-4 flex justify-end">
           <button
-            onClick={() => onSave(question.id)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:text-green-300 transition-colors border border-green-500/30"
+            onClick={handleSave}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors border ${
+              saved 
+                ? 'bg-green-500/30 text-green-300 border-green-400' 
+                : 'bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:text-green-300 border-green-500/30'
+            }`}
             type="button"
-            title="Save this answer"
+            title={saved ? "Answer saved!" : "Save this answer"}
+            disabled={saved}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span className="text-sm font-medium">Save Answer</span>
+            <span className="text-sm font-medium">
+              {saved ? 'Saved!' : 'Save Answer'}
+            </span>
           </button>
         </div>
       )}

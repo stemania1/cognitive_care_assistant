@@ -107,11 +107,17 @@ export default function DailyQuestionsPage() {
         photoUrl: photoUrl || undefined,
       });
       
+      // Refresh recent answers data to show the newly saved answer
+      if (showHistory) {
+        await loadRecentAnswers();
+      }
+      
       // Show success feedback
       console.log(`Answer saved for question: ${question.text}`);
     } catch (error) {
       console.error('Error saving individual answer:', error);
       alert('Failed to save answer. Please try again.');
+      throw error; // Re-throw so QuestionCard can handle it
     }
   }
 
