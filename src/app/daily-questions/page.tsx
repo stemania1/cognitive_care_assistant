@@ -31,6 +31,14 @@ export default function DailyQuestionsPage() {
   const [autoNavigating, setAutoNavigating] = useState(false);
   const [hasAutoNavigated, setHasAutoNavigated] = useState(false);
   const [showPriorResponses, setShowPriorResponses] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completionData, setCompletionData] = useState<{
+    answeredQuestions: number;
+    totalQuestions: number;
+    savedCount: number;
+    completionTime: number;
+    answers: Array<{question: string, answer: string}>;
+  } | null>(null);
   
   const { saveDailyCheck, getAnswer, hasAnswer, clearChecks, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree, resetToStart, navigateToPage } = useQuestionNavigation(today);
@@ -266,25 +274,32 @@ export default function DailyQuestionsPage() {
       // Refresh recent answers data
       await loadRecentAnswers();
       
-      // Calculate completion statistics
+      // Calculate completion statistics and prepare data for modal
       const answeredQuestions = todaysQuestions.filter(q => {
         const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
         return value.length > 0;
       }).length;
       
-      const completionTimeText = startedAt ? 
-        `Completed in ${Math.round((Date.now() - startedAt) / 1000)} seconds` : 
-        'Completion time not available';
+      const completionTimeSeconds = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
       
-      alert(`Questionnaire Saved!\n\n📊 Questions Answered: ${answeredQuestions} of ${todaysQuestions.length}\n💾 New Answers Saved: ${savedCount}\n⏱️ ${completionTimeText}\n\nRedirecting to home page...`);
+      // Prepare answers data for the modal
+      const answersData = todaysQuestions.map(q => {
+        const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
+        return {
+          question: q.text,
+          answer: value || "No answer provided"
+        };
+      }).filter(item => item.answer !== "No answer provided");
       
-      // Reset questionnaire state before redirecting
-      resetQuestionnaireState();
-      
-      // Redirect to home page after a short delay
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 2000);
+      // Set completion data and show modal
+      setCompletionData({
+        answeredQuestions,
+        totalQuestions: todaysQuestions.length,
+        savedCount,
+        completionTime: completionTimeSeconds,
+        answers: answersData
+      });
+      setShowCompletionModal(true);
     } catch (error) {
       console.error('Error saving questionnaire:', error);
       alert('Failed to save questionnaire. Please try again.');
@@ -374,6 +389,19 @@ export default function DailyQuestionsPage() {
     
     // Navigate to dashboard
     window.location.href = '/dashboard';
+  };
+
+  const handleCloseCompletionModal = () => {
+    setShowCompletionModal(false);
+    setCompletionData(null);
+    
+    // Reset questionnaire state before redirecting
+    resetQuestionnaireState();
+    
+    // Redirect to home page after a short delay
+    setTimeout(() => {
+      window.location.href = '/dashboard';
+    }, 500);
   };
 
   const resetQuestionnaireState = () => {
@@ -686,6 +714,89 @@ export default function DailyQuestionsPage() {
           </div>
         </main>
       </div>
+
+      {/* Completion Modal */}
+      {showCompletionModal && completionData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Questionnaire Completed!
+                </h2>
+                <button
+                  onClick={handleCloseCompletionModal}
+                  className="text-white/60 hover:text-white transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-400">{completionData.answeredQuestions}</div>
+                  <div className="text-sm text-blue-300">Questions Answered</div>
+                  <div className="text-xs text-blue-300/70">of {completionData.totalQuestions}</div>
+                </div>
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-green-400">{completionData.savedCount}</div>
+                  <div className="text-sm text-green-300">New Answers Saved</div>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-purple-400">{completionData.completionTime}</div>
+                  <div className="text-sm text-purple-300">Seconds</div>
+                  <div className="text-xs text-purple-300/70">Completion Time</div>
+                </div>
+              </div>
+
+              {/* Answers Summary */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Your Answers
+                </h3>
+                <div className="space-y-3">
+                  {completionData.answers.map((item, index) => (
+                    <div key={index} className="bg-white/5 border border-white/10 rounded-lg p-4">
+                      <div className="text-sm font-medium text-cyan-300 mb-2">
+                        Question {index + 1}
+                      </div>
+                      <div className="text-sm text-white/90 mb-2">
+                        {item.question}
+                      </div>
+                      <div className="text-white bg-white/10 rounded p-2 text-sm">
+                        {item.answer}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-center">
+                <button
+                  onClick={handleCloseCompletionModal}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  Return to Dashboard
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AuthenticationGuard>
   );
 }
