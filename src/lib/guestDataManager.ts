@@ -196,11 +196,47 @@ export class GuestDataManager {
 // Helper function to check if user is guest
 export async function isGuestUser(): Promise<boolean> {
   try {
+    // First check if we have a guest session in localStorage
+    const guestSession = localStorage.getItem('cognitive_care_guest_session');
+    if (guestSession) {
+      const session = JSON.parse(guestSession);
+      // Check if session is still valid (not expired)
+      const createdAt = new Date(session.createdAt);
+      const now = new Date();
+      const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (diffDays < 7) { // Guest sessions expire after 7 days
+        return session.isGuest === true;
+      } else {
+        // Clean up expired session
+        localStorage.removeItem('cognitive_care_guest_session');
+        return false;
+      }
+    }
+    
+    // If no localStorage session, check Supabase anonymous auth
     const { data: { user } } = await supabase.auth.getUser();
     return user?.is_anonymous || false;
   } catch (error) {
     console.error('Error checking user type:', error);
     return false;
+  }
+}
+
+// Helper function to get guest user ID
+export function getGuestUserId(): string | null {
+  try {
+    const guestSession = localStorage.getItem('cognitive_care_guest_session');
+    if (guestSession) {
+      const session = JSON.parse(guestSession);
+      return session.userId;
+    }
+    
+    // If no localStorage session, return null (will be handled by Supabase auth)
+    return null;
+  } catch (error) {
+    console.error('Error getting guest user ID:', error);
+    return null;
   }
 }
 

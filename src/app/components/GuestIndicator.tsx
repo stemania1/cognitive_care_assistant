@@ -11,6 +11,16 @@ export function GuestIndicator() {
   useEffect(() => {
     const checkGuestStatus = async () => {
       try {
+        // First check localStorage for guest session
+        const guestSession = localStorage.getItem('cognitive_care_guest_session');
+        if (guestSession) {
+          const session = JSON.parse(guestSession);
+          setIsGuest(session.isGuest === true);
+          setIsLoading(false);
+          return;
+        }
+        
+        // If no localStorage session, check Supabase
         const guestStatus = await isGuestUser();
         setIsGuest(guestStatus);
       } catch (error) {

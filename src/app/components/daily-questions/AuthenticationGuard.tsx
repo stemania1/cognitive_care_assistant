@@ -15,6 +15,16 @@ export function AuthenticationGuard({ children, userId }: AuthenticationGuardPro
     const checkUserType = async () => {
       if (userId) {
         try {
+          // First check localStorage for guest session
+          const guestSession = localStorage.getItem('cognitive_care_guest_session');
+          if (guestSession) {
+            const session = JSON.parse(guestSession);
+            setIsGuest(session.isGuest === true);
+            setIsLoading(false);
+            return;
+          }
+          
+          // If no localStorage session, check Supabase
           const { data: { user } } = await supabase.auth.getUser();
           setIsGuest(user?.is_anonymous || false);
         } catch (error) {

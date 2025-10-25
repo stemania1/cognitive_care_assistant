@@ -33,7 +33,16 @@ export default function DailyQuestionsPage() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setUserId(user?.id || null);
+      if (user?.id) {
+        setUserId(user.id);
+      } else {
+        // Check for guest session in localStorage
+        const guestSession = localStorage.getItem('cognitive_care_guest_session');
+        if (guestSession) {
+          const session = JSON.parse(guestSession);
+          setUserId(session.userId);
+        }
+      }
     };
     getUser();
   }, []);

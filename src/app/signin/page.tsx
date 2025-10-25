@@ -46,10 +46,24 @@ export default function SignIn() {
         return;
       }
       
-      // Sign in anonymously as guest
+      // Try anonymous sign-in first
       const { error: guestError } = await supabase.auth.signInAnonymously();
       if (guestError) {
-        setError(guestError.message || "Unable to sign in as guest. Please try again.");
+        // If anonymous auth fails, create a temporary guest session
+        console.log("Anonymous auth disabled, using fallback guest mode");
+        
+        // Create a temporary guest user ID
+        const guestUserId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Store guest session in localStorage
+        localStorage.setItem('cognitive_care_guest_session', JSON.stringify({
+          userId: guestUserId,
+          isGuest: true,
+          createdAt: new Date().toISOString()
+        }));
+        
+        // Redirect to dashboard
+        router.push("/dashboard");
         return;
       }
       
