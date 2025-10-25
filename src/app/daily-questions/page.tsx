@@ -124,29 +124,13 @@ export default function DailyQuestionsPage() {
   }
 
         async function showProgress() {
-          console.log('=== SHOW PROGRESS CLICKED ===');
-          console.log('userId:', userId);
-          console.log('userId type:', typeof userId);
-          console.log('userId length:', userId?.length);
-          console.log('showHistory before:', showHistory);
-          
-          // Add alert here instead of in render
-          alert('SHOW PROGRESS BUTTON CLICKED - This should appear once!');
-          
           setShowHistory(true);
-          console.log('showHistory set to true');
           
           try {
-            console.log('Starting to load sessions...');
             await loadSessions();
-            console.log('Sessions loaded, starting to load recent answers...');
             await loadRecentAnswers();
-            console.log('=== PROGRESS DATA LOADED SUCCESSFULLY ===');
-            
-            // Add alert after data is loaded
-            alert('DATA LOADED - Empty state should be visible now!');
           } catch (error) {
-            console.error('=== ERROR LOADING PROGRESS DATA ===', error);
+            console.error('Error loading progress data:', error);
           }
         }
 
@@ -229,54 +213,40 @@ export default function DailyQuestionsPage() {
               </>
             )}
 
-            {/* ALWAYS VISIBLE TEST MESSAGE */}
-            <div className="mt-8 p-8 bg-green-500 text-white font-bold text-3xl text-center">
-              🟢 THIS SHOULD ALWAYS BE VISIBLE - TEST MESSAGE 🟢
-            </div>
-
             {/* Historical Data - Show regardless of questions state */}
             {showHistory && (
               <div className="mt-8 space-y-6">
                 {(() => {
-                  console.log('=== RENDERING HISTORICAL DATA ===');
-                  console.log('showHistory:', showHistory);
-                  console.log('sessions:', sessions);
-                  console.log('sessions.length:', sessions.length);
-                  console.log('recentAnswers:', recentAnswers);
-                  console.log('recentAnswers.length:', recentAnswers.length);
-                  
                   if (sessions.length === 0 && recentAnswers.length === 0) {
-                    console.log('Rendering empty state message');
                     return (
                       <>
                         {/* Simple text fallback */}
                         <div className="text-center p-8 bg-yellow-500 text-black font-bold text-2xl mb-4">
-                          🚨 NO PROGRESS DATA YET - COMPLETE SOME QUESTIONS FIRST! 🚨
+                          📊 No data has been recorded yet
                         </div>
                         
                         {/* Original styled message */}
-                        <div className="rounded-lg border-2 border-red-500 bg-red-500/10 p-8 mb-8" style={{zIndex: 9999, position: 'relative'}}>
+                        <div className="rounded-lg border-2 border-blue-500 bg-blue-500/10 p-8 mb-8" style={{zIndex: 9999, position: 'relative'}}>
                           <div className="text-center">
                             <div className="mb-6">
-                              <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-r from-red-500/30 to-orange-500/30 flex items-center justify-center mb-4">
-                                <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-r from-blue-500/30 to-cyan-500/30 flex items-center justify-center mb-4">
+                                <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                 </svg>
                               </div>
                             </div>
-                            <h3 className="text-2xl font-bold text-red-400 mb-4">🚨 NO PROGRESS DATA YET 🚨</h3>
+                            <h3 className="text-2xl font-bold text-blue-400 mb-4">📊 No Data Recorded Yet</h3>
                             <p className="text-lg text-gray-300 mb-6">
                               You haven't completed any daily questions yet. Complete some questions and save your answers to start tracking your progress.
                             </p>
-                            <div className="text-lg text-yellow-400 bg-yellow-400/10 p-4 rounded-lg border border-yellow-400/20">
-                              💡 <strong>ACTION REQUIRED:</strong> Answer the questions above and click "Save Answers" to create your first progress entry.
+                            <div className="text-lg text-blue-400 bg-blue-400/10 p-4 rounded-lg border border-blue-400/20">
+                              💡 <strong>Get Started:</strong> Answer the questions above and click "Save Answers" to create your first progress entry.
                             </div>
                           </div>
                         </div>
                       </>
                     );
                   } else {
-                    console.log('Rendering charts and tables');
                     return (
                       <>
                         <CompletionChart sessions={sessions} />
@@ -288,16 +258,6 @@ export default function DailyQuestionsPage() {
                     );
                   }
                 })()}
-              </div>
-            )}
-            
-            {/* Debug info */}
-            {showHistory && (
-              <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <h4 className="text-blue-400 font-bold mb-2">Debug Info:</h4>
-                <p className="text-sm text-blue-300">showHistory: {showHistory.toString()}</p>
-                <p className="text-sm text-blue-300">sessions.length: {sessions.length}</p>
-                <p className="text-sm text-blue-300">recentAnswers.length: {recentAnswers.length}</p>
               </div>
             )}
           </div>
