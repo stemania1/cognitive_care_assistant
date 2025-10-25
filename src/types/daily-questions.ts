@@ -15,6 +15,7 @@ export interface DailyCheckSession {
   created_at: string;
   duration_ms: number;
   set_start_index: number;
+  date: string;
 }
 
 export interface RecentAnswer {
