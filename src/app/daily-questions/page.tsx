@@ -227,18 +227,7 @@ export default function DailyQuestionsPage() {
             {showHistory && (
               <div className="mt-8 space-y-6">
                 {(() => {
-                  console.log('=== RENDERING HISTORICAL DATA ===');
-                  console.log('showHistory:', showHistory);
-                  console.log('sessions:', sessions);
-                  console.log('sessions.length:', sessions.length);
-                  console.log('recentAnswers:', recentAnswers);
-                  console.log('recentAnswers.length:', recentAnswers.length);
-                  console.log('Condition (sessions.length === 0 && recentAnswers.length === 0):', sessions.length === 0 && recentAnswers.length === 0);
-                  
                   if (sessions.length === 0 && recentAnswers.length === 0) {
-                    console.log('Rendering empty state message');
-                    // Add alert to confirm this is working
-                    alert('🚨 NO PROGRESS DATA YET! You need to complete some questions first.');
                     return (
                       <div className="rounded-lg border-2 border-red-500 bg-red-500/10 p-8 mb-8" style={{zIndex: 9999, position: 'relative'}}>
                         <div className="text-center">
@@ -260,7 +249,6 @@ export default function DailyQuestionsPage() {
                       </div>
                     );
                   } else {
-                    console.log('Rendering charts and tables');
                     return (
                       <>
                         <CompletionChart sessions={sessions} />
