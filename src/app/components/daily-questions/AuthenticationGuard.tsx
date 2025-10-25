@@ -85,72 +85,7 @@ export function AuthenticationGuard({ children, userId }: AuthenticationGuardPro
     );
   }
 
-  // Show guest warning if user is anonymous
-  if (isGuest) {
-    return (
-      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
-        <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
-
-        <main className="relative p-8 sm:p-16">
-          <div className="mx-auto max-w-3xl">
-            <div className="mb-6 flex items-center justify-between">
-              <div className="flex flex-col">
-                <h1 className="text-2xl sm:text-3xl font-semibold">Daily Questions</h1>
-              </div>
-              <Link href="/dashboard" className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20">
-                Back to Home
-              </Link>
-            </div>
-            
-            <div className="relative rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-8 text-center mb-6">
-              {/* Close button */}
-              <button
-                onClick={() => setIsGuest(false)}
-                className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-                aria-label="Close guest account notice"
-              >
-                <svg
-                  className="w-4 h-4 text-white/70 hover:text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-              
-              <h2 className="text-xl font-semibold mb-4 text-yellow-400">Guest Account</h2>
-              <p className="text-white/70 mb-6">
-                You're using a guest account. Your data will be temporary and limited features are available.
-                <br />
-                <span className="text-yellow-400 font-medium">Create a free account to save your progress permanently.</span>
-              </p>
-              <div className="flex gap-4 justify-center">
-                <Link href="/signup" className="inline-flex items-center rounded-full bg-cyan-500 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-cyan-600">
-                  Create Account
-                </Link>
-                <button 
-                  onClick={() => setIsGuest(false)}
-                  className="inline-flex items-center rounded-full bg-white/10 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-white/20"
-                >
-                  Continue as Guest
-                </button>
-              </div>
-            </div>
-
-            {children}
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // Guest users can access the content directly without popup
 
   return <>{children}</>;
 }
