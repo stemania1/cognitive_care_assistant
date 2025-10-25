@@ -219,6 +219,17 @@ export default function DailyQuestionsPage() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={showProgress}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    showHistory 
+                      ? 'bg-cyan-500 text-white hover:bg-cyan-600' 
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+                  type="button"
+                >
+                  Show Answers
+                </button>
                 <Link href="/dashboard" className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20">
                   Back to Home
                 </Link>
@@ -321,24 +332,6 @@ export default function DailyQuestionsPage() {
                       <span className="text-lg">Save Questionnaire</span>
                     </button>
                   )}
-                </div>
-
-                {/* Show Answers Button */}
-                <div className="mb-6">
-                  <button
-                    onClick={showProgress}
-                    className={`w-full py-3 px-6 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 ${
-                      showHistory 
-                        ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white' 
-                        : 'bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white'
-                    }`}
-                    type="button"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="text-lg">{showHistory ? 'Hide Answers' : 'Show Answers'}</span>
-                  </button>
                 </div>
 
                 {/* Questions */}
