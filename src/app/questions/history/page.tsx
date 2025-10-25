@@ -12,6 +12,8 @@ export default function QuestionsHistoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedQuestionnaires, setSelectedQuestionnaires] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteSession, deleteDailyChecks } = useHistoricalData(userId);
 
@@ -26,7 +28,7 @@ export default function QuestionsHistoryPage() {
           setUserId(guestUserId);
         } else {
           // For regular users, get the actual user ID from Supabase
-          const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
           if (user?.id) {
             setUserId(user.id);
           } else {
@@ -36,10 +38,10 @@ export default function QuestionsHistoryPage() {
         }
       } catch (error) {
         console.error('Error initializing user:', error);
-      } finally {
-        setLoading(false);
-      }
+    } finally {
+      setLoading(false);
     }
+  }
 
     initializeUser();
   }, []);
@@ -70,6 +72,7 @@ export default function QuestionsHistoryPage() {
     return {
       date: session.date,
       sessionId: session.id,
+      uniqueId: `${session.date}-${session.id}`, // Use unique combination for selection
       createdAt: session.created_at,
       completionTime: session.duration_ms ? Math.round(session.duration_ms / 1000) : 0,
       answers: answersMap
@@ -84,7 +87,9 @@ export default function QuestionsHistoryPage() {
     recentAnswersCount: recentAnswers.length,
     sessions: sessions,
     recentAnswers: recentAnswers,
-    questionnaireDataCount: questionnaireData.length
+    questionnaireDataCount: questionnaireData.length,
+    questionnaireData: questionnaireData,
+    selectedQuestionnaires: Array.from(selectedQuestionnaires)
   });
 
   const formatCompletionTime = (seconds: number) => {
@@ -107,6 +112,89 @@ export default function QuestionsHistoryPage() {
       date: date.toLocaleDateString(),
       time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
+  };
+
+  // Checkbox handling functions
+  const handleSelectQuestionnaire = (uniqueId: string) => {
+    console.log('=== INDIVIDUAL CHECKBOX CLICKED ===');
+    console.log('UniqueId clicked:', uniqueId);
+    console.log('Current selectedQuestionnaires:', Array.from(selectedQuestionnaires));
+    console.log('Is currently selected:', selectedQuestionnaires.has(uniqueId));
+    
+    const newSelected = new Set(selectedQuestionnaires);
+    if (newSelected.has(uniqueId)) {
+      newSelected.delete(uniqueId);
+      console.log('Removed from selection');
+    } else {
+      newSelected.add(uniqueId);
+      console.log('Added to selection');
+    }
+    console.log('New selectedQuestionnaires:', Array.from(newSelected));
+    setSelectedQuestionnaires(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    console.log('=== SELECT ALL CLICKED ===');
+    console.log('Current selectedQuestionnaires size:', selectedQuestionnaires.size);
+    console.log('QuestionnaireData length:', questionnaireData.length);
+    console.log('Current selectedQuestionnaires:', Array.from(selectedQuestionnaires));
+    console.log('All questionnaire uniqueIds:', questionnaireData.map(q => q.uniqueId));
+    
+    if (selectedQuestionnaires.size === questionnaireData.length) {
+      // Deselect all
+      console.log('Deselecting all');
+      setSelectedQuestionnaires(new Set());
+    } else {
+      // Select all
+      console.log('Selecting all');
+      const allUniqueIds = new Set(questionnaireData.map(q => q.uniqueId));
+      console.log('All uniqueIds to select:', Array.from(allUniqueIds));
+      setSelectedQuestionnaires(allUniqueIds);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedQuestionnaires.size === 0) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${selectedQuestionnaires.size} questionnaire${selectedQuestionnaires.size !== 1 ? 's' : ''}?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      const deletePromises = Array.from(selectedQuestionnaires).map(async (uniqueId) => {
+        const questionnaire = questionnaireData.find(q => q.uniqueId === uniqueId);
+        const sessionId = questionnaire?.sessionId;
+        const date = questionnaire?.date;
+        
+        if (!sessionId || !date) {
+          console.log('No session ID or date found for uniqueId:', uniqueId);
+          return;
+        }
+
+        // Delete both the session and all answers for this date
+        await deleteSession(sessionId);
+        await deleteDailyChecks(date);
+      });
+
+      await Promise.all(deletePromises);
+
+      // Reload data after deletion
+      await loadSessions();
+      await loadRecentAnswers();
+
+      // Clear selection
+      setSelectedQuestionnaires(new Set());
+
+      console.log('Bulk delete completed successfully');
+    } catch (error) {
+      console.error('Error in bulk delete:', error);
+      alert('Failed to delete some questionnaires. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleDeleteSession = async (date: string) => {
@@ -248,6 +336,39 @@ export default function QuestionsHistoryPage() {
             </div>
           </div>
 
+          {/* Bulk Actions */}
+          {questionnaireData.length > 0 && (
+            <div className="mb-4 flex items-center justify-between p-4 rounded-lg border border-white/10 bg-white/5">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleSelectAll}
+                  className="px-3 py-1 rounded-md bg-white/10 text-white border border-white/15 hover:bg-white/20 transition-colors text-sm font-medium"
+                >
+                  {selectedQuestionnaires.size === questionnaireData.length ? 'Deselect All' : 'Select All'}
+                </button>
+                <span className="text-sm text-white/70">
+                  {selectedQuestionnaires.size} of {questionnaireData.length} selected
+                </span>
+              </div>
+              {selectedQuestionnaires.size > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-lg bg-red-600/20 text-red-400 border border-red-400/30 hover:bg-red-600/30 hover:text-red-300 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isDeleting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-400 border-t-transparent"></div>
+                      Deleting...
+                    </div>
+                  ) : (
+                    `Delete ${selectedQuestionnaires.size} Selected`
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Questionnaire Table */}
           {questionnaireData.length === 0 ? (
             <div className="text-center py-12">
@@ -285,27 +406,44 @@ export default function QuestionsHistoryPage() {
               </div>
 
               {/* Table Content */}
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30">
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-10">
                     <tr className="border-b border-white/10 bg-white/5">
-                      <th className="text-left py-3 px-4 font-medium text-cyan-300 min-w-[120px]">Date/Time</th>
-                      <th className="text-left py-3 px-4 font-medium text-cyan-300 min-w-[100px]">Completion Time</th>
+                      <th className="text-center py-3 px-4 font-medium text-cyan-300 min-w-[50px] bg-white/5">
+                        <input
+                          type="checkbox"
+                          checked={selectedQuestionnaires.size === questionnaireData.length && questionnaireData.length > 0}
+                          onChange={handleSelectAll}
+                          className="h-4 w-4 rounded border-white/30 bg-white/10 text-blue-600 focus:ring-blue-500 focus:ring-2"
+                        />
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-cyan-300 min-w-[120px] bg-white/5">Date/Time</th>
+                      <th className="text-left py-3 px-4 font-medium text-cyan-300 min-w-[100px] bg-white/5">Completion Time</th>
                       {ALL_QUESTIONS.map((question, index) => (
-                        <th key={question.id} className="text-left py-3 px-4 font-medium text-cyan-300 min-w-[200px]">
+                        <th key={question.id} className="text-left py-3 px-4 font-medium text-cyan-300 min-w-[200px] bg-white/5">
                           <div className="text-xs text-white/90">
                             Q{index + 1}: {question.text}
                           </div>
                         </th>
                       ))}
-                      <th className="text-center py-3 px-4 font-medium text-cyan-300 min-w-[80px]">Actions</th>
+                      <th className="text-center py-3 px-4 font-medium text-cyan-300 min-w-[80px] bg-white/5">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {questionnaireData.map((questionnaire, index) => {
                       const { date, time } = formatDateTime(questionnaire.createdAt);
+                      const isSelected = selectedQuestionnaires.has(questionnaire.uniqueId);
                       return (
-                        <tr key={index} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <tr key={index} className={`border-b border-white/5 hover:bg-white/5 transition-colors ${isSelected ? 'bg-blue-500/10' : ''}`}>
+                          <td className="py-3 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleSelectQuestionnaire(questionnaire.uniqueId)}
+                              className="h-4 w-4 rounded border-white/30 bg-white/10 text-blue-600 focus:ring-blue-500 focus:ring-2"
+                            />
+                          </td>
                           <td className="py-3 px-4 text-white/90">
                             <div className="font-medium">{date}</div>
                             <div className="text-xs text-white/60">{time}</div>

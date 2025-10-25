@@ -73,7 +73,9 @@ export default function SignIn() {
       }
 
       if (!captchaToken) {
-        setError("Please complete the security verification above before continuing as guest.");
+        // Show popup for captcha verification
+        alert("Please verify that you are human by completing the security verification above before signing in as a guest.");
+        setIsLoading(false);
         return;
       }
       
@@ -276,7 +278,7 @@ export default function SignIn() {
               
               <button
                 onClick={handleGuestSignIn}
-                disabled={isLoading || !captchaToken}
+                disabled={isLoading}
                 className="w-full mt-4 py-3 px-4 rounded-lg border border-white/20 bg-white/5 backdrop-blur text-white font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-black transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
@@ -284,18 +286,13 @@ export default function SignIn() {
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Signing in...</span>
                   </div>
-                ) : !captchaToken ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <span>Complete verification above</span>
-                    <span className="text-xs opacity-75">→</span>
-                  </div>
                 ) : (
-                  "Continue as Guest"
+                  "Sign in as Guest"
                 )}
               </button>
               
               <p className="mt-2 text-xs text-gray-500 text-center">
-                Guest accounts require CAPTCHA verification and have limited features
+                Guest accounts have limited features but don't require registration
               </p>
             </div>
 
