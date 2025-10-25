@@ -196,7 +196,23 @@ export class GuestDataManager {
 // Helper function to check if user is guest
 export async function isGuestUser(): Promise<boolean> {
   try {
-    // First check if we have a guest session in localStorage
+    // First check Supabase authentication status
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    // If user is authenticated via Supabase
+    if (user) {
+      // Check if it's an anonymous user
+      if (user.is_anonymous) {
+        return true;
+      }
+      
+      // If it's a regular authenticated user, they're not a guest
+      // Clean up any leftover guest session data
+      localStorage.removeItem('cognitive_care_guest_session');
+      return false;
+    }
+    
+    // If no Supabase user, check localStorage for guest session
     const guestSession = localStorage.getItem('cognitive_care_guest_session');
     if (guestSession) {
       const session = JSON.parse(guestSession);
@@ -205,8 +221,8 @@ export async function isGuestUser(): Promise<boolean> {
       const now = new Date();
       const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
       
-      if (diffDays < 7) { // Guest sessions expire after 7 days
-        return session.isGuest === true;
+      if (diffDays < 7 && session.isGuest === true) { // Guest sessions expire after 7 days
+        return true;
       } else {
         // Clean up expired session
         localStorage.removeItem('cognitive_care_guest_session');
@@ -214,9 +230,8 @@ export async function isGuestUser(): Promise<boolean> {
       }
     }
     
-    // If no localStorage session, check Supabase anonymous auth
-    const { data: { user } } = await supabase.auth.getUser();
-    return user?.is_anonymous || false;
+    // No user and no guest session = not a guest
+    return false;
   } catch (error) {
     console.error('Error checking user type:', error);
     return false;

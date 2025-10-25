@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
+import { isGuestUser } from '@/lib/guestDataManager';
 
 interface AuthenticationGuardProps {
   children: React.ReactNode;
@@ -15,18 +16,8 @@ export function AuthenticationGuard({ children, userId }: AuthenticationGuardPro
     const checkUserType = async () => {
       if (userId) {
         try {
-          // First check localStorage for guest session
-          const guestSession = localStorage.getItem('cognitive_care_guest_session');
-          if (guestSession) {
-            const session = JSON.parse(guestSession);
-            setIsGuest(session.isGuest === true);
-            setIsLoading(false);
-            return;
-          }
-          
-          // If no localStorage session, check Supabase
-          const { data: { user } } = await supabase.auth.getUser();
-          setIsGuest(user?.is_anonymous || false);
+          const guestStatus = await isGuestUser();
+          setIsGuest(guestStatus);
         } catch (error) {
           console.error('Error checking user type:', error);
           setIsGuest(false);
