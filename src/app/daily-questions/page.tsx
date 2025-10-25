@@ -82,6 +82,16 @@ export default function DailyQuestionsPage() {
   function setAnswer(id: string, value: string) {
     if (!startedAt) setStartedAt(Date.now());
     setAnswers((prev) => ({ ...prev, [id]: value }));
+    
+    // If user starts editing a saved answer, remove it from savedQuestions
+    if (savedQuestions.has(id)) {
+      setSavedQuestions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+    }
+    
     // Turn off force fresh start when user starts typing
     if (forceFreshStart && value.trim()) {
       setForceFreshStart(false);
