@@ -6,9 +6,11 @@ import { useDailyChecks } from "@/lib/useDailyChecks";
 import { supabase } from "@/lib/supabaseClient";
 import { getTodayKey } from "@/utils/date";
 import { ALL_QUESTIONS } from "@/constants/questions";
+import { useQuestionNavigation } from "@/hooks/useQuestionNavigation";
 import { useHistoricalData } from "@/hooks/useHistoricalData";
 import { AuthenticationGuard } from "@/app/components/daily-questions/AuthenticationGuard";
 import { QuestionCard } from "@/app/components/daily-questions/QuestionCard";
+import { QuestionNavigation } from "@/app/components/daily-questions/QuestionNavigation";
 import { RecentAnswersTable } from "@/app/components/daily-questions/RecentAnswersTable";
 
 export default function DailyQuestionsPage() {
@@ -26,11 +28,8 @@ export default function DailyQuestionsPage() {
   const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
+  const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
   const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteDailyChecks } = useHistoricalData(userId);
-  
-  // Show first 4 questions (questions 1-4)
-  const todaysQuestions = ALL_QUESTIONS.slice(0, 4);
-  const windowStart = 0;
 
   // Get current user
   useEffect(() => {
@@ -279,7 +278,7 @@ export default function DailyQuestionsPage() {
               <div className="flex flex-col">
                 <h1 className="text-2xl sm:text-3xl font-semibold">Daily Questions</h1>
                 <span className="text-xs opacity-70">
-                  Questions 1–4 of {ALL_QUESTIONS.length}
+                  Questions {windowStart + 1}–{windowStart + todaysQuestions.length} of {ALL_QUESTIONS.length}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -411,6 +410,17 @@ export default function DailyQuestionsPage() {
                   </div>
                 )}
 
+                {/* Navigation */}
+                <div className="mb-6">
+                  <QuestionNavigation
+                    windowStart={windowStart}
+                    totalQuestions={ALL_QUESTIONS.length}
+                    questionsPerPage={todaysQuestions.length}
+                    onPrevious={prevThree}
+                    onNext={nextThree}
+                  />
+                </div>
+
                 {/* Questions */}
                 <div className="space-y-4 mb-6">
                 {todaysQuestions.map((q, index) => (
@@ -422,7 +432,7 @@ export default function DailyQuestionsPage() {
                     photoUrl={photoUrls[q.id]}
                     onPhotoChange={(url) => setPhotoUrl(q.id, url)}
                     userId={userId || undefined}
-                    questionNumber={index + 1}
+                    questionNumber={windowStart + index + 1}
                     onSave={saveIndividualAnswer}
                     readOnly={questionnaireSaved}
                     onFocus={handleQuestionFocus}
