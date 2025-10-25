@@ -525,8 +525,15 @@ export default function DailyQuestionsPage() {
                 {showHistory && (
                   <div className="mb-6 space-y-6">
                     {(() => {
-                      // Filter recent answers to only show current questionnaire (today's answers)
-                      const currentQuestionnaireAnswers = recentAnswers.filter(answer => answer.date === today);
+                      // Filter recent answers to only show current questionnaire session
+                      // Only show answers saved after the questionnaire was started
+                      const currentQuestionnaireAnswers = recentAnswers.filter(answer => {
+                        if (answer.date !== today) return false;
+                        if (!startedAt) return false; // No questionnaire started yet
+                        // Only show answers saved after questionnaire started
+                        const answerTime = new Date(answer.created_at).getTime();
+                        return answerTime >= startedAt;
+                      });
                       
                       if (sessions.length === 0 && currentQuestionnaireAnswers.length === 0) {
                         return (
@@ -550,8 +557,15 @@ export default function DailyQuestionsPage() {
                             </div>
                         );
                       } else {
-                        // Filter recent answers to only show current questionnaire (today's answers)
-                        const currentQuestionnaireAnswers = recentAnswers.filter(answer => answer.date === today);
+                        // Filter recent answers to only show current questionnaire session
+                        // Only show answers saved after the questionnaire was started
+                        const currentQuestionnaireAnswers = recentAnswers.filter(answer => {
+                          if (answer.date !== today) return false;
+                          if (!startedAt) return false; // No questionnaire started yet
+                          // Only show answers saved after questionnaire started
+                          const answerTime = new Date(answer.created_at).getTime();
+                          return answerTime >= startedAt;
+                        });
                         
                         if (currentQuestionnaireAnswers.length === 0) {
                           return (
