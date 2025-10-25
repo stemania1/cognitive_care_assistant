@@ -86,7 +86,7 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
         <table className="w-full text-sm min-w-[800px]">
           <thead>
             <tr className="border-b border-white/10">
-              <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300">Questions</th>
               <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
                 <div className="text-lg font-bold text-yellow-400">Question 1</div>
                 <div className="text-xs text-white/70">Describe your day and attach a photo</div>
@@ -121,17 +121,11 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
                   return (
                     <td key={qaIdx} className="py-3 px-3 text-white/70 max-w-48">
                       {qa ? (
-                        <div>
-                          <div className="text-yellow-400 font-bold text-sm mb-1">Question {qaIdx + 1}:</div>
-                          <div className="truncate" title={qa.answer}>
-                            {qa.answer}
-                          </div>
+                        <div className="truncate" title={qa.answer}>
+                          {qa.answer}
                         </div>
                       ) : (
-                        <div>
-                          <div className="text-yellow-400 font-bold text-sm mb-1">Question {qaIdx + 1}:</div>
-                          <div className="text-white/40 italic">No answer</div>
-                        </div>
+                        <div className="text-white/40 italic">No answer</div>
                       )}
                     </td>
                   );
