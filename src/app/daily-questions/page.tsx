@@ -161,6 +161,13 @@ export default function DailyQuestionsPage() {
       return;
     }
 
+    console.log('=== SAVING INDIVIDUAL ANSWER ===');
+    console.log('questionId:', questionId);
+    console.log('value:', value);
+    console.log('startedAt:', startedAt);
+    console.log('questionnaireStarted:', questionnaireStarted);
+    console.log('currentSessionId:', currentSessionId);
+
     try {
       const photoUrl = photoUrls[questionId];
       await saveDailyCheck({
@@ -171,6 +178,8 @@ export default function DailyQuestionsPage() {
         date: today,
         photoUrl: photoUrl || undefined,
       });
+      
+      console.log('Answer saved successfully, reloading recent answers...');
       
       // Refresh recent answers data to show the newly saved answer
       await loadRecentAnswers();
