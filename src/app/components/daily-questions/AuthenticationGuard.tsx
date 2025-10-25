@@ -103,7 +103,29 @@ export function AuthenticationGuard({ children, userId }: AuthenticationGuardPro
               </Link>
             </div>
             
-            <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-8 text-center mb-6">
+            <div className="relative rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-8 text-center mb-6">
+              {/* Close button */}
+              <button
+                onClick={() => setIsGuest(false)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                aria-label="Close guest account notice"
+              >
+                <svg
+                  className="w-4 h-4 text-white/70 hover:text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+              
               <h2 className="text-xl font-semibold mb-4 text-yellow-400">Guest Account</h2>
               <p className="text-white/70 mb-6">
                 You're using a guest account. Your data will be temporary and limited features are available.
