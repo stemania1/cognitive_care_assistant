@@ -247,7 +247,15 @@ export async function isGuestUser(): Promise<boolean> {
           return true;
         }
         
-        // If it's a regular authenticated user, they're not a guest
+        // If user has an email address, they are definitely not a guest
+        if (user.email) {
+          // Clean up any leftover guest session data
+          localStorage.removeItem('cognitive_care_guest_session');
+          console.log('isGuestUser: User has email, not a guest:', user.email);
+          return false;
+        }
+        
+        // If it's a regular authenticated user without email, they're still not a guest
         // Clean up any leftover guest session data
         localStorage.removeItem('cognitive_care_guest_session');
         return false;

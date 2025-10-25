@@ -13,6 +13,7 @@ export function GuestIndicator() {
     const checkGuestStatus = async () => {
       try {
         const guestStatus = await isGuestUser();
+        console.log('GuestIndicator: isGuestUser() returned:', guestStatus);
         setIsGuest(guestStatus);
       } catch (error) {
         console.error('Error checking guest status:', error);
