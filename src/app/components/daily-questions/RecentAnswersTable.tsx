@@ -135,7 +135,7 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
         <div className="mt-4">
           <div className="flex items-center gap-3">
             <span className="text-xs text-white/50">←</span>
-            <div className="flex-1 relative">
+            <div className="flex-1 relative h-4 bg-transparent">
               <div 
                 className="absolute w-4 h-4 bg-cyan-500 rounded-full cursor-pointer border-2 border-white shadow-lg hover:bg-cyan-400 hover:scale-110 transition-all duration-200"
                 style={{
