@@ -527,13 +527,36 @@ export default function DailyQuestionsPage() {
                     {(() => {
                       // Filter recent answers to only show current questionnaire session
                       // Only show answers saved after the questionnaire was started
+                      console.log('=== FILTERING RECENT ANSWERS ===');
+                      console.log('recentAnswers:', recentAnswers);
+                      console.log('startedAt:', startedAt);
+                      console.log('today:', today);
+                      
                       const currentQuestionnaireAnswers = recentAnswers.filter(answer => {
-                        if (answer.date !== today) return false;
-                        if (!startedAt) return false; // No questionnaire started yet
+                        console.log('Checking answer:', answer);
+                        console.log('answer.date:', answer.date, 'today:', today, 'match:', answer.date === today);
+                        console.log('startedAt:', startedAt, 'exists:', !!startedAt);
+                        
+                        if (answer.date !== today) {
+                          console.log('Filtered out: wrong date');
+                          return false;
+                        }
+                        if (!startedAt) {
+                          console.log('Filtered out: no startedAt');
+                          return false; // No questionnaire started yet
+                        }
+                        
                         // Only show answers saved after questionnaire started
                         const answerTime = new Date(answer.created_at).getTime();
-                        return answerTime >= startedAt;
+                        console.log('answer.created_at:', answer.created_at);
+                        console.log('answerTime:', answerTime, 'startedAt:', startedAt, 'match:', answerTime >= startedAt);
+                        
+                        const result = answerTime >= startedAt;
+                        console.log('Final filter result:', result);
+                        return result;
                       });
+                      
+                      console.log('Filtered answers:', currentQuestionnaireAnswers);
                       
                       // Always show the answers table, even if no answers yet
                       return (
