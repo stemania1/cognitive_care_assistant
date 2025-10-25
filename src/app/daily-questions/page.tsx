@@ -24,6 +24,7 @@ export default function DailyQuestionsPage() {
   const [completionTime, setCompletionTime] = useState<number | null>(null);
   const [questionnaireSaved, setQuestionnaireSaved] = useState(false);
   const [questionnaireStarted, setQuestionnaireStarted] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentlyFocusedQuestion, setCurrentlyFocusedQuestion] = useState<string | null>(null);
   const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
   const [forceFreshStart, setForceFreshStart] = useState(false);
@@ -283,9 +284,14 @@ export default function DailyQuestionsPage() {
 
   async function startDailyQuestionnaire() {
     setQuestionnaireStarted(true);
-    setStartedAt(Date.now());
+    const sessionStartTime = Date.now();
+    setStartedAt(sessionStartTime);
     setQuestionnaireSaved(false);
     setForceFreshStart(true);
+    
+    // Generate a unique session ID for this questionnaire
+    const sessionId = `session_${sessionStartTime}_${Math.random().toString(36).substr(2, 9)}`;
+    setCurrentSessionId(sessionId);
     
     // Reset to start from question 1
     resetToStart();
@@ -293,6 +299,9 @@ export default function DailyQuestionsPage() {
     // Clear any existing saved answers for today to ensure fresh start
     await deleteDailyChecks(today);
     clearChecks(); // Also clear local state
+    
+    console.log('Questionnaire started at:', new Date(sessionStartTime).toISOString());
+    console.log('Session ID:', sessionId);
   }
 
   async function startNewQuestionnaire() {
@@ -373,6 +382,7 @@ export default function DailyQuestionsPage() {
     setAutoNavigating(false);
     setHasAutoNavigated(false);
     setShowPriorResponses(false);
+    setCurrentSessionId(null);
   };
 
   async function showProgress() {
@@ -530,6 +540,7 @@ export default function DailyQuestionsPage() {
                       console.log('=== FILTERING RECENT ANSWERS ===');
                       console.log('recentAnswers:', recentAnswers);
                       console.log('questionnaireStarted:', questionnaireStarted);
+                      console.log('startedAt:', startedAt);
                       console.log('today:', today);
                       
                       const currentQuestionnaireAnswers = recentAnswers.filter(answer => {
@@ -544,6 +555,18 @@ export default function DailyQuestionsPage() {
                         if (!questionnaireStarted) {
                           console.log('Filtered out: questionnaire not started');
                           return false; // No questionnaire started yet
+                        }
+                        
+                        // If we have a startedAt timestamp, only show answers saved after it
+                        if (startedAt && answer.created_at) {
+                          const answerTime = new Date(answer.created_at).getTime();
+                          console.log('answer.created_at:', answer.created_at);
+                          console.log('answerTime:', answerTime, 'startedAt:', startedAt, 'match:', answerTime >= startedAt);
+                          
+                          if (answerTime < startedAt) {
+                            console.log('Filtered out: answer saved before questionnaire started');
+                            return false;
+                          }
                         }
                         
                         console.log('Answer included in current questionnaire');
