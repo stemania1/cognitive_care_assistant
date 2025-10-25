@@ -124,17 +124,23 @@ export default function DailyQuestionsPage() {
   }
 
   async function showProgress() {
-    console.log('Show Progress clicked, userId:', userId);
+    console.log('=== SHOW PROGRESS CLICKED ===');
+    console.log('userId:', userId);
+    console.log('userId type:', typeof userId);
+    console.log('userId length:', userId?.length);
+    console.log('showHistory before:', showHistory);
+    
     setShowHistory(true);
+    console.log('showHistory set to true');
     
     try {
-      console.log('Loading sessions...');
+      console.log('Starting to load sessions...');
       await loadSessions();
-      console.log('Loading recent answers...');
+      console.log('Sessions loaded, starting to load recent answers...');
       await loadRecentAnswers();
-      console.log('Progress data loaded successfully');
+      console.log('=== PROGRESS DATA LOADED SUCCESSFULLY ===');
     } catch (error) {
-      console.error('Error loading progress data:', error);
+      console.error('=== ERROR LOADING PROGRESS DATA ===', error);
     }
   }
 

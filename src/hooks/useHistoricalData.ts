@@ -9,6 +9,10 @@ export function useHistoricalData(userId: string | null) {
   const [loading, setLoading] = useState(false);
 
   const loadSessions = useCallback(async () => {
+    console.log('=== LOAD SESSIONS CALLED ===');
+    console.log('userId:', userId);
+    console.log('userId type:', typeof userId);
+    
     if (!userId) {
       console.log('loadSessions: No userId provided');
       return;
