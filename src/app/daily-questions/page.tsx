@@ -219,14 +219,7 @@ export default function DailyQuestionsPage() {
                 {(() => {
                   if (sessions.length === 0 && recentAnswers.length === 0) {
                     return (
-                      <>
-                        {/* Simple text fallback */}
-                        <div className="text-center p-8 bg-yellow-500 text-black font-bold text-2xl mb-4">
-                          📊 No data has been recorded yet
-                        </div>
-                        
-                        {/* Original styled message */}
-                        <div className="rounded-lg border-2 border-blue-500 bg-blue-500/10 p-8 mb-8" style={{zIndex: 9999, position: 'relative'}}>
+                      <div className="rounded-lg border-2 border-blue-500 bg-blue-500/10 p-8 mb-8" style={{zIndex: 9999, position: 'relative'}}>
                           <div className="text-center">
                             <div className="mb-6">
                               <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-r from-blue-500/30 to-cyan-500/30 flex items-center justify-center mb-4">
@@ -244,7 +237,7 @@ export default function DailyQuestionsPage() {
                             </div>
                           </div>
                         </div>
-                      </>
+                      </div>
                     );
                   } else {
                     return (
