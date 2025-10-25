@@ -44,6 +44,15 @@ export function useQuestionNavigation(today: string) {
     } catch {}
   };
 
+  const navigateToPage = (pageStart: number) => {
+    if (pageStart >= 0 && pageStart < ALL_QUESTIONS.length) {
+      setWindowStart(pageStart);
+      try {
+        localStorage.setItem(windowKey, String(pageStart));
+      } catch {}
+    }
+  };
+
   const todaysQuestions = ALL_QUESTIONS.slice(windowStart, windowStart + 4);
 
   return {
@@ -51,6 +60,7 @@ export function useQuestionNavigation(today: string) {
     todaysQuestions,
     nextThree,
     prevThree,
-    resetToStart
+    resetToStart,
+    navigateToPage
   };
 }

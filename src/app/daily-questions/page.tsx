@@ -31,7 +31,7 @@ export default function DailyQuestionsPage() {
   const [hasAutoNavigated, setHasAutoNavigated] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, clearChecks, loading: dbLoading } = useDailyChecks(userId);
-  const { windowStart, todaysQuestions, nextThree, prevThree, resetToStart } = useQuestionNavigation(today);
+  const { windowStart, todaysQuestions, nextThree, prevThree, resetToStart, navigateToPage } = useQuestionNavigation(today);
   const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteDailyChecks } = useHistoricalData(userId);
 
   // Get current user
@@ -124,7 +124,10 @@ export default function DailyQuestionsPage() {
         // Auto-navigate to next page after a short delay
         setTimeout(() => {
           console.log('Auto-navigating from', windowStart, 'to next page');
-          nextThree();
+          // Use direct navigation instead of nextThree() to ensure exact positioning
+          const targetWindowStart = windowStart + todaysQuestions.length;
+          console.log('Target window start:', targetWindowStart);
+          navigateToPage(targetWindowStart);
           setAutoNavigating(false);
         }, 1500); // 1.5 second delay to show the completion
       }
