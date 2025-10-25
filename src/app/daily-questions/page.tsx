@@ -144,13 +144,15 @@ export default function DailyQuestionsPage() {
   }
 
         async function showProgress() {
-          setShowHistory(true);
+          setShowHistory(!showHistory);
           
-          try {
-            await loadSessions();
-            await loadRecentAnswers();
-          } catch (error) {
-            console.error('Error loading progress data:', error);
+          if (!showHistory) {
+            try {
+              await loadSessions();
+              await loadRecentAnswers();
+            } catch (error) {
+              console.error('Error loading progress data:', error);
+            }
           }
         }
 
