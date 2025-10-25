@@ -173,7 +173,17 @@ export default function DailyQuestionsPage() {
       // Refresh recent answers data
       await loadRecentAnswers();
       
-      alert('Questionnaire saved successfully! Answers are now read-only. Start a new questionnaire to answer more questions.');
+      // Calculate completion statistics
+      const answeredQuestions = todaysQuestions.filter(q => {
+        const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
+        return value.length > 0;
+      }).length;
+      
+      const completionTimeText = startedAt ? 
+        `Completed in ${Math.round((Date.now() - startedAt) / 1000)} seconds` : 
+        'Completion time not available';
+      
+      alert(`Questionnaire Saved!\n\n📊 Questions Answered: ${answeredQuestions} of ${todaysQuestions.length}\n⏱️ ${completionTimeText}\n\nAnswers are now read-only. Start a new questionnaire to answer more questions.`);
     } catch (error) {
       console.error('Error saving questionnaire:', error);
       alert('Failed to save questionnaire. Please try again.');
