@@ -237,7 +237,6 @@ export default function DailyQuestionsPage() {
                             </div>
                           </div>
                         </div>
-                      </div>
                     );
                   } else {
                     return (
