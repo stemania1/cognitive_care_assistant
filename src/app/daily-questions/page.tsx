@@ -28,6 +28,7 @@ export default function DailyQuestionsPage() {
   const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
   const [forceFreshStart, setForceFreshStart] = useState(false);
   const [autoNavigating, setAutoNavigating] = useState(false);
+  const [hasAutoNavigated, setHasAutoNavigated] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, clearChecks, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
@@ -73,6 +74,11 @@ export default function DailyQuestionsPage() {
     getUser();
   }, []);
 
+  // Reset auto-navigation flag when page changes
+  useEffect(() => {
+    setHasAutoNavigated(false);
+  }, [windowStart]);
+
   function setAnswer(id: string, value: string) {
     if (!startedAt) setStartedAt(Date.now());
     setAnswers((prev) => ({ ...prev, [id]: value }));
@@ -87,6 +93,11 @@ export default function DailyQuestionsPage() {
   }
 
   function checkAndAutoNavigate() {
+    // Prevent multiple auto-navigations
+    if (hasAutoNavigated || autoNavigating) {
+      return;
+    }
+
     // Check if all questions on current page have answers
     const allQuestionsAnswered = todaysQuestions.every(q => {
       const hasLocalAnswer = answers[q.id] && answers[q.id].trim();
@@ -97,12 +108,22 @@ export default function DailyQuestionsPage() {
     if (allQuestionsAnswered) {
       // Check if there's a next page available
       const nextWindowStart = windowStart + todaysQuestions.length;
+      console.log('Auto-navigation check:', {
+        windowStart,
+        todaysQuestionsLength: todaysQuestions.length,
+        nextWindowStart,
+        allQuestionsLength: ALL_QUESTIONS.length,
+        allQuestionsAnswered
+      });
+      
       if (nextWindowStart < ALL_QUESTIONS.length) {
-        // Show auto-navigation indicator
+        // Mark that we're about to auto-navigate
+        setHasAutoNavigated(true);
         setAutoNavigating(true);
         
         // Auto-navigate to next page after a short delay
         setTimeout(() => {
+          console.log('Auto-navigating from', windowStart, 'to next page');
           nextThree();
           setAutoNavigating(false);
         }, 1500); // 1.5 second delay to show the completion
@@ -330,6 +351,7 @@ export default function DailyQuestionsPage() {
     setShowHistory(false);
     setForceFreshStart(false);
     setAutoNavigating(false);
+    setHasAutoNavigated(false);
   };
 
   async function showProgress() {
