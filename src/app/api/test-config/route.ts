@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
       anonKeyLength: anonKey?.length || 0,
       hcaptchaKeyLength: hcaptchaKey?.length || 0,
       supabaseUrlPreview: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : 'Not set',
+      hcaptchaKeyPreview: hcaptchaKey ? hcaptchaKey.substring(0, 20) + '...' : 'Not set',
+      allEnvKeys: Object.keys(process.env).filter(key => key.includes('HCAPTCHA') || key.includes('SUPABASE')),
     };
     
     console.log('Configuration check:', config);
