@@ -174,6 +174,8 @@ export default function DailyQuestionsPage() {
 
       // Mark questionnaire as saved and load saved answers as read-only
       setQuestionnaireSaved(true);
+      setAnswers({}); // Clear local answers so UI shows empty fields
+      setPhotoUrls({}); // Clear local photo URLs
       setStartedAt(null);
       setCompletionTime(null);
       
@@ -190,7 +192,7 @@ export default function DailyQuestionsPage() {
         `Completed in ${Math.round((Date.now() - startedAt) / 1000)} seconds` : 
         'Completion time not available';
       
-      alert(`Questionnaire Saved!\n\n📊 Questions Answered: ${answeredQuestions} of ${todaysQuestions.length}\n💾 New Answers Saved: ${savedCount}\n⏱️ ${completionTimeText}\n\nAnswers are now read-only. Start a new questionnaire to answer more questions.`);
+      alert(`Questionnaire Saved!\n\n📊 Questions Answered: ${answeredQuestions} of ${todaysQuestions.length}\n💾 New Answers Saved: ${savedCount}\n⏱️ ${completionTimeText}\n\nAnswers have been saved and cleared. Start a new questionnaire to answer more questions.`);
     } catch (error) {
       console.error('Error saving questionnaire:', error);
       alert('Failed to save questionnaire. Please try again.');
