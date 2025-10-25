@@ -566,19 +566,9 @@ export default function DailyQuestionsPage() {
                           return false; // No questionnaire started yet
                         }
                         
-                        // If we have a startedAt timestamp, only show answers saved after it
-                        if (startedAt && answer.created_at) {
-                          const answerTime = new Date(answer.created_at).getTime();
-                          console.log('answer.created_at:', answer.created_at);
-                          console.log('answerTime:', answerTime, 'startedAt:', startedAt, 'match:', answerTime >= startedAt);
-                          
-                          if (answerTime < startedAt) {
-                            console.log('Filtered out: answer saved before questionnaire started');
-                            return false;
-                          }
-                        }
-                        
-                        console.log('Answer included in current questionnaire');
+                        // For now, show all answers from today when questionnaire is started
+                        // We'll refine this later once we understand the timing issue
+                        console.log('Answer included in current questionnaire (showing all today answers)');
                         return true;
                       });
                       
