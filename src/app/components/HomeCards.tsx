@@ -75,15 +75,6 @@ export default function HomeCards() {
         targetBlank
         emoji="🧠"
       />
-
-      {/* Row 4: Prior Questionnaires */}
-      <LinkCard
-        href="/questions/history"
-        title="Prior Questionnaires"
-        description="View your completed questionnaires and answers"
-        accent="from-indigo-500 to-purple-500"
-        emoji="📋"
-      />
     </div>
   );
 }

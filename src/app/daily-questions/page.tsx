@@ -461,6 +461,28 @@ export default function DailyQuestionsPage() {
               </div>
             </div>
 
+            {/* Prior Questionnaires Tile */}
+            <div className="mb-6">
+              <Link
+                href="/questions/history"
+                className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-5 py-6 hover:bg-white/10 transition-all duration-200"
+              >
+                <div className="pointer-events-none absolute -inset-px rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 opacity-0 group-hover:opacity-30 transition-opacity" />
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-base">
+                      📋
+                    </span>
+                    <div>
+                      <h3 className="text-lg font-medium">Prior Questionnaires</h3>
+                      <p className="text-sm text-white/70">View your completed questionnaires and answers</p>
+                    </div>
+                  </div>
+                  <span className="text-base opacity-60 transition-transform group-hover:translate-x-0.5">→</span>
+                </div>
+              </Link>
+            </div>
+
             {/* Auto-Navigation Indicator */}
             {autoNavigating && (
               <div className="mb-4 rounded-lg bg-green-500/20 border border-green-400/30 p-4 text-center">
