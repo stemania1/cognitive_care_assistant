@@ -52,17 +52,6 @@ export default function QuestionsHistoryPage() {
     }
   }, [userId, loadSessions, loadRecentAnswers, isGuest]);
 
-  // Debug logging
-  console.log('Prior Questionnaires Debug:', {
-    userId,
-    isGuest,
-    sessionsCount: sessions.length,
-    recentAnswersCount: recentAnswers.length,
-    sessions: sessions,
-    recentAnswers: recentAnswers,
-    questionnaireDataCount: questionnaireData.length
-  });
-
   // Group answers by session for display (each session represents a complete questionnaire)
   const questionnaireData = sessions.map(session => {
     // Find all answers for this session (by date)
@@ -86,6 +75,17 @@ export default function QuestionsHistoryPage() {
       answers: answersMap
     };
   }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  // Debug logging
+  console.log('Prior Questionnaires Debug:', {
+    userId,
+    isGuest,
+    sessionsCount: sessions.length,
+    recentAnswersCount: recentAnswers.length,
+    sessions: sessions,
+    recentAnswers: recentAnswers,
+    questionnaireDataCount: questionnaireData.length
+  });
 
   const formatCompletionTime = (seconds: number) => {
     if (seconds < 60) {
