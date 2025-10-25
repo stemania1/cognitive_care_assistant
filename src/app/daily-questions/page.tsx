@@ -173,6 +173,16 @@ export default function DailyQuestionsPage() {
               </button>
             </div>
 
+            {/* Navigation - Moved below Save Button */}
+            <div className="mb-6">
+              <QuestionNavigation
+                windowStart={windowStart}
+                totalQuestions={ALL_QUESTIONS.length}
+                onPrevious={prevThree}
+                onNext={nextThree}
+              />
+            </div>
+
             {dbLoading ? (
               <div className="text-center py-8">
                 <div className="text-white/60">Loading...</div>
@@ -193,14 +203,6 @@ export default function DailyQuestionsPage() {
                     />
                   ))}
                 </div>
-
-                {/* Navigation */}
-                <QuestionNavigation
-                  windowStart={windowStart}
-                  totalQuestions={ALL_QUESTIONS.length}
-                  onPrevious={prevThree}
-                  onNext={nextThree}
-                />
 
                 {/* Completion Time */}
                 {completionTime && (
