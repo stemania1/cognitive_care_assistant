@@ -213,36 +213,16 @@ export async function isGuestUser(): Promise<boolean> {
       return false;
     }
     
-    // First check localStorage for guest session (faster and avoids auth errors)
-    const guestSession = localStorage.getItem('cognitive_care_guest_session');
-    if (guestSession) {
-      const session = JSON.parse(guestSession);
-      // Check if session is still valid (not expired)
-      const createdAt = new Date(session.createdAt);
-      const now = new Date();
-      const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
-      
-      if (diffDays < 7 && session.isGuest === true) { // Guest sessions expire after 7 days
-        return true;
-      } else {
-        // Clean up expired session
-        localStorage.removeItem('cognitive_care_guest_session');
-      }
-    }
-    
-    // Then check Supabase authentication status (with error handling)
+    // PRIORITY: Check Supabase authentication first (most reliable)
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
       
       // If there's an auth error (like refresh token issues), treat as no user
       if (error) {
         console.log('Auth error (likely expired token):', error.message);
-        return false;
-      }
-      
-      // If user is authenticated via Supabase
-      if (user) {
-        // Check if it's an anonymous user
+        // Fall through to localStorage check
+      } else if (user) {
+        // If user is authenticated via Supabase
         if (user.is_anonymous) {
           return true;
         }
@@ -264,6 +244,23 @@ export async function isGuestUser(): Promise<boolean> {
       // If Supabase auth fails (network issues, expired tokens, etc.), 
       // fall back to localStorage check only
       console.log('Supabase auth check failed:', authError);
+    }
+    
+    // FALLBACK: Only check localStorage if no Supabase user found
+    const guestSession = localStorage.getItem('cognitive_care_guest_session');
+    if (guestSession) {
+      const session = JSON.parse(guestSession);
+      // Check if session is still valid (not expired)
+      const createdAt = new Date(session.createdAt);
+      const now = new Date();
+      const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (diffDays < 7 && session.isGuest === true) { // Guest sessions expire after 7 days
+        return true;
+      } else {
+        // Clean up expired session
+        localStorage.removeItem('cognitive_care_guest_session');
+      }
     }
     
     // No user and no guest session = not a guest
