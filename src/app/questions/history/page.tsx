@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useHistoricalData } from "@/hooks/useHistoricalData";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
+import { supabase } from "@/lib/supabaseClient";
 import { ALL_QUESTIONS } from "@/constants/questions";
 import { DailyCheckSession, RecentAnswer } from "@/types/daily-questions";
 
@@ -24,8 +25,14 @@ export default function QuestionsHistoryPage() {
           const guestUserId = getGuestUserId();
           setUserId(guestUserId);
         } else {
-          // For regular users, we'll get userId from the hook
-          setUserId("regular_user"); // Placeholder, will be updated by the hook
+          // For regular users, get the actual user ID from Supabase
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.id) {
+            setUserId(user.id);
+          } else {
+            console.error('No user ID found for regular user');
+            setUserId(null);
+          }
         }
       } catch (error) {
         console.error('Error initializing user:', error);
@@ -39,10 +46,21 @@ export default function QuestionsHistoryPage() {
 
   useEffect(() => {
     if (userId) {
+      console.log('Prior Questionnaires: Loading data for userId:', userId, 'isGuest:', isGuest);
       loadSessions();
       loadRecentAnswers();
     }
-  }, [userId, loadSessions, loadRecentAnswers]);
+  }, [userId, loadSessions, loadRecentAnswers, isGuest]);
+
+  // Debug logging
+  console.log('Prior Questionnaires Debug:', {
+    userId,
+    isGuest,
+    sessionsCount: sessions.length,
+    recentAnswersCount: recentAnswers.length,
+    sessions: sessions,
+    recentAnswers: recentAnswers
+  });
 
   // Group answers by session/date for display
   const questionnaireData = recentAnswers.map(answer => {
