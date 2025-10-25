@@ -21,12 +21,7 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
         const element = tableRef.current;
         setHorizontalScrollPosition(element.scrollLeft);
         setMaxHorizontalScroll(element.scrollWidth - element.clientWidth);
-        console.log('Scroll info:', {
-          scrollLeft: element.scrollLeft,
-          scrollWidth: element.scrollWidth,
-          clientWidth: element.clientWidth,
-          maxScroll: element.scrollWidth - element.clientWidth
-        });
+        // Removed console logging for cleaner output
       }
     };
 
@@ -93,16 +88,16 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
             <tr className="border-b border-white/10">
               <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
               <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
-                <div className="font-bold text-white">Question 1:</div>
-                <div className="text-sm">Describe your day and attach a photo</div>
+                <div className="text-lg font-bold text-yellow-400">Question 1</div>
+                <div className="text-xs text-white/70">Describe your day and attach a photo</div>
               </th>
               <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
-                <div className="font-bold text-white">Question 2:</div>
-                <div className="text-sm">What color do you like best?</div>
+                <div className="text-lg font-bold text-yellow-400">Question 2</div>
+                <div className="text-xs text-white/70">What color do you like best?</div>
               </th>
               <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
-                <div className="font-bold text-white">Question 3:</div>
-                <div className="text-sm">Which meal do you like most?</div>
+                <div className="text-lg font-bold text-yellow-400">Question 3</div>
+                <div className="text-xs text-white/70">Which meal do you like most?</div>
               </th>
               <th className="text-center py-2 px-3 font-medium text-cyan-300 w-20">Actions</th>
             </tr>
@@ -173,12 +168,6 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
           </div>
         </div>
       )}
-      
-      {/* Debug Info */}
-      <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs">
-        <div className="text-blue-300">Debug: maxScroll={maxHorizontalScroll}, current={horizontalScrollPosition}</div>
-        <div className="text-blue-300">Slider should show: {maxHorizontalScroll > 0 ? 'YES' : 'NO'}</div>
-      </div>
     </div>
   );
 }
