@@ -226,6 +226,7 @@ export default function DailyQuestionsPage() {
               <QuestionNavigation
                 windowStart={windowStart}
                 totalQuestions={ALL_QUESTIONS.length}
+                questionsPerPage={todaysQuestions.length}
                 onPrevious={prevThree}
                 onNext={nextThree}
               />
