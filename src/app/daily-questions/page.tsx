@@ -13,6 +13,28 @@ import { QuestionCard } from "@/app/components/daily-questions/QuestionCard";
 import { QuestionNavigation } from "@/app/components/daily-questions/QuestionNavigation";
 import { RecentAnswersTable } from "@/app/components/daily-questions/RecentAnswersTable";
 
+// Timer Display Component
+function TimerDisplay({ startTime }: { startTime: number }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = elapsed % 60;
+
+  return (
+    <span className="text-cyan-200 font-mono">
+      {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+    </span>
+  );
+}
+
 export default function DailyQuestionsPage() {
   const today = useMemo(() => getTodayKey(), []);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -23,6 +45,7 @@ export default function DailyQuestionsPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [completionTime, setCompletionTime] = useState<number | null>(null);
   const [questionnaireSaved, setQuestionnaireSaved] = useState(false);
+  const [questionnaireStarted, setQuestionnaireStarted] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
@@ -204,8 +227,15 @@ export default function DailyQuestionsPage() {
     }
   }
 
+  function startDailyQuestionnaire() {
+    setQuestionnaireStarted(true);
+    setStartedAt(Date.now());
+    setQuestionnaireSaved(false);
+  }
+
   async function startNewQuestionnaire() {
     setQuestionnaireSaved(false);
+    setQuestionnaireStarted(false);
     setAnswers({});
     setPhotoUrls({});
     setStartedAt(null);
@@ -265,6 +295,44 @@ export default function DailyQuestionsPage() {
               </div>
             </div>
 
+            {/* Start Questionnaire Section */}
+            {!questionnaireStarted && !questionnaireSaved && (
+              <div className="mb-6 text-center">
+                <div className="rounded-lg border border-white/10 bg-white/5 p-6">
+                  <h2 className="text-xl font-semibold mb-4">Ready to Start Your Daily Questions?</h2>
+                  <p className="text-white/70 mb-6">
+                    Answer questions about your day, mood, and experiences. Take your time and be honest with your responses.
+                  </p>
+                  <button
+                    onClick={startDailyQuestionnaire}
+                    className="px-8 py-3 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mx-auto"
+                    type="button"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-lg">Start Daily Questionnaire</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Timer Display */}
+            {questionnaireStarted && startedAt && !questionnaireSaved && (
+              <div className="mb-6 text-center">
+                <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-4">
+                  <div className="flex items-center justify-center gap-3">
+                    <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-lg font-semibold text-cyan-300">
+                      Time Elapsed: <TimerDisplay startTime={startedAt} />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Navigation - Moved below Save Button */}
             <div className="mb-6">
               <QuestionNavigation
@@ -276,7 +344,11 @@ export default function DailyQuestionsPage() {
               />
             </div>
 
-            {dbLoading ? (
+            {!questionnaireStarted ? (
+              <div className="text-center py-8">
+                <div className="text-white/60">Click "Start Daily Questionnaire" above to begin</div>
+              </div>
+            ) : dbLoading ? (
               <div className="text-center py-8">
                 <div className="text-white/60">Loading...</div>
               </div>
