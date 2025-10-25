@@ -213,28 +213,13 @@ export default function DailyQuestionsPage() {
     }
   }
 
-  function startDailyQuestionnaire() {
+  async function startDailyQuestionnaire() {
     setQuestionnaireStarted(true);
     setStartedAt(Date.now());
     setQuestionnaireSaved(false);
     
     // Clear any existing saved answers for today to ensure fresh start
-    todaysQuestions.forEach(q => {
-      const existingAnswer = getAnswer(q.id);
-      if (existingAnswer) {
-        // Clear the saved answer by saving an empty string
-        saveDailyCheck({
-          questionId: q.id,
-          questionText: q.text,
-          answer: "",
-          answerType: q.choices ? 'choice' : 'text',
-          date: today,
-          photoUrl: undefined,
-        }).catch(error => {
-          console.error('Error clearing existing answer:', error);
-        });
-      }
-    });
+    await deleteDailyChecks(today);
   }
 
   async function startNewQuestionnaire() {
@@ -368,7 +353,7 @@ export default function DailyQuestionsPage() {
                     Answer questions about your day, mood, and experiences. Take your time and be honest with your responses.
                   </p>
                   <button
-                    onClick={startDailyQuestionnaire}
+                    onClick={() => startDailyQuestionnaire()}
                     className="px-8 py-3 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mx-auto"
                     type="button"
                   >
