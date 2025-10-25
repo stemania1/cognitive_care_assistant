@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -11,7 +11,9 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const router = useRouter();
+  const captchaRef = useRef<any>(null);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,14 +25,37 @@ export default function SignIn() {
         setError("Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the dev server.");
         return;
       }
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (!captchaToken) {
+        setError("Please complete the CAPTCHA verification.");
+        return;
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password,
+        options: {
+          captchaToken: captchaToken
+        }
+      });
+      
       if (signInError) {
         setError(signInError.message || "Invalid email or password. Please try again.");
+        // Reset CAPTCHA on error
+        if (captchaRef.current) {
+          captchaRef.current.reset();
+        }
+        setCaptchaToken(null);
         return;
       }
       router.push("/dashboard");
     } catch (err) {
       setError("Invalid email or password. Please try again.");
+      // Reset CAPTCHA on error
+      if (captchaRef.current) {
+        captchaRef.current.reset();
+      }
+      setCaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +99,48 @@ export default function SignIn() {
       setIsLoading(false);
     }
   };
+
+  const handleCaptchaVerify = (token: string) => {
+    setCaptchaToken(token);
+  };
+
+  const handleCaptchaExpire = () => {
+    setCaptchaToken(null);
+  };
+
+  const handleCaptchaError = () => {
+    setCaptchaToken(null);
+    setError("CAPTCHA verification failed. Please try again.");
+  };
+
+  // Load Turnstile script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+
+    // Set up global callback functions
+    (window as any).onTurnstileCallback = (token: string) => {
+      handleCaptchaVerify(token);
+    };
+
+    (window as any).onTurnstileExpired = () => {
+      handleCaptchaExpire();
+    };
+
+    (window as any).onTurnstileError = () => {
+      handleCaptchaError();
+    };
+
+    return () => {
+      // Cleanup
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+    };
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
@@ -145,6 +212,26 @@ export default function SignIn() {
                   className="w-full px-4 py-3 rounded-lg border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all duration-200"
                   placeholder="Enter your password"
                 />
+              </div>
+
+              {/* CAPTCHA Widget */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-200">
+                  Security Verification
+                </label>
+                <div className="flex justify-center">
+                  <div 
+                    className="cf-turnstile" 
+                    data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"}
+                    data-callback="onTurnstileCallback"
+                    data-expired-callback="onTurnstileExpired"
+                    data-error-callback="onTurnstileError"
+                    ref={captchaRef}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 text-center">
+                  Complete the verification to continue
+                </p>
               </div>
 
               <div className="flex items-center justify-between text-sm">
