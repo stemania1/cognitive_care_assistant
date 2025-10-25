@@ -21,23 +21,29 @@ export function QuestionNavigation({ windowStart, totalQuestions, questionsPerPa
 
   return (
     <div className="flex items-center justify-between">
-      <button
-        onClick={onPrevious}
-        className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
-        type="button"
-        disabled={!hasPrevious}
-      >
-        ← Questions {prevStart}-{prevEnd}
-      </button>
+      {hasPrevious ? (
+        <button
+          onClick={onPrevious}
+          className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
+          type="button"
+        >
+          ← Questions {prevStart}-{prevEnd}
+        </button>
+      ) : (
+        <div className="px-4 py-2"></div>
+      )}
       
-      <button
-        onClick={onNext}
-        className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
-        type="button"
-        disabled={!hasNext}
-      >
-        Questions {nextStart}-{nextEnd} →
-      </button>
+      {hasNext ? (
+        <button
+          onClick={onNext}
+          className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
+          type="button"
+        >
+          Questions {nextStart}-{nextEnd} →
+        </button>
+      ) : (
+        <div className="px-4 py-2"></div>
+      )}
     </div>
   );
 }
