@@ -239,18 +239,18 @@ export default function DailyQuestionsPage() {
               <>
                 {/* Questions */}
                 <div className="space-y-4 mb-6">
-                  {todaysQuestions.map((q, index) => (
-                    <QuestionCard
-                      key={q.id}
-                      question={q}
-                      value={answers[q.id] ?? getAnswer(q.id) ?? ""}
-                      onChange={(value) => setAnswer(q.id, value)}
-                      photoUrl={photoUrls[q.id]}
-                      onPhotoChange={(url) => setPhotoUrl(q.id, url)}
-                      userId={userId || undefined}
-                      questionNumber={index + 1}
-                    />
-                  ))}
+                {todaysQuestions.map((q, index) => (
+                  <QuestionCard
+                    key={q.id}
+                    question={q}
+                    value={answers[q.id] ?? getAnswer(q.id) ?? ""}
+                    onChange={(value) => setAnswer(q.id, value)}
+                    photoUrl={photoUrls[q.id]}
+                    onPhotoChange={(url) => setPhotoUrl(q.id, url)}
+                    userId={userId || undefined}
+                    questionNumber={windowStart + index + 1}
+                  />
+                ))}
                 </div>
 
                 {/* Completion Time */}
