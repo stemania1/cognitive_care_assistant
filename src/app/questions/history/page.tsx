@@ -106,23 +106,46 @@ export default function QuestionsHistoryPage() {
   };
 
   const handleDeleteSession = async (date: string) => {
+    console.log('=== DELETE SESSION DEBUG ===');
+    console.log('Date to delete:', date);
+    console.log('UserId:', userId);
+    console.log('IsGuest:', isGuest);
+    console.log('Sessions before delete:', sessions);
+    console.log('RecentAnswers before delete:', recentAnswers);
+    
     const confirmed = window.confirm(
       `Are you sure you want to delete the questionnaire from ${date}?\n\nThis action cannot be undone.`
     );
     
     if (confirmed) {
       try {
+        console.log('User confirmed deletion, proceeding...');
+        
         // Delete both the session and all answers for this date
+        console.log('Calling deleteSession with date:', date);
         await deleteSession(date);
+        console.log('deleteSession completed');
+        
+        console.log('Calling deleteDailyChecks with date:', date);
         await deleteDailyChecks(date);
+        console.log('deleteDailyChecks completed');
         
         // Reload data after deletion
+        console.log('Reloading sessions...');
         await loadSessions();
+        console.log('Sessions reloaded');
+        
+        console.log('Reloading recent answers...');
         await loadRecentAnswers();
+        console.log('Recent answers reloaded');
+        
+        console.log('Delete process completed successfully');
       } catch (error) {
         console.error('Error deleting session:', error);
         alert('Failed to delete questionnaire. Please try again.');
       }
+    } else {
+      console.log('User cancelled deletion');
     }
   };
 

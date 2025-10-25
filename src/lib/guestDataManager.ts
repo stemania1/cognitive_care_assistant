@@ -136,11 +136,26 @@ export class GuestDataManager {
   }
 
   public deleteSession(sessionId: string): void {
-    if (!this.guestData) return;
+    console.log('=== GUEST DATA MANAGER DELETE SESSION ===');
+    console.log('SessionId to delete:', sessionId);
+    console.log('Current guest data:', this.guestData);
+    
+    if (!this.guestData) {
+      console.log('No guest data found, returning');
+      return;
+    }
+    
+    console.log('Sessions before delete:', this.guestData.sessions);
     
     // Remove the session with the specified ID
-    this.guestData.sessions = this.guestData.sessions.filter((session: any) => session.id !== sessionId);
+    this.guestData.sessions = this.guestData.sessions.filter((session: any) => {
+      console.log('Checking session:', session.id, 'against:', sessionId, 'match:', session.id === sessionId);
+      return session.id !== sessionId;
+    });
+    
+    console.log('Sessions after delete:', this.guestData.sessions);
     this.saveGuestData();
+    console.log('Guest data saved');
   }
 
   public clearAllData(): void {
