@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
+import { getGuestDataManager, isGuestUser } from './guestDataManager';
 
 export interface DailyCheck {
   id: string;
@@ -27,6 +28,18 @@ export function useDailyChecks(userId: string | null) {
   const [checks, setChecks] = useState<Record<string, DailyCheck>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
+
+  // Check if user is guest
+  useEffect(() => {
+    const checkGuestStatus = async () => {
+      if (userId) {
+        const guestStatus = await isGuestUser();
+        setIsGuest(guestStatus);
+      }
+    };
+    checkGuestStatus();
+  }, [userId]);
 
   const fetchDailyChecks = useCallback(async (date?: string) => {
     if (!userId) return;
@@ -35,77 +48,120 @@ export function useDailyChecks(userId: string | null) {
     setError(null);
 
     try {
-      const params = new URLSearchParams({ userId });
-      if (date) params.append('date', date);
+      if (isGuest) {
+        // For guest users, fetch from local storage
+        const guestManager = getGuestDataManager();
+        const guestChecks = guestManager.getDailyChecks();
+        
+        // Convert to the expected format
+        const checksMap: Record<string, DailyCheck> = {};
+        Object.values(guestChecks).forEach((check: any) => {
+          checksMap[check.question_id] = check;
+        });
+        
+        setChecks(checksMap);
+      } else {
+        // For regular users, fetch from API
+        const params = new URLSearchParams({ userId });
+        if (date) params.append('date', date);
 
-      const response = await fetch(`/api/daily-checks?${params}`);
-      const result = await response.json();
+        const response = await fetch(`/api/daily-checks?${params}`);
+        const result = await response.json();
 
-      if (!response.ok) {
-        console.error('API Error:', result);
-        throw new Error(result.error || result.details || 'Failed to fetch daily checks');
+        if (!response.ok) {
+          console.error('API Error:', result);
+          throw new Error(result.error || result.details || 'Failed to fetch daily checks');
+        }
+
+        // Convert array to object keyed by question_id for easy lookup
+        const checksMap: Record<string, DailyCheck> = {};
+        result.data.forEach((check: DailyCheck) => {
+          checksMap[check.question_id] = check;
+        });
+
+        setChecks(checksMap);
       }
-
-      // Convert array to object keyed by question_id for easy lookup
-      const checksMap: Record<string, DailyCheck> = {};
-      result.data.forEach((check: DailyCheck) => {
-        checksMap[check.question_id] = check;
-      });
-
-      setChecks(checksMap);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Error fetching daily checks:', err);
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, isGuest]);
 
   const saveDailyCheck = useCallback(async (input: DailyCheckInput) => {
     if (!userId) return;
 
     try {
-      const body: any = {
-        userId,
-        questionId: input.questionId,
-        questionText: input.questionText,
-        answer: input.answer,
-        answerType: input.answerType || 'text',
-        date: input.date || new Date().toISOString().split('T')[0],
-      };
-      
-      if (input.photoUrl) {
-        body.photoUrl = input.photoUrl;
+      if (isGuest) {
+        // For guest users, save to local storage
+        const guestManager = getGuestDataManager();
+        const checkData = {
+          id: `guest_${Date.now()}_${input.questionId}`,
+          user_id: userId,
+          question_id: input.questionId,
+          question_text: input.questionText,
+          answer: input.answer,
+          answer_type: input.answerType || 'text',
+          date: input.date || new Date().toISOString().split('T')[0],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          photo_url: input.photoUrl
+        };
+        
+        guestManager.saveDailyCheck(checkData);
+        
+        // Update local state
+        setChecks(prev => ({
+          ...prev,
+          [input.questionId]: checkData,
+        }));
+        
+        return checkData;
+      } else {
+        // For regular users, save via API
+        const body: any = {
+          userId,
+          questionId: input.questionId,
+          questionText: input.questionText,
+          answer: input.answer,
+          answerType: input.answerType || 'text',
+          date: input.date || new Date().toISOString().split('T')[0],
+        };
+        
+        if (input.photoUrl) {
+          body.photoUrl = input.photoUrl;
+        }
+
+        const response = await fetch('/api/daily-checks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          console.error('API Error:', result);
+          throw new Error(result.details || result.error || 'Failed to save daily check');
+        }
+
+        // Update local state
+        setChecks(prev => ({
+          ...prev,
+          [input.questionId]: result.data,
+        }));
+
+        return result.data;
       }
-
-      const response = await fetch('/api/daily-checks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        console.error('API Error:', result);
-        throw new Error(result.details || result.error || 'Failed to save daily check');
-      }
-
-      // Update local state
-      setChecks(prev => ({
-        ...prev,
-        [input.questionId]: result.data,
-      }));
-
-      return result.data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Error saving daily check:', err);
       throw err;
     }
-  }, [userId]);
+  }, [userId, isGuest]);
 
   const getAnswer = useCallback((questionId: string): string => {
     return checks[questionId]?.answer || '';
@@ -130,5 +186,6 @@ export function useDailyChecks(userId: string | null) {
     saveDailyCheck,
     getAnswer,
     hasAnswer,
+    isGuest,
   };
 }

@@ -36,6 +36,31 @@ export default function SignIn() {
     }
   };
 
+  const handleGuestSignIn = async () => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      if (!isSupabaseConfigured) {
+        setError("Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the dev server.");
+        return;
+      }
+      
+      // Sign in anonymously as guest
+      const { error: guestError } = await supabase.auth.signInAnonymously();
+      if (guestError) {
+        setError(guestError.message || "Unable to sign in as guest. Please try again.");
+        return;
+      }
+      
+      router.push("/dashboard");
+    } catch (err) {
+      setError("Unable to sign in as guest. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
       {/* Background gradients */}
@@ -139,6 +164,37 @@ export default function SignIn() {
                 )}
               </button>
             </form>
+
+            {/* Guest Account Option */}
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-transparent text-gray-400">or</span>
+                </div>
+              </div>
+              
+              <button
+                onClick={handleGuestSignIn}
+                disabled={isLoading}
+                className="w-full mt-4 py-3 px-4 rounded-lg border border-white/20 bg-white/5 backdrop-blur text-white font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-black transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Signing in...</span>
+                  </div>
+                ) : (
+                  "Continue as Guest"
+                )}
+              </button>
+              
+              <p className="mt-2 text-xs text-gray-500 text-center">
+                Guest accounts have limited features and data is temporary
+              </p>
+            </div>
 
             <div className="mt-6 text-center">
               <p className="text-gray-400 text-sm">
