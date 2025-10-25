@@ -27,7 +27,7 @@ export function UserStatusIndicator() {
         // Check for regular user
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          setUserEmail(user.email);
+          setUserEmail(user.email || null);
           setIsGuest(false);
         } else {
           setUserEmail(null);
@@ -47,7 +47,7 @@ export function UserStatusIndicator() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        setUserEmail(session.user.email);
+        setUserEmail(session.user.email || null);
         setIsGuest(false);
       } else {
         setUserEmail(null);
