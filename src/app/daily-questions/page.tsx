@@ -165,7 +165,11 @@ export default function DailyQuestionsPage() {
             <div className="mb-4 flex items-center justify-between">
               <div className="flex flex-col">
                 <h1 className="text-2xl sm:text-3xl font-semibold">Daily Questions</h1>
-                <span className="text-xs opacity-70">Set label: Questions {((windowStart % ALL_QUESTIONS.length) + 1)}–{(((windowStart + todaysQuestions.length - 1) % ALL_QUESTIONS.length) + 1)} of {ALL_QUESTIONS.length}</span>
+                <span className="text-xs opacity-70">
+                  Set label: Questions {((windowStart % ALL_QUESTIONS.length) + 1)}–{(((windowStart + todaysQuestions.length - 1) % ALL_QUESTIONS.length) + 1)} of {ALL_QUESTIONS.length}
+                  <br />
+                  <span className="text-red-400">Debug: todaysQuestions.length = {todaysQuestions.length}</span>
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <button
