@@ -43,3 +43,5 @@ next-env.d.ts
 # Large video files (use compressed versions from Supabase instead)
 public/videos/workouts/*.mp4
 compressed-videos/
+
+.vercel
