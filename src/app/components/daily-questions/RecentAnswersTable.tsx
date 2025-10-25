@@ -34,13 +34,6 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
     }
   }, [recentAnswers]);
 
-  const handleHorizontalScroll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const scrollValue = parseInt(e.target.value);
-    if (tableRef.current) {
-      tableRef.current.scrollLeft = scrollValue;
-    }
-  };
-
   if (recentAnswers.length === 0) {
     return (
       <div className="rounded-lg border border-white/10 bg-white/5 p-4">
@@ -137,26 +130,49 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
         </div>
       </div>
       
-      {/* Horizontal Scroll Slider */}
+      {/* Custom Horizontal Scroll Ball */}
       {maxHorizontalScroll > 0 && (
         <div className="mt-4">
           <div className="flex items-center gap-3">
             <span className="text-xs text-white/50">←</span>
-            <input
-              type="range"
-              min="0"
-              max={maxHorizontalScroll}
-              value={horizontalScrollPosition}
-              onChange={handleHorizontalScroll}
-              className="flex-1 h-2 bg-transparent rounded-lg appearance-none cursor-pointer slider"
-              style={{
-                background: 'transparent'
-              }}
-            />
+            <div className="flex-1 relative">
+              <div 
+                className="absolute w-4 h-4 bg-cyan-500 rounded-full cursor-pointer border-2 border-white shadow-lg hover:bg-cyan-400 hover:scale-110 transition-all duration-200"
+                style={{
+                  left: `${(horizontalScrollPosition / maxHorizontalScroll) * 100}%`,
+                  transform: 'translateX(-50%)'
+                }}
+                onMouseDown={(e) => {
+                  const startX = e.clientX;
+                  const startScroll = horizontalScrollPosition;
+                  
+                  const handleMouseMove = (moveEvent: MouseEvent) => {
+                    const deltaX = moveEvent.clientX - startX;
+                    const containerWidth = e.currentTarget.parentElement?.offsetWidth || 0;
+                    const ballWidth = 16; // 4 * 4 (w-4 h-4)
+                    const maxBallPosition = containerWidth - ballWidth;
+                    const scrollRatio = deltaX / maxBallPosition;
+                    const newScroll = Math.max(0, Math.min(maxHorizontalScroll, startScroll + (scrollRatio * maxHorizontalScroll)));
+                    
+                    if (tableRef.current) {
+                      tableRef.current.scrollLeft = newScroll;
+                    }
+                  };
+                  
+                  const handleMouseUp = () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                  };
+                  
+                  document.addEventListener('mousemove', handleMouseMove);
+                  document.addEventListener('mouseup', handleMouseUp);
+                }}
+              />
+            </div>
             <span className="text-xs text-white/50">→</span>
           </div>
           <div className="text-xs text-white/40 mt-1 text-center">
-            Scroll horizontally to see more columns
+            Drag the blue ball to scroll horizontally
           </div>
         </div>
       )}
