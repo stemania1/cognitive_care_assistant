@@ -21,6 +21,12 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
         const element = tableRef.current;
         setHorizontalScrollPosition(element.scrollLeft);
         setMaxHorizontalScroll(element.scrollWidth - element.clientWidth);
+        console.log('Scroll info:', {
+          scrollLeft: element.scrollLeft,
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+          maxScroll: element.scrollWidth - element.clientWidth
+        });
       }
     };
 
@@ -82,7 +88,7 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
       </div>
       
       <div className="overflow-x-auto max-h-96 overflow-y-auto" id="answers-table" ref={tableRef}>
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[800px]">
           <thead>
             <tr className="border-b border-white/10">
               <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
@@ -158,6 +164,12 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
           </div>
         </div>
       )}
+      
+      {/* Debug Info */}
+      <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs">
+        <div className="text-blue-300">Debug: maxScroll={maxHorizontalScroll}, current={horizontalScrollPosition}</div>
+        <div className="text-blue-300">Slider should show: {maxHorizontalScroll > 0 ? 'YES' : 'NO'}</div>
+      </div>
     </div>
   );
 }
