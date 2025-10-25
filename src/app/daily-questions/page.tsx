@@ -28,7 +28,7 @@ export default function DailyQuestionsPage() {
   const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
   const [forceFreshStart, setForceFreshStart] = useState(false);
   
-  const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
+  const { saveDailyCheck, getAnswer, hasAnswer, clearChecks, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
   const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteDailyChecks } = useHistoricalData(userId);
 
@@ -226,6 +226,7 @@ export default function DailyQuestionsPage() {
     
     // Clear any existing saved answers for today to ensure fresh start
     await deleteDailyChecks(today);
+    clearChecks(); // Also clear local state
   }
 
   async function startNewQuestionnaire() {
@@ -234,6 +235,7 @@ export default function DailyQuestionsPage() {
     
     // Clear stored answers from database/localStorage
     await deleteDailyChecks(today);
+    clearChecks(); // Also clear local state
     
     // Refresh the data to ensure UI updates
     await loadRecentAnswers();
@@ -479,7 +481,7 @@ export default function DailyQuestionsPage() {
                   <QuestionCard
                     key={q.id}
                     question={q}
-                    value={answers[q.id] ?? (forceFreshStart ? "" : (questionnaireStarted ? getAnswer(q.id) : "")) ?? ""}
+                    value={forceFreshStart ? "" : (answers[q.id] ?? (questionnaireStarted ? getAnswer(q.id) : ""))}
                     onChange={(value) => setAnswer(q.id, value)}
                     photoUrl={photoUrls[q.id]}
                     onPhotoChange={(url) => setPhotoUrl(q.id, url)}

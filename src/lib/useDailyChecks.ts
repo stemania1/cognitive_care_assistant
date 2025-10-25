@@ -181,6 +181,10 @@ export function useDailyChecks(userId: string | null) {
     return Boolean(checks[questionId]?.answer);
   }, [checks]);
 
+  const clearChecks = useCallback(() => {
+    setChecks({});
+  }, []);
+
   // Load today's checks on mount
   useEffect(() => {
     if (userId) {
@@ -196,6 +200,7 @@ export function useDailyChecks(userId: string | null) {
     saveDailyCheck,
     getAnswer,
     hasAnswer,
+    clearChecks,
     isGuest,
   };
 }
