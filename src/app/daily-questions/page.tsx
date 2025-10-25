@@ -26,6 +26,7 @@ export default function DailyQuestionsPage() {
   const [questionnaireStarted, setQuestionnaireStarted] = useState(false);
   const [currentlyFocusedQuestion, setCurrentlyFocusedQuestion] = useState<string | null>(null);
   const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
+  const [forceFreshStart, setForceFreshStart] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
@@ -74,6 +75,10 @@ export default function DailyQuestionsPage() {
   function setAnswer(id: string, value: string) {
     if (!startedAt) setStartedAt(Date.now());
     setAnswers((prev) => ({ ...prev, [id]: value }));
+    // Turn off force fresh start when user starts typing
+    if (forceFreshStart && value.trim()) {
+      setForceFreshStart(false);
+    }
   }
 
   function setPhotoUrl(id: string, url: string) {
@@ -217,6 +222,7 @@ export default function DailyQuestionsPage() {
     setQuestionnaireStarted(true);
     setStartedAt(Date.now());
     setQuestionnaireSaved(false);
+    setForceFreshStart(true);
     
     // Clear any existing saved answers for today to ensure fresh start
     await deleteDailyChecks(today);
@@ -292,6 +298,7 @@ export default function DailyQuestionsPage() {
     setSavedQuestions(new Set());
     setCurrentlyFocusedQuestion(null);
     setShowHistory(false);
+    setForceFreshStart(false);
   };
 
   async function showProgress() {
@@ -472,7 +479,7 @@ export default function DailyQuestionsPage() {
                   <QuestionCard
                     key={q.id}
                     question={q}
-                    value={answers[q.id] ?? (questionnaireStarted ? getAnswer(q.id) : "") ?? ""}
+                    value={answers[q.id] ?? (forceFreshStart ? "" : (questionnaireStarted ? getAnswer(q.id) : "")) ?? ""}
                     onChange={(value) => setAnswer(q.id, value)}
                     photoUrl={photoUrls[q.id]}
                     onPhotoChange={(url) => setPhotoUrl(q.id, url)}
