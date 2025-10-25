@@ -23,6 +23,7 @@ export default function DailyQuestionsPage() {
   const [questionnaireSaved, setQuestionnaireSaved] = useState(false);
   const [questionnaireStarted, setQuestionnaireStarted] = useState(false);
   const [currentlyFocusedQuestion, setCurrentlyFocusedQuestion] = useState<string | null>(null);
+  const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
   const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteDailyChecks } = useHistoricalData(userId);
@@ -108,6 +109,9 @@ export default function DailyQuestionsPage() {
       
       // Refresh recent answers data to show the newly saved answer
       await loadRecentAnswers();
+      
+      // Mark question as saved for visual feedback
+      setSavedQuestions(prev => new Set(prev).add(questionId));
       
       // Show success feedback
       console.log(`Answer saved for question: ${question.text}`);
@@ -220,6 +224,7 @@ export default function DailyQuestionsPage() {
     setPhotoUrls({});
     setStartedAt(null);
     setCompletionTime(null);
+    setSavedQuestions(new Set());
     
     // Clear stored answers from database/localStorage
     await deleteDailyChecks(today);
@@ -422,6 +427,7 @@ export default function DailyQuestionsPage() {
                     readOnly={questionnaireSaved}
                     onFocus={handleQuestionFocus}
                     onBlur={handleQuestionBlur}
+                    isSaved={savedQuestions.has(q.id)}
                   />
                 ))}
                 </div>

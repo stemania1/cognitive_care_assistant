@@ -17,9 +17,10 @@ interface QuestionCardProps {
   readOnly?: boolean;
   onFocus?: (questionId: string) => void;
   onBlur?: (questionId: string) => void;
+  isSaved?: boolean;
 }
 
-export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChange, userId, questionNumber, onSave, readOnly = false, onFocus, onBlur }: QuestionCardProps) {
+export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChange, userId, questionNumber, onSave, readOnly = false, onFocus, onBlur, isSaved = false }: QuestionCardProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -30,6 +31,9 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
       setSaved(false);
     }
   }, [value]);
+
+  // Use isSaved prop or local saved state
+  const isQuestionSaved = isSaved || saved;
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -117,7 +121,7 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
 
   return (
     <div className={`rounded-lg border p-4 transition-all duration-300 ${
-      saved 
+      isQuestionSaved 
         ? 'border-green-500/50 bg-green-500/5' 
         : 'border-white/10 bg-white/5'
     }`}>
@@ -242,18 +246,18 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
           <button
             onClick={handleToggleSave}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors border ${
-              saved 
+              isQuestionSaved 
                 ? 'bg-green-500/30 text-green-300 border-green-400' 
                 : 'bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:text-green-300 border-green-500/30'
             }`}
             type="button"
-            title={saved ? "Click to save new answer" : "Save this answer"}
+            title={isQuestionSaved ? "Click to save new answer" : "Save this answer"}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             <span className="text-sm font-medium">
-              {saved ? 'Answer Saved' : 'Save Answer'}
+              {isQuestionSaved ? 'Answer Saved' : 'Save Answer'}
             </span>
           </button>
         </div>
