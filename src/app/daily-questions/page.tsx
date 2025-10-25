@@ -237,7 +237,7 @@ export default function DailyQuestionsPage() {
               <>
                 {/* Questions */}
                 <div className="space-y-4 mb-6">
-                  {todaysQuestions.map((q) => (
+                  {todaysQuestions.map((q, index) => (
                     <QuestionCard
                       key={q.id}
                       question={q}
@@ -246,6 +246,7 @@ export default function DailyQuestionsPage() {
                       photoUrl={photoUrls[q.id]}
                       onPhotoChange={(url) => setPhotoUrl(q.id, url)}
                       userId={userId || undefined}
+                      questionNumber={index + 1}
                     />
                   ))}
                 </div>

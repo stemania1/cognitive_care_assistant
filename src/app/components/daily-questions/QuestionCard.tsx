@@ -12,9 +12,10 @@ interface QuestionCardProps {
   photoUrl?: string;
   onPhotoChange?: (url: string) => void;
   userId?: string;
+  questionNumber?: number;
 }
 
-export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChange, userId }: QuestionCardProps) {
+export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChange, userId, questionNumber }: QuestionCardProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -83,6 +84,9 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+      {questionNumber && (
+        <div className="text-yellow-400 font-bold text-lg mb-2">Question {questionNumber}</div>
+      )}
       <h3 className="text-sm font-medium mb-3 text-white/90">{question.text}</h3>
       
       {question.choices ? (
