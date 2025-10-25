@@ -1,6 +1,7 @@
 import { RecentAnswer } from '@/types/daily-questions';
 import { formatDate, formatTime } from '@/utils/date';
 import { useTableScroll } from '@/hooks/useTableScroll';
+import { useRef, useState, useEffect } from 'react';
 
 interface RecentAnswersTableProps {
   recentAnswers: RecentAnswer[];
@@ -9,6 +10,35 @@ interface RecentAnswersTableProps {
 
 export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: RecentAnswersTableProps) {
   const { scrollPosition, scrollUp, scrollDown } = useTableScroll('answers-table');
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [horizontalScrollPosition, setHorizontalScrollPosition] = useState(0);
+  const [maxHorizontalScroll, setMaxHorizontalScroll] = useState(0);
+
+  // Update horizontal scroll position and max scroll
+  useEffect(() => {
+    const updateScrollInfo = () => {
+      if (tableRef.current) {
+        const element = tableRef.current;
+        setHorizontalScrollPosition(element.scrollLeft);
+        setMaxHorizontalScroll(element.scrollWidth - element.clientWidth);
+      }
+    };
+
+    const element = tableRef.current;
+    if (element) {
+      element.addEventListener('scroll', updateScrollInfo);
+      updateScrollInfo(); // Initial update
+      
+      return () => element.removeEventListener('scroll', updateScrollInfo);
+    }
+  }, [recentAnswers]);
+
+  const handleHorizontalScroll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const scrollValue = parseInt(e.target.value);
+    if (tableRef.current) {
+      tableRef.current.scrollLeft = scrollValue;
+    }
+  };
 
   if (recentAnswers.length === 0) {
     return (
@@ -51,7 +81,7 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
         </div>
       </div>
       
-      <div className="overflow-x-auto max-h-96 overflow-y-auto" id="answers-table">
+      <div className="overflow-x-auto max-h-96 overflow-y-auto" id="answers-table" ref={tableRef}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/10">
@@ -104,6 +134,30 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
           </tbody>
         </table>
       </div>
+      
+      {/* Horizontal Scroll Slider */}
+      {maxHorizontalScroll > 0 && (
+        <div className="mt-4">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-white/50">←</span>
+            <input
+              type="range"
+              min="0"
+              max={maxHorizontalScroll}
+              value={horizontalScrollPosition}
+              onChange={handleHorizontalScroll}
+              className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
+              style={{
+                background: `linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(horizontalScrollPosition / maxHorizontalScroll) * 100}%, #ffffff20 ${(horizontalScrollPosition / maxHorizontalScroll) * 100}%, #ffffff20 100%)`
+              }}
+            />
+            <span className="text-xs text-white/50">→</span>
+          </div>
+          <div className="text-xs text-white/40 mt-1 text-center">
+            Scroll horizontally to see more columns
+          </div>
+        </div>
+      )}
     </div>
   );
 }
