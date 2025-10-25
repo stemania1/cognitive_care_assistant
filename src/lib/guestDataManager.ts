@@ -123,6 +123,18 @@ export class GuestDataManager {
     this.saveGuestData();
   }
 
+  public deleteDailyChecksByDate(date: string): void {
+    if (!this.guestData) return;
+    
+    // Remove all daily checks for the specified date
+    const updatedChecks = Object.fromEntries(
+      Object.entries(this.guestData.dailyChecks).filter(([_, check]: [string, any]) => check.date !== date)
+    );
+    
+    this.guestData.dailyChecks = updatedChecks;
+    this.saveGuestData();
+  }
+
   public clearAllData(): void {
     this.clearGuestData();
   }

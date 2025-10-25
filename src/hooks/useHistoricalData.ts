@@ -140,15 +140,9 @@ export function useHistoricalData(userId: string | null) {
       if (isGuest) {
         // For guest users, remove from localStorage
         const guestManager = getGuestDataManager();
-        const checks = guestManager.getDailyChecks();
+        guestManager.deleteDailyChecksByDate(date);
         
-        // Remove checks for the specified date
-        const updatedChecks = Object.fromEntries(
-          Object.entries(checks).filter(([_, check]: [string, any]) => check.date !== date)
-        );
-        
-        // Update localStorage (we need to modify the guest manager to support this)
-        // For now, we'll just reload the data
+        // Reload the data to reflect changes
         await loadRecentAnswers();
       } else {
         // For regular users, delete via API
