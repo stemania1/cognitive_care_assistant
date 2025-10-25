@@ -200,6 +200,9 @@ export default function DailyQuestionsPage() {
       
       alert(`Questionnaire Saved!\n\n📊 Questions Answered: ${answeredQuestions} of ${todaysQuestions.length}\n💾 New Answers Saved: ${savedCount}\n⏱️ ${completionTimeText}\n\nRedirecting to home page...`);
       
+      // Reset questionnaire state before redirecting
+      resetQuestionnaireState();
+      
       // Redirect to home page after a short delay
       setTimeout(() => {
         window.location.href = '/dashboard';
@@ -217,13 +220,8 @@ export default function DailyQuestionsPage() {
   }
 
   async function startNewQuestionnaire() {
-    setQuestionnaireSaved(false);
-    setQuestionnaireStarted(false);
-    setAnswers({});
-    setPhotoUrls({});
-    setStartedAt(null);
-    setCompletionTime(null);
-    setSavedQuestions(new Set());
+    // Reset questionnaire state
+    resetQuestionnaireState();
     
     // Clear stored answers from database/localStorage
     await deleteDailyChecks(today);
@@ -273,10 +271,25 @@ export default function DailyQuestionsPage() {
       }
     }
     
+    // Reset questionnaire state before leaving
+    resetQuestionnaireState();
+    
     // Navigate to dashboard
     window.location.href = '/dashboard';
   };
 
+  const resetQuestionnaireState = () => {
+    // Reset all questionnaire state to initial values
+    setQuestionnaireStarted(false);
+    setQuestionnaireSaved(false);
+    setAnswers({});
+    setPhotoUrls({});
+    setStartedAt(null);
+    setCompletionTime(null);
+    setSavedQuestions(new Set());
+    setCurrentlyFocusedQuestion(null);
+    setShowHistory(false);
+  };
 
   async function showProgress() {
     setShowHistory(!showHistory);
