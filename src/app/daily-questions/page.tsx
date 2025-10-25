@@ -566,9 +566,25 @@ export default function DailyQuestionsPage() {
                           return false; // No questionnaire started yet
                         }
                         
-                        // For now, show all answers from today when questionnaire is started
-                        // We'll refine this later once we understand the timing issue
-                        console.log('Answer included in current questionnaire (showing all today answers)');
+                        // Use a more lenient timestamp comparison
+                        // Since we clear answers when starting questionnaire, any answer that exists
+                        // should be from the current session, but let's add a small buffer
+                        if (startedAt && answer.created_at) {
+                          const answerTime = new Date(answer.created_at).getTime();
+                          console.log('answer.created_at:', answer.created_at);
+                          console.log('answerTime:', answerTime, 'startedAt:', startedAt);
+                          
+                          // Add a 5-minute buffer before startedAt to account for any timing issues
+                          const bufferTime = startedAt - (5 * 60 * 1000); // 5 minutes before
+                          console.log('bufferTime:', bufferTime, 'answerTime >= bufferTime:', answerTime >= bufferTime);
+                          
+                          if (answerTime < bufferTime) {
+                            console.log('Filtered out: answer saved too long before questionnaire started');
+                            return false;
+                          }
+                        }
+                        
+                        console.log('Answer included in current questionnaire');
                         return true;
                       });
                       
