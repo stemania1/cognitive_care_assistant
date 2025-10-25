@@ -192,7 +192,12 @@ export default function DailyQuestionsPage() {
         `Completed in ${Math.round((Date.now() - startedAt) / 1000)} seconds` : 
         'Completion time not available';
       
-      alert(`Questionnaire Saved!\n\n📊 Questions Answered: ${answeredQuestions} of ${todaysQuestions.length}\n💾 New Answers Saved: ${savedCount}\n⏱️ ${completionTimeText}\n\nAnswers have been saved and cleared. Start a new questionnaire to answer more questions.`);
+      alert(`Questionnaire Saved!\n\n📊 Questions Answered: ${answeredQuestions} of ${todaysQuestions.length}\n💾 New Answers Saved: ${savedCount}\n⏱️ ${completionTimeText}\n\nRedirecting to home page...`);
+      
+      // Redirect to home page after a short delay
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 2000);
     } catch (error) {
       console.error('Error saving questionnaire:', error);
       alert('Failed to save questionnaire. Please try again.');
