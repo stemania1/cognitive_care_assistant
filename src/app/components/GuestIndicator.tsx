@@ -25,22 +25,7 @@ export function GuestIndicator() {
     checkGuestStatus();
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="fixed top-4 left-4 z-50">
-        <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 text-sm text-white/70">
-          Loading guest status...
-        </div>
-      </div>
-    );
-  }
-
-  // Show debug info temporarily
-  if (debugInfo) {
-    console.log('GuestIndicator debug info:', debugInfo);
-  }
-
-  if (!isGuest || isDismissed) {
+  if (isLoading || !isGuest || isDismissed) {
     return null;
   }
 
