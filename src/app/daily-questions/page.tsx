@@ -19,12 +19,10 @@ export default function DailyQuestionsPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [completionTime, setCompletionTime] = useState<number | null>(null);
-  const [showSaveWarning, setShowSaveWarning] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
@@ -73,8 +71,6 @@ export default function DailyQuestionsPage() {
   function setAnswer(id: string, value: string) {
     if (!startedAt) setStartedAt(Date.now());
     setAnswers((prev) => ({ ...prev, [id]: value }));
-    // Hide warning when user starts answering
-    if (showSaveWarning) setShowSaveWarning(false);
   }
 
   function setPhotoUrl(id: string, url: string) {
@@ -121,80 +117,19 @@ export default function DailyQuestionsPage() {
     }
   }
 
-  async function saveAll() {
-    if (!userId) {
-      alert('Please sign in to save your answers.');
-      return;
-    }
 
-    // Check if any questions are answered
-    const hasAnyAnswers = todaysQuestions.some(q => {
-      const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
-      return value.length > 0;
-    });
-
-    if (!hasAnyAnswers) {
-      setShowSaveWarning(true);
-      // Hide the warning after 5 seconds
-      setTimeout(() => setShowSaveWarning(false), 5000);
-      return;
-    }
-
-    // Hide any existing warning
-    setShowSaveWarning(false);
-
-    try {
-      setSaving(true);
-      for (const q of todaysQuestions) {
-        const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
-        if (!value) continue;
-        const photoUrl = photoUrls[q.id];
-        await saveDailyCheck({
-          questionId: q.id,
-          questionText: q.text,
-          answer: value,
-          answerType: q.choices ? 'choice' : 'text',
-          date: today,
-          photoUrl: photoUrl || undefined,
-        });
+  async function showProgress() {
+    setShowHistory(!showHistory);
+    
+    if (!showHistory) {
+      try {
+        await loadSessions();
+        await loadRecentAnswers();
+      } catch (error) {
+        console.error('Error loading progress data:', error);
       }
-      if (startedAt) {
-        const durationMs = Date.now() - startedAt;
-        const durationSeconds = Math.round(durationMs / 1000);
-        setCompletionTime(durationSeconds);
-        try {
-          await fetch('/api/daily-check-sessions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, date: today, setStartIndex: windowStart, durationMs })
-          });
-        } catch (error) {
-          console.error('Error saving session:', error);
-        }
-      }
-      setSaved(true);
-      setShowHistory(true);
-      await loadSessions();
-      await loadRecentAnswers();
-    } catch (error) {
-      console.error('Error saving:', error);
-    } finally {
-      setSaving(false);
     }
   }
-
-        async function showProgress() {
-          setShowHistory(!showHistory);
-          
-          if (!showHistory) {
-            try {
-              await loadSessions();
-              await loadRecentAnswers();
-            } catch (error) {
-              console.error('Error loading progress data:', error);
-            }
-          }
-        }
 
   return (
     <AuthenticationGuard userId={userId}>
@@ -269,43 +204,7 @@ export default function DailyQuestionsPage() {
               </div>
             )}
 
-            {/* Save Button - Moved to top */}
-            <div className="mb-6 text-center">
-              <button
-                onClick={saveAll}
-                disabled={saving}
-                className="rounded-full bg-cyan-500 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                type="button"
-              >
-                {saving ? 'Saving...' : 'Save Answers'}
-              </button>
-            </div>
 
-            {/* Save Warning Banner */}
-            {showSaveWarning && (
-              <div className="mb-6 rounded-lg border-2 border-orange-500 bg-orange-500/10 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <span className="text-orange-400 font-medium">
-                      ⚠️ All questions on the page need to be answered before saving
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setShowSaveWarning(false)}
-                    className="text-orange-400 hover:text-orange-300 transition-colors"
-                    type="button"
-                    aria-label="Dismiss warning"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Navigation - Moved below Save Button */}
             <div className="mb-6">
