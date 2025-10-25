@@ -65,19 +65,28 @@ export function useDailyChecks(userId: string | null) {
         const params = new URLSearchParams({ userId });
         if (date) params.append('date', date);
 
+        console.log('Fetching daily checks from API:', `/api/daily-checks?${params}`);
         const response = await fetch(`/api/daily-checks?${params}`);
+        console.log('API response status:', response.status);
+        
         const result = await response.json();
+        console.log('API response data:', result);
 
         if (!response.ok) {
-          console.error('API Error:', result);
-          throw new Error(result.error || result.details || 'Failed to fetch daily checks');
+          const errorMessage = result.error || result.details || result.message || 'Failed to fetch daily checks';
+          console.error('API Error:', errorMessage, 'Response:', result);
+          throw new Error(errorMessage);
         }
 
         // Convert array to object keyed by question_id for easy lookup
         const checksMap: Record<string, DailyCheck> = {};
-        result.data.forEach((check: DailyCheck) => {
-          checksMap[check.question_id] = check;
-        });
+        if (result.data && Array.isArray(result.data)) {
+          result.data.forEach((check: DailyCheck) => {
+            checksMap[check.question_id] = check;
+          });
+        } else {
+          console.warn('Unexpected API response structure:', result);
+        }
 
         setChecks(checksMap);
       }
@@ -144,8 +153,9 @@ export function useDailyChecks(userId: string | null) {
         const result = await response.json();
 
         if (!response.ok) {
-          console.error('API Error:', result);
-          throw new Error(result.details || result.error || 'Failed to save daily check');
+          const errorMessage = result.details || result.error || result.message || 'Failed to save daily check';
+          console.error('API Error:', errorMessage, 'Response:', result);
+          throw new Error(errorMessage);
         }
 
         // Update local state
