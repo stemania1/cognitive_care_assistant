@@ -252,6 +252,31 @@ export default function DailyQuestionsPage() {
     }
   };
 
+  const handleBackToHome = () => {
+    // Check if questionnaire has been started and has unsaved answers
+    if (questionnaireStarted && !questionnaireSaved) {
+      const hasAnswers = todaysQuestions.some(q => {
+        const answer = answers[q.id] ?? getAnswer(q.id) ?? "";
+        return answer.trim().length > 0;
+      });
+
+      if (hasAnswers) {
+        const confirmed = window.confirm(
+          "⚠️ Warning: You have unsaved answers!\n\n" +
+          "Going back to home will discard your current answers.\n\n" +
+          "Are you sure you want to go back?"
+        );
+        
+        if (!confirmed) {
+          return; // User cancelled, stay on page
+        }
+      }
+    }
+    
+    // Navigate to dashboard
+    window.location.href = '/dashboard';
+  };
+
 
   async function showProgress() {
     setShowHistory(!showHistory);
@@ -293,9 +318,13 @@ export default function DailyQuestionsPage() {
                 >
                   Show Answers
                 </button>
-                <Link href="/dashboard" className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20">
+                <button
+                  onClick={handleBackToHome}
+                  className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
+                  type="button"
+                >
                   Back to Home
-                </Link>
+                </button>
               </div>
             </div>
 
