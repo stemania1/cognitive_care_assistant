@@ -9,22 +9,29 @@ export function useHistoricalData(userId: string | null) {
   const [loading, setLoading] = useState(false);
 
   const loadSessions = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('loadSessions: No userId provided');
+      return;
+    }
     
     try {
       // Check if user is guest
       const isGuest = await isGuestUser();
+      console.log('loadSessions: isGuest =', isGuest);
       
       if (isGuest) {
         // For guest users, load from localStorage
         const guestManager = getGuestDataManager();
         const guestSessions = guestManager.getSessions();
+        console.log('loadSessions: Guest sessions loaded:', guestSessions);
         setSessions(guestSessions);
       } else {
         // For regular users, load from API
         const params = new URLSearchParams({ userId, limit: '10' });
+        console.log('loadSessions: Fetching from API:', `/api/daily-check-sessions?${params}`);
         const res = await fetch(`/api/daily-check-sessions?${params}`);
         const json = await res.json();
+        console.log('loadSessions: API response:', json);
         if (res.ok) {
           setSessions(json.data || []);
         }
@@ -35,16 +42,21 @@ export function useHistoricalData(userId: string | null) {
   }, [userId]);
 
   const loadRecentAnswers = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('loadRecentAnswers: No userId provided');
+      return;
+    }
     
     try {
       // Check if user is guest
       const isGuest = await isGuestUser();
+      console.log('loadRecentAnswers: isGuest =', isGuest);
       
       if (isGuest) {
         // For guest users, load from localStorage
         const guestManager = getGuestDataManager();
         const guestChecks = guestManager.getDailyChecks();
+        console.log('loadRecentAnswers: Guest checks loaded:', guestChecks);
         
         // Convert guest data to the expected format
         const answers = Object.values(guestChecks).map((check: any) => ({
@@ -60,13 +72,17 @@ export function useHistoricalData(userId: string | null) {
           photo_url: check.photo_url
         }));
         
+        console.log('loadRecentAnswers: Converted answers:', answers);
         const groupedAnswers = groupAnswersByQuestionSets(answers);
+        console.log('loadRecentAnswers: Grouped answers:', groupedAnswers);
         setRecentAnswers(groupedAnswers);
       } else {
         // For regular users, load from API
         const params = new URLSearchParams({ userId });
+        console.log('loadRecentAnswers: Fetching from API:', `/api/daily-checks?${params}`);
         const res = await fetch(`/api/daily-checks?${params}`);
         const json = await res.json();
+        console.log('loadRecentAnswers: API response:', json);
         if (res.ok) {
           const answers = json.data || [];
           const groupedAnswers = groupAnswersByQuestionSets(answers);

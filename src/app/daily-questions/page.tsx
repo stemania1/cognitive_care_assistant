@@ -101,10 +101,19 @@ export default function DailyQuestionsPage() {
     }
   }
 
-  function showProgress() {
+  async function showProgress() {
+    console.log('Show Progress clicked, userId:', userId);
     setShowHistory(true);
-    loadSessions();
-    loadRecentAnswers();
+    
+    try {
+      console.log('Loading sessions...');
+      await loadSessions();
+      console.log('Loading recent answers...');
+      await loadRecentAnswers();
+      console.log('Progress data loaded successfully');
+    } catch (error) {
+      console.error('Error loading progress data:', error);
+    }
   }
 
   return (
