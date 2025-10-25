@@ -71,9 +71,18 @@ export default function SignIn() {
         setError("Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the dev server.");
         return;
       }
+
+      if (!captchaToken) {
+        setError("Please complete the CAPTCHA verification to continue as guest.");
+        return;
+      }
       
       // Try anonymous sign-in first
-      const { error: guestError } = await supabase.auth.signInAnonymously();
+      const { error: guestError } = await supabase.auth.signInAnonymously({
+        options: {
+          captchaToken: captchaToken
+        }
+      });
       if (guestError) {
         // If anonymous auth fails, create a temporary guest session
         console.log("Anonymous auth disabled, using fallback guest mode");
@@ -88,14 +97,31 @@ export default function SignIn() {
           createdAt: new Date().toISOString()
         }));
         
+        // Reset CAPTCHA after successful guest login
+        if (captchaRef.current) {
+          captchaRef.current.resetCaptcha();
+        }
+        setCaptchaToken(null);
+        
         // Redirect to dashboard
         router.push("/dashboard");
         return;
       }
       
+      // Reset CAPTCHA after successful anonymous login
+      if (captchaRef.current) {
+        captchaRef.current.resetCaptcha();
+      }
+      setCaptchaToken(null);
+      
       router.push("/dashboard");
     } catch (err) {
       setError("Unable to sign in as guest. Please try again.");
+      // Reset CAPTCHA on error
+      if (captchaRef.current) {
+        captchaRef.current.resetCaptcha();
+      }
+      setCaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -250,7 +276,7 @@ export default function SignIn() {
               
               <button
                 onClick={handleGuestSignIn}
-                disabled={isLoading}
+                disabled={isLoading || !captchaToken}
                 className="w-full mt-4 py-3 px-4 rounded-lg border border-white/20 bg-white/5 backdrop-blur text-white font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-black transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
@@ -264,7 +290,7 @@ export default function SignIn() {
               </button>
               
               <p className="mt-2 text-xs text-gray-500 text-center">
-                Guest accounts have limited features and data is temporary
+                Guest accounts require CAPTCHA verification and have limited features
               </p>
             </div>
 
