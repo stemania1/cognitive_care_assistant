@@ -73,7 +73,7 @@ export default function SignIn() {
       }
 
       if (!captchaToken) {
-        setError("Please complete the CAPTCHA verification to continue as guest.");
+        setError("Please complete the security verification above before continuing as guest.");
         return;
       }
       
@@ -283,6 +283,11 @@ export default function SignIn() {
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Signing in...</span>
+                  </div>
+                ) : !captchaToken ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <span>Complete verification above</span>
+                    <span className="text-xs opacity-75">→</span>
                   </div>
                 ) : (
                   "Continue as Guest"
