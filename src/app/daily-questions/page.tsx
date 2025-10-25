@@ -24,6 +24,7 @@ export default function DailyQuestionsPage() {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [completionTime, setCompletionTime] = useState<number | null>(null);
+  const [showSaveWarning, setShowSaveWarning] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
@@ -72,6 +73,8 @@ export default function DailyQuestionsPage() {
   function setAnswer(id: string, value: string) {
     if (!startedAt) setStartedAt(Date.now());
     setAnswers((prev) => ({ ...prev, [id]: value }));
+    // Hide warning when user starts answering
+    if (showSaveWarning) setShowSaveWarning(false);
   }
 
   function setPhotoUrl(id: string, url: string) {
@@ -83,6 +86,23 @@ export default function DailyQuestionsPage() {
       alert('Please sign in to save your answers.');
       return;
     }
+
+    // Check if any questions are answered
+    const hasAnyAnswers = todaysQuestions.some(q => {
+      const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
+      return value.length > 0;
+    });
+
+    if (!hasAnyAnswers) {
+      setShowSaveWarning(true);
+      // Hide the warning after 5 seconds
+      setTimeout(() => setShowSaveWarning(false), 5000);
+      return;
+    }
+
+    // Hide any existing warning
+    setShowSaveWarning(false);
+
     try {
       setSaving(true);
       for (const q of todaysQuestions) {
@@ -172,6 +192,20 @@ export default function DailyQuestionsPage() {
                 {saving ? 'Saving...' : 'Save Answers'}
               </button>
             </div>
+
+            {/* Save Warning Banner */}
+            {showSaveWarning && (
+              <div className="mb-6 rounded-lg border-2 border-orange-500 bg-orange-500/10 p-4 text-center">
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="text-orange-400 font-medium">
+                    ⚠️ All questions on the page need to be answered before saving
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Navigation - Moved below Save Button */}
             <div className="mb-6">
