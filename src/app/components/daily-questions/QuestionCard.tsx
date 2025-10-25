@@ -2,7 +2,7 @@
 
 import { Question } from '@/types/daily-questions';
 import { supabase } from '@/lib/supabaseClient';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
 interface QuestionCardProps {
@@ -20,6 +20,13 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // Reset saved state when value changes
+  useEffect(() => {
+    if (saved) {
+      setSaved(false);
+    }
+  }, [value]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,11 +96,19 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
       try {
         await onSave(question.id);
         setSaved(true);
-        // Reset saved state after 3 seconds
-        setTimeout(() => setSaved(false), 3000);
       } catch (error) {
         console.error('Error saving answer:', error);
       }
+    }
+  };
+
+  const handleToggleSave = () => {
+    if (saved) {
+      // If already saved, toggle back to allow re-saving
+      setSaved(false);
+    } else {
+      // If not saved, save the answer
+      handleSave();
     }
   };
 
@@ -214,21 +229,20 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
       {onSave && value.trim() && (
         <div className="mt-4 flex justify-end">
           <button
-            onClick={handleSave}
+            onClick={handleToggleSave}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors border ${
               saved 
                 ? 'bg-green-500/30 text-green-300 border-green-400' 
                 : 'bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:text-green-300 border-green-500/30'
             }`}
             type="button"
-            title={saved ? "Answer saved!" : "Save this answer"}
-            disabled={saved}
+            title={saved ? "Click to save new answer" : "Save this answer"}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             <span className="text-sm font-medium">
-              {saved ? 'Saved!' : 'Save Answer'}
+              {saved ? 'Answer Saved' : 'Save Answer'}
             </span>
           </button>
         </div>
