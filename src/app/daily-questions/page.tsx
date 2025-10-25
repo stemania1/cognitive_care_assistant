@@ -174,7 +174,11 @@ export default function DailyQuestionsPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={showProgress}
-                  className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    showHistory 
+                      ? 'bg-cyan-500 text-white hover:bg-cyan-600' 
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
                   type="button"
                 >
                   Show Answers
