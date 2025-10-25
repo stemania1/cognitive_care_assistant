@@ -16,9 +16,6 @@ export function QuestionNavigation({ windowStart, totalQuestions, onPrevious, on
         ← Previous 3
       </button>
       
-      <span className="text-xs opacity-70">
-        Questions {((windowStart % totalQuestions) + 1)}–{(((windowStart + 2) % totalQuestions) + 1)} of {totalQuestions}
-      </span>
       
       <button
         onClick={onNext}
