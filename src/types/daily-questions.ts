@@ -22,6 +22,7 @@ export interface RecentAnswer {
   created_at?: string;
   setIndex: number;
   answers: Array<{
+    question_id?: string;
     question: string;
     answer: string;
     photo_url?: string;

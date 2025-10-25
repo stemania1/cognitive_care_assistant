@@ -104,9 +104,7 @@ export default function DailyQuestionsPage() {
       });
       
       // Refresh recent answers data to show the newly saved answer
-      if (showHistory) {
-        await loadRecentAnswers();
-      }
+      await loadRecentAnswers();
       
       // Show success feedback
       console.log(`Answer saved for question: ${question.text}`);
