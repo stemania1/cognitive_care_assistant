@@ -13,28 +13,6 @@ import { QuestionCard } from "@/app/components/daily-questions/QuestionCard";
 import { QuestionNavigation } from "@/app/components/daily-questions/QuestionNavigation";
 import { RecentAnswersTable } from "@/app/components/daily-questions/RecentAnswersTable";
 
-// Timer Display Component
-function TimerDisplay({ startTime }: { startTime: number }) {
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [startTime]);
-
-  const minutes = Math.floor(elapsed / 60);
-  const seconds = elapsed % 60;
-
-  return (
-    <span className="text-cyan-200 font-mono">
-      {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
-    </span>
-  );
-}
-
 export default function DailyQuestionsPage() {
   const today = useMemo(() => getTodayKey(), []);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -313,22 +291,6 @@ export default function DailyQuestionsPage() {
                     </svg>
                     <span className="text-lg">Start Daily Questionnaire</span>
                   </button>
-                </div>
-              </div>
-            )}
-
-            {/* Timer Display */}
-            {questionnaireStarted && startedAt && !questionnaireSaved && (
-              <div className="mb-6 text-center">
-                <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-4">
-                  <div className="flex items-center justify-center gap-3">
-                    <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-lg font-semibold text-cyan-300">
-                      Time Elapsed: <TimerDisplay startTime={startedAt} />
-                    </span>
-                  </div>
                 </div>
               </div>
             )}
