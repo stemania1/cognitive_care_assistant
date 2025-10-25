@@ -92,9 +92,9 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
           <thead>
             <tr className="border-b border-white/10">
               <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
-              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Answer 1</th>
-              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Answer 2</th>
-              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Answer 3</th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 1</th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 2</th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Question 3</th>
               <th className="text-center py-2 px-3 font-medium text-cyan-300 w-20">Actions</th>
             </tr>
           </thead>
