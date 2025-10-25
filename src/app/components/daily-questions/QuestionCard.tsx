@@ -13,9 +13,10 @@ interface QuestionCardProps {
   onPhotoChange?: (url: string) => void;
   userId?: string;
   questionNumber?: number;
+  onSave?: (questionId: string) => void;
 }
 
-export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChange, userId, questionNumber }: QuestionCardProps) {
+export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChange, userId, questionNumber, onSave }: QuestionCardProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -188,6 +189,23 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
               )}
             </div>
           )}
+        </div>
+      )}
+      
+      {/* Save Checkmark Button */}
+      {onSave && value.trim() && (
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={() => onSave(question.id)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:text-green-300 transition-colors border border-green-500/30"
+            type="button"
+            title="Save this answer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-sm font-medium">Save Answer</span>
+          </button>
         </div>
       )}
     </div>

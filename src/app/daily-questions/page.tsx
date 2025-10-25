@@ -81,6 +81,40 @@ export default function DailyQuestionsPage() {
     setPhotoUrls((prev) => ({ ...prev, [id]: url }));
   }
 
+  async function saveIndividualAnswer(questionId: string) {
+    if (!userId) {
+      alert('Please sign in to save your answers.');
+      return;
+    }
+
+    const question = todaysQuestions.find(q => q.id === questionId);
+    if (!question) return;
+
+    const value = (answers[questionId] ?? getAnswer(questionId) ?? "").toString().trim();
+    if (!value) {
+      alert('Please enter an answer before saving.');
+      return;
+    }
+
+    try {
+      const photoUrl = photoUrls[questionId];
+      await saveDailyCheck({
+        questionId: question.id,
+        questionText: question.text,
+        answer: value,
+        answerType: question.choices ? 'choice' : 'text',
+        date: today,
+        photoUrl: photoUrl || undefined,
+      });
+      
+      // Show success feedback
+      console.log(`Answer saved for question: ${question.text}`);
+    } catch (error) {
+      console.error('Error saving individual answer:', error);
+      alert('Failed to save answer. Please try again.');
+    }
+  }
+
   async function saveAll() {
     if (!userId) {
       alert('Please sign in to save your answers.');
@@ -296,6 +330,7 @@ export default function DailyQuestionsPage() {
                     onPhotoChange={(url) => setPhotoUrl(q.id, url)}
                     userId={userId || undefined}
                     questionNumber={windowStart + index + 1}
+                    onSave={saveIndividualAnswer}
                   />
                 ))}
                 </div>
