@@ -19,19 +19,31 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Test the actual daily-checks API
+    // Test with both the provided userId and a proper UUID format
+    const testUuid = '123e4567-e89b-12d3-a456-426614174000';
     const apiUrl = `/api/daily-checks?userId=${userId}${date ? `&date=${date}` : ''}`;
+    const uuidApiUrl = `/api/daily-checks?userId=${testUuid}${date ? `&date=${date}` : ''}`;
+    
     console.log('Testing API URL:', apiUrl);
+    console.log('Testing UUID API URL:', uuidApiUrl);
     
     try {
-      const response = await fetch(`http://localhost:${process.env.PORT || 3001}${apiUrl}`);
+      // Test both URLs
+      const [response, uuidResponse] = await Promise.all([
+        fetch(`http://localhost:${process.env.PORT || 3001}${apiUrl}`),
+        fetch(`http://localhost:${process.env.PORT || 3001}${uuidApiUrl}`)
+      ]);
+      
       console.log('API Response Status:', response.status);
-      console.log('API Response Headers:', Object.fromEntries(response.headers.entries()));
+      console.log('UUID API Response Status:', uuidResponse.status);
       
       const responseText = await response.text();
-      console.log('API Response Body (raw):', responseText);
+      const uuidResponseText = await uuidResponse.text();
       
-      let responseData;
+      console.log('API Response Body (raw):', responseText);
+      console.log('UUID API Response Body (raw):', uuidResponseText);
+      
+      let responseData, uuidResponseData;
       try {
         responseData = JSON.parse(responseText);
         console.log('API Response Body (parsed):', responseData);
@@ -40,12 +52,28 @@ export async function GET(request: NextRequest) {
         responseData = { raw: responseText };
       }
       
+      try {
+        uuidResponseData = JSON.parse(uuidResponseText);
+        console.log('UUID API Response Body (parsed):', uuidResponseData);
+      } catch (parseError) {
+        console.log('Failed to parse UUID response as JSON:', parseError);
+        uuidResponseData = { raw: uuidResponseText };
+      }
+      
       return NextResponse.json({
         test: 'Direct API test',
-        apiUrl,
-        responseStatus: response.status,
-        responseData,
-        success: response.ok
+        originalTest: {
+          apiUrl,
+          responseStatus: response.status,
+          responseData,
+          success: response.ok
+        },
+        uuidTest: {
+          apiUrl: uuidApiUrl,
+          responseStatus: uuidResponse.status,
+          responseData: uuidResponseData,
+          success: uuidResponse.ok
+        }
       });
       
     } catch (fetchError) {
