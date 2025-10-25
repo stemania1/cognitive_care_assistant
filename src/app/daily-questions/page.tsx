@@ -123,26 +123,32 @@ export default function DailyQuestionsPage() {
     }
   }
 
-  async function showProgress() {
-    console.log('=== SHOW PROGRESS CLICKED ===');
-    console.log('userId:', userId);
-    console.log('userId type:', typeof userId);
-    console.log('userId length:', userId?.length);
-    console.log('showHistory before:', showHistory);
-    
-    setShowHistory(true);
-    console.log('showHistory set to true');
-    
-    try {
-      console.log('Starting to load sessions...');
-      await loadSessions();
-      console.log('Sessions loaded, starting to load recent answers...');
-      await loadRecentAnswers();
-      console.log('=== PROGRESS DATA LOADED SUCCESSFULLY ===');
-    } catch (error) {
-      console.error('=== ERROR LOADING PROGRESS DATA ===', error);
-    }
-  }
+        async function showProgress() {
+          console.log('=== SHOW PROGRESS CLICKED ===');
+          console.log('userId:', userId);
+          console.log('userId type:', typeof userId);
+          console.log('userId length:', userId?.length);
+          console.log('showHistory before:', showHistory);
+          
+          // Add alert here instead of in render
+          alert('SHOW PROGRESS BUTTON CLICKED - This should appear once!');
+          
+          setShowHistory(true);
+          console.log('showHistory set to true');
+          
+          try {
+            console.log('Starting to load sessions...');
+            await loadSessions();
+            console.log('Sessions loaded, starting to load recent answers...');
+            await loadRecentAnswers();
+            console.log('=== PROGRESS DATA LOADED SUCCESSFULLY ===');
+            
+            // Add alert after data is loaded
+            alert('DATA LOADED - Empty state should be visible now!');
+          } catch (error) {
+            console.error('=== ERROR LOADING PROGRESS DATA ===', error);
+          }
+        }
 
   return (
     <AuthenticationGuard userId={userId}>
@@ -231,12 +237,6 @@ export default function DailyQuestionsPage() {
             {/* Historical Data - Show regardless of questions state */}
             {showHistory && (
               <div className="mt-8 space-y-6">
-                {/* ALERT TO CONFIRM RENDERING */}
-                {(() => {
-                  alert('RENDERING HISTORICAL DATA SECTION - This should appear!');
-                  return null;
-                })()}
-                
                 {(() => {
                   console.log('=== RENDERING HISTORICAL DATA ===');
                   console.log('showHistory:', showHistory);
@@ -247,7 +247,6 @@ export default function DailyQuestionsPage() {
                   
                   if (sessions.length === 0 && recentAnswers.length === 0) {
                     console.log('Rendering empty state message');
-                    alert('RENDERING EMPTY STATE MESSAGE - This should appear!');
                     return (
                       <>
                         {/* Simple text fallback */}
