@@ -183,18 +183,18 @@ export default function DailyQuestionsPage() {
                     </div>
                   </div>
                 )}
-
-                {/* Historical Data */}
-                {showHistory && (
-                  <div className="mt-8 space-y-6">
-                    <CompletionChart sessions={sessions} />
-                    <RecentAnswersTable 
-                      recentAnswers={recentAnswers} 
-                      onDeleteDailyChecks={deleteDailyChecks}
-                    />
-                  </div>
-                )}
               </>
+            )}
+
+            {/* Historical Data - Show regardless of questions state */}
+            {showHistory && (
+              <div className="mt-8 space-y-6">
+                <CompletionChart sessions={sessions} />
+                <RecentAnswersTable 
+                  recentAnswers={recentAnswers} 
+                  onDeleteDailyChecks={deleteDailyChecks}
+                />
+              </div>
             )}
           </div>
         </main>

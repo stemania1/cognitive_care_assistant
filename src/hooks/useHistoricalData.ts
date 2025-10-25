@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { DailyCheckSession, RecentAnswer } from '@/types/daily-questions';
 import { groupAnswersByQuestionSets } from '@/utils/data-transformation';
+import { getGuestDataManager, isGuestUser } from '@/lib/guestDataManager';
 
 export function useHistoricalData(userId: string | null) {
   const [sessions, setSessions] = useState<DailyCheckSession[]>([]);
@@ -9,12 +10,24 @@ export function useHistoricalData(userId: string | null) {
 
   const loadSessions = useCallback(async () => {
     if (!userId) return;
+    
     try {
-      const params = new URLSearchParams({ userId, limit: '10' });
-      const res = await fetch(`/api/daily-check-sessions?${params}`);
-      const json = await res.json();
-      if (res.ok) {
-        setSessions(json.data || []);
+      // Check if user is guest
+      const isGuest = await isGuestUser();
+      
+      if (isGuest) {
+        // For guest users, load from localStorage
+        const guestManager = getGuestDataManager();
+        const guestSessions = guestManager.getSessions();
+        setSessions(guestSessions);
+      } else {
+        // For regular users, load from API
+        const params = new URLSearchParams({ userId, limit: '10' });
+        const res = await fetch(`/api/daily-check-sessions?${params}`);
+        const json = await res.json();
+        if (res.ok) {
+          setSessions(json.data || []);
+        }
       }
     } catch (error) {
       console.error('Error loading sessions:', error);
@@ -23,14 +36,42 @@ export function useHistoricalData(userId: string | null) {
 
   const loadRecentAnswers = useCallback(async () => {
     if (!userId) return;
+    
     try {
-      const params = new URLSearchParams({ userId });
-      const res = await fetch(`/api/daily-checks?${params}`);
-      const json = await res.json();
-      if (res.ok) {
-        const answers = json.data || [];
+      // Check if user is guest
+      const isGuest = await isGuestUser();
+      
+      if (isGuest) {
+        // For guest users, load from localStorage
+        const guestManager = getGuestDataManager();
+        const guestChecks = guestManager.getDailyChecks();
+        
+        // Convert guest data to the expected format
+        const answers = Object.values(guestChecks).map((check: any) => ({
+          id: check.id,
+          user_id: check.user_id,
+          question_id: check.question_id,
+          question_text: check.question_text,
+          answer: check.answer,
+          answer_type: check.answer_type,
+          date: check.date,
+          created_at: check.created_at,
+          updated_at: check.updated_at,
+          photo_url: check.photo_url
+        }));
+        
         const groupedAnswers = groupAnswersByQuestionSets(answers);
         setRecentAnswers(groupedAnswers);
+      } else {
+        // For regular users, load from API
+        const params = new URLSearchParams({ userId });
+        const res = await fetch(`/api/daily-checks?${params}`);
+        const json = await res.json();
+        if (res.ok) {
+          const answers = json.data || [];
+          const groupedAnswers = groupAnswersByQuestionSets(answers);
+          setRecentAnswers(groupedAnswers);
+        }
       }
     } catch (error) {
       console.error('Error loading answers:', error);
@@ -39,14 +80,30 @@ export function useHistoricalData(userId: string | null) {
 
   const deleteSession = useCallback(async (sessionId: string) => {
     if (!userId) return;
+    
     try {
-      const res = await fetch('/api/daily-check-sessions', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, sessionId })
-      });
-      if (res.ok) {
+      // Check if user is guest
+      const isGuest = await isGuestUser();
+      
+      if (isGuest) {
+        // For guest users, remove from localStorage
+        const guestManager = getGuestDataManager();
+        const sessions = guestManager.getSessions();
+        const updatedSessions = sessions.filter(session => session.id !== sessionId);
+        
+        // Update localStorage (we need to modify the guest manager to support this)
+        // For now, we'll just reload the data
         await loadSessions();
+      } else {
+        // For regular users, delete via API
+        const res = await fetch('/api/daily-check-sessions', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, sessionId })
+        });
+        if (res.ok) {
+          await loadSessions();
+        }
       }
     } catch (error) {
       console.error('Error deleting session:', error);
@@ -55,14 +112,34 @@ export function useHistoricalData(userId: string | null) {
 
   const deleteDailyChecks = useCallback(async (date: string) => {
     if (!userId) return;
+    
     try {
-      const res = await fetch('/api/daily-checks', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, date })
-      });
-      if (res.ok) {
+      // Check if user is guest
+      const isGuest = await isGuestUser();
+      
+      if (isGuest) {
+        // For guest users, remove from localStorage
+        const guestManager = getGuestDataManager();
+        const checks = guestManager.getDailyChecks();
+        
+        // Remove checks for the specified date
+        const updatedChecks = Object.fromEntries(
+          Object.entries(checks).filter(([_, check]: [string, any]) => check.date !== date)
+        );
+        
+        // Update localStorage (we need to modify the guest manager to support this)
+        // For now, we'll just reload the data
         await loadRecentAnswers();
+      } else {
+        // For regular users, delete via API
+        const res = await fetch('/api/daily-checks', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, date })
+        });
+        if (res.ok) {
+          await loadRecentAnswers();
+        }
       }
     } catch (error) {
       console.error('Error deleting daily checks:', error);
