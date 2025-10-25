@@ -47,9 +47,15 @@ body {
 }
 
 /* Custom slider styles for horizontal scroll */
+.slider {
+  background: transparent !important;
+  border: none !important;
+}
+
 .slider::-webkit-slider-track {
   background: transparent;
-  height: 2px;
+  height: 0px;
+  border: none;
 }
 
 .slider::-webkit-slider-thumb {
@@ -70,7 +76,8 @@ body {
 
 .slider::-moz-range-track {
   background: transparent;
-  height: 2px;
+  height: 0px;
+  border: none;
 }
 
 .slider::-moz-range-thumb {
