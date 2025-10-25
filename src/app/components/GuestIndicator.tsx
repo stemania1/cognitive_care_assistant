@@ -3,21 +3,42 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { isGuestUser } from '@/lib/guestDataManager';
+import { supabase } from '@/lib/supabaseClient';
 
 export function GuestIndicator() {
   const [isGuest, setIsGuest] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     const checkGuestStatus = async () => {
       try {
+        console.log('GuestIndicator: Starting guest status check...');
+        
+        // Check localStorage first
+        const guestSession = localStorage.getItem('cognitive_care_guest_session');
+        console.log('GuestIndicator: localStorage guest session:', guestSession);
+        
+        // Check Supabase auth
+        const { data: { user }, error } = await supabase.auth.getUser();
+        console.log('GuestIndicator: Supabase user:', user);
+        console.log('GuestIndicator: Supabase error:', error);
+        
+        if (user) {
+          console.log('GuestIndicator: User email:', user.email);
+          console.log('GuestIndicator: User is_anonymous:', user.is_anonymous);
+        }
+        
         const guestStatus = await isGuestUser();
         console.log('GuestIndicator: isGuestUser() returned:', guestStatus);
+        
+        setDebugInfo(`User: ${user?.email || 'none'}, Anonymous: ${user?.is_anonymous || false}, Guest: ${guestStatus}`);
         setIsGuest(guestStatus);
       } catch (error) {
         console.error('Error checking guest status:', error);
         setIsGuest(false);
+        setDebugInfo('Error occurred');
       } finally {
         setIsLoading(false);
       }
@@ -26,12 +47,31 @@ export function GuestIndicator() {
     checkGuestStatus();
   }, []);
 
-  if (isLoading || !isGuest || isDismissed) {
+  if (isLoading) {
+    return (
+      <div className="fixed top-4 left-4 z-50">
+        <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 text-sm text-white/70">
+          Loading guest status...
+        </div>
+      </div>
+    );
+  }
+
+  // Show debug info temporarily
+  if (debugInfo) {
+    console.log('GuestIndicator debug info:', debugInfo);
+  }
+
+  if (!isGuest || isDismissed) {
     return null;
   }
 
   return (
     <div className="fixed top-4 left-4 z-50">
+      {/* Debug info - temporary */}
+      <div className="mb-2 bg-red-500/20 border border-red-500/50 rounded p-2 text-xs text-red-300">
+        DEBUG: {debugInfo}
+      </div>
       <div className="relative rounded-lg border border-yellow-500/20 bg-yellow-500/10 backdrop-blur p-3 max-w-xs">
         {/* Close button */}
         <button
