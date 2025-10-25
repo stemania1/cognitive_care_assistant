@@ -3,7 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('Daily checks GET request received');
+    console.log('=== DAILY CHECKS GET REQUEST ===');
+    console.log('Request URL:', request.url);
+    console.log('Request method:', request.method);
+    
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
     const userId = searchParams.get('userId');
@@ -11,7 +14,7 @@ export async function GET(request: NextRequest) {
     console.log('Request params:', { date, userId });
 
     if (!userId) {
-      console.log('Missing userId parameter');
+      console.log('ERROR: Missing userId parameter');
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
