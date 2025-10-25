@@ -92,9 +92,18 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
           <thead>
             <tr className="border-b border-white/10">
               <th className="text-left py-2 px-3 font-medium text-cyan-300">Date/Time</th>
-              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Q1: Describe your day and attach a photo</th>
-              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Q2: What color do you like best?</th>
-              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">Q3: Which meal do you like most?</th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
+                <div className="font-bold text-white">Question 1:</div>
+                <div className="text-sm">Describe your day and attach a photo</div>
+              </th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
+                <div className="font-bold text-white">Question 2:</div>
+                <div className="text-sm">What color do you like best?</div>
+              </th>
+              <th className="text-left py-2 px-3 font-medium text-cyan-300 max-w-48">
+                <div className="font-bold text-white">Question 3:</div>
+                <div className="text-sm">Which meal do you like most?</div>
+              </th>
               <th className="text-center py-2 px-3 font-medium text-cyan-300 w-20">Actions</th>
             </tr>
           </thead>
