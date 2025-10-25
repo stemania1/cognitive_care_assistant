@@ -171,9 +171,9 @@ export function RecentAnswersTable({ recentAnswers, onDeleteDailyChecks }: Recen
               max={maxHorizontalScroll}
               value={horizontalScrollPosition}
               onChange={handleHorizontalScroll}
-              className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
+              className="flex-1 h-2 bg-transparent rounded-lg appearance-none cursor-pointer slider"
               style={{
-                background: `linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(horizontalScrollPosition / maxHorizontalScroll) * 100}%, #ffffff20 ${(horizontalScrollPosition / maxHorizontalScroll) * 100}%, #ffffff20 100%)`
+                background: 'transparent'
               }}
             />
             <span className="text-xs text-white/50">→</span>
