@@ -217,6 +217,24 @@ export default function DailyQuestionsPage() {
     setQuestionnaireStarted(true);
     setStartedAt(Date.now());
     setQuestionnaireSaved(false);
+    
+    // Clear any existing saved answers for today to ensure fresh start
+    todaysQuestions.forEach(q => {
+      const existingAnswer = getAnswer(q.id);
+      if (existingAnswer) {
+        // Clear the saved answer by saving an empty string
+        saveDailyCheck({
+          questionId: q.id,
+          questionText: q.text,
+          answer: "",
+          answerType: q.choices ? 'choice' : 'text',
+          date: today,
+          photoUrl: undefined,
+        }).catch(error => {
+          console.error('Error clearing existing answer:', error);
+        });
+      }
+    });
   }
 
   async function startNewQuestionnaire() {
@@ -469,7 +487,7 @@ export default function DailyQuestionsPage() {
                   <QuestionCard
                     key={q.id}
                     question={q}
-                    value={answers[q.id] ?? getAnswer(q.id) ?? ""}
+                    value={answers[q.id] ?? (questionnaireStarted ? getAnswer(q.id) : "") ?? ""}
                     onChange={(value) => setAnswer(q.id, value)}
                     photoUrl={photoUrls[q.id]}
                     onPhotoChange={(url) => setPhotoUrl(q.id, url)}
