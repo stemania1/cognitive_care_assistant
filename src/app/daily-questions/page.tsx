@@ -32,11 +32,33 @@ export default function DailyQuestionsPage() {
   // Get current user
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.id) {
-        setUserId(user.id);
-      } else {
-        // Check for guest session in localStorage
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        // If there's an auth error (like refresh token issues), check for guest session
+        if (error) {
+          console.log('Auth error, checking for guest session:', error.message);
+          const guestSession = localStorage.getItem('cognitive_care_guest_session');
+          if (guestSession) {
+            const session = JSON.parse(guestSession);
+            setUserId(session.userId);
+          }
+          return;
+        }
+        
+        if (user?.id) {
+          setUserId(user.id);
+        } else {
+          // Check for guest session in localStorage
+          const guestSession = localStorage.getItem('cognitive_care_guest_session');
+          if (guestSession) {
+            const session = JSON.parse(guestSession);
+            setUserId(session.userId);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user:', error);
+        // Fall back to guest session check
         const guestSession = localStorage.getItem('cognitive_care_guest_session');
         if (guestSession) {
           const session = JSON.parse(guestSession);

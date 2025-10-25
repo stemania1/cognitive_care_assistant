@@ -196,23 +196,7 @@ export class GuestDataManager {
 // Helper function to check if user is guest
 export async function isGuestUser(): Promise<boolean> {
   try {
-    // First check Supabase authentication status
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    // If user is authenticated via Supabase
-    if (user) {
-      // Check if it's an anonymous user
-      if (user.is_anonymous) {
-        return true;
-      }
-      
-      // If it's a regular authenticated user, they're not a guest
-      // Clean up any leftover guest session data
-      localStorage.removeItem('cognitive_care_guest_session');
-      return false;
-    }
-    
-    // If no Supabase user, check localStorage for guest session
+    // First check localStorage for guest session (faster and avoids auth errors)
     const guestSession = localStorage.getItem('cognitive_care_guest_session');
     if (guestSession) {
       const session = JSON.parse(guestSession);
@@ -226,8 +210,35 @@ export async function isGuestUser(): Promise<boolean> {
       } else {
         // Clean up expired session
         localStorage.removeItem('cognitive_care_guest_session');
+      }
+    }
+    
+    // Then check Supabase authentication status (with error handling)
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      // If there's an auth error (like refresh token issues), treat as no user
+      if (error) {
+        console.log('Auth error (likely expired token):', error.message);
         return false;
       }
+      
+      // If user is authenticated via Supabase
+      if (user) {
+        // Check if it's an anonymous user
+        if (user.is_anonymous) {
+          return true;
+        }
+        
+        // If it's a regular authenticated user, they're not a guest
+        // Clean up any leftover guest session data
+        localStorage.removeItem('cognitive_care_guest_session');
+        return false;
+      }
+    } catch (authError) {
+      // If Supabase auth fails (network issues, expired tokens, etc.), 
+      // fall back to localStorage check only
+      console.log('Supabase auth check failed:', authError);
     }
     
     // No user and no guest session = not a guest
