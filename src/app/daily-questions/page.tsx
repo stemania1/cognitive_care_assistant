@@ -11,7 +11,6 @@ import { useHistoricalData } from "@/hooks/useHistoricalData";
 import { AuthenticationGuard } from "@/app/components/daily-questions/AuthenticationGuard";
 import { QuestionCard } from "@/app/components/daily-questions/QuestionCard";
 import { QuestionNavigation } from "@/app/components/daily-questions/QuestionNavigation";
-import { CompletionChart } from "@/app/components/daily-questions/CompletionChart";
 import { RecentAnswersTable } from "@/app/components/daily-questions/RecentAnswersTable";
 
 export default function DailyQuestionsPage() {
@@ -320,7 +319,6 @@ export default function DailyQuestionsPage() {
                       } else {
                         return (
                           <>
-                            <CompletionChart sessions={sessions} />
                             <RecentAnswersTable 
                               recentAnswers={recentAnswers} 
                               onDeleteDailyChecks={deleteDailyChecks}
