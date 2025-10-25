@@ -177,10 +177,10 @@ export function useHistoricalData(userId: string | null) {
       } else {
         console.log('Regular user - deleting daily checks from API');
         // For regular users, delete via API
-        const res = await fetch('/api/daily-checks', {
+        const res = await fetch(`/api/daily-checks?userId=${userId}`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, date })
+          body: JSON.stringify({ date })
         });
         console.log('API response status:', res.status);
         if (res.ok) {

@@ -64,7 +64,7 @@ export default function QuestionsHistoryPage() {
 
   // Group answers by session/date for display
   const questionnaireData = recentAnswers.map(answer => {
-    const session = sessions.find(s => s.id === answer.date);
+    const session = sessions.find(s => s.date === answer.date);
     const completionTime = session?.duration_ms ? Math.round(session.duration_ms / 1000) : 0;
     
     // Create a map of question_id to answer for easy lookup
@@ -77,6 +77,7 @@ export default function QuestionsHistoryPage() {
 
     return {
       date: answer.date,
+      sessionId: session?.id, // Store the actual session ID (UUID)
       createdAt: answer.created_at || session?.created_at || '',
       completionTime,
       answers: answersMap
@@ -113,6 +114,19 @@ export default function QuestionsHistoryPage() {
     console.log('Sessions before delete:', sessions);
     console.log('RecentAnswers before delete:', recentAnswers);
     
+    // Find the questionnaire data for this date
+    const questionnaire = questionnaireData.find(q => q.date === date);
+    const sessionId = questionnaire?.sessionId;
+    
+    console.log('Found questionnaire:', questionnaire);
+    console.log('Session ID to delete:', sessionId);
+    
+    if (!sessionId) {
+      console.log('No session ID found for date:', date);
+      alert('No session found for this date. Cannot delete.');
+      return;
+    }
+    
     const confirmed = window.confirm(
       `Are you sure you want to delete the questionnaire from ${date}?\n\nThis action cannot be undone.`
     );
@@ -122,8 +136,8 @@ export default function QuestionsHistoryPage() {
         console.log('User confirmed deletion, proceeding...');
         
         // Delete both the session and all answers for this date
-        console.log('Calling deleteSession with date:', date);
-        await deleteSession(date);
+        console.log('Calling deleteSession with sessionId:', sessionId);
+        await deleteSession(sessionId);
         console.log('deleteSession completed');
         
         console.log('Calling deleteDailyChecks with date:', date);
