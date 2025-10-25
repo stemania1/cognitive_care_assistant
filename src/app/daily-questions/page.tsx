@@ -31,7 +31,7 @@ export default function DailyQuestionsPage() {
   const [hasAutoNavigated, setHasAutoNavigated] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, clearChecks, loading: dbLoading } = useDailyChecks(userId);
-  const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
+  const { windowStart, todaysQuestions, nextThree, prevThree, resetToStart } = useQuestionNavigation(today);
   const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteDailyChecks } = useHistoricalData(userId);
 
   // Get current user
@@ -273,6 +273,9 @@ export default function DailyQuestionsPage() {
     setQuestionnaireSaved(false);
     setForceFreshStart(true);
     
+    // Reset to start from question 1
+    resetToStart();
+    
     // Clear any existing saved answers for today to ensure fresh start
     await deleteDailyChecks(today);
     clearChecks(); // Also clear local state
@@ -281,6 +284,9 @@ export default function DailyQuestionsPage() {
   async function startNewQuestionnaire() {
     // Reset questionnaire state
     resetQuestionnaireState();
+    
+    // Reset to start from question 1
+    resetToStart();
     
     // Clear stored answers from database/localStorage
     await deleteDailyChecks(today);

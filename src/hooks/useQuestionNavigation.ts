@@ -37,12 +37,20 @@ export function useQuestionNavigation(today: string) {
     });
   };
 
+  const resetToStart = () => {
+    setWindowStart(0);
+    try {
+      localStorage.removeItem(windowKey);
+    } catch {}
+  };
+
   const todaysQuestions = ALL_QUESTIONS.slice(windowStart, windowStart + 4);
 
   return {
     windowStart,
     todaysQuestions,
     nextThree,
-    prevThree
+    prevThree,
+    resetToStart
   };
 }
