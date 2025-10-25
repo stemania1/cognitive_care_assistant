@@ -196,6 +196,11 @@ export class GuestDataManager {
 // Helper function to check if user is guest
 export async function isGuestUser(): Promise<boolean> {
   try {
+    // Check if we're on the client side
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    
     // First check localStorage for guest session (faster and avoids auth errors)
     const guestSession = localStorage.getItem('cognitive_care_guest_session');
     if (guestSession) {
@@ -252,6 +257,11 @@ export async function isGuestUser(): Promise<boolean> {
 // Helper function to get guest user ID
 export function getGuestUserId(): string | null {
   try {
+    // Check if we're on the client side
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    
     const guestSession = localStorage.getItem('cognitive_care_guest_session');
     if (guestSession) {
       const session = JSON.parse(guestSession);
