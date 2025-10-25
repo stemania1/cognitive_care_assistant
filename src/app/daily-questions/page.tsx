@@ -133,20 +133,27 @@ export default function DailyQuestionsPage() {
     }
 
     try {
-      // Save all answered questions
+      // Save only unsaved answered questions (those not already saved via "Save Answer")
+      let savedCount = 0;
       for (const q of todaysQuestions) {
         const value = (answers[q.id] ?? getAnswer(q.id) ?? "").toString().trim();
         if (!value) continue;
         
-        const photoUrl = photoUrls[q.id];
-        await saveDailyCheck({
-          questionId: q.id,
-          questionText: q.text,
-          answer: value,
-          answerType: q.choices ? 'choice' : 'text',
-          date: today,
-          photoUrl: photoUrl || undefined,
-        });
+        // Check if this answer was already saved individually
+        const existingAnswer = getAnswer(q.id);
+        if (!existingAnswer || existingAnswer.trim() === "") {
+          // This answer hasn't been saved yet, save it now
+          const photoUrl = photoUrls[q.id];
+          await saveDailyCheck({
+            questionId: q.id,
+            questionText: q.text,
+            answer: value,
+            answerType: q.choices ? 'choice' : 'text',
+            date: today,
+            photoUrl: photoUrl || undefined,
+          });
+          savedCount++;
+        }
       }
 
       // Save session data if we have timing info
@@ -183,7 +190,7 @@ export default function DailyQuestionsPage() {
         `Completed in ${Math.round((Date.now() - startedAt) / 1000)} seconds` : 
         'Completion time not available';
       
-      alert(`Questionnaire Saved!\n\n📊 Questions Answered: ${answeredQuestions} of ${todaysQuestions.length}\n⏱️ ${completionTimeText}\n\nAnswers are now read-only. Start a new questionnaire to answer more questions.`);
+      alert(`Questionnaire Saved!\n\n📊 Questions Answered: ${answeredQuestions} of ${todaysQuestions.length}\n💾 New Answers Saved: ${savedCount}\n⏱️ ${completionTimeText}\n\nAnswers are now read-only. Start a new questionnaire to answer more questions.`);
     } catch (error) {
       console.error('Error saving questionnaire:', error);
       alert('Failed to save questionnaire. Please try again.');
@@ -199,6 +206,9 @@ export default function DailyQuestionsPage() {
     
     // Clear stored answers from database/localStorage
     await deleteDailyChecks(today);
+    
+    // Refresh the data to ensure UI updates
+    await loadRecentAnswers();
   }
 
 
