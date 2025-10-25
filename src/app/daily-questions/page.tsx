@@ -23,6 +23,7 @@ export default function DailyQuestionsPage() {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [completionTime, setCompletionTime] = useState<number | null>(null);
+  const [questionnaireSaved, setQuestionnaireSaved] = useState(false);
   
   const { saveDailyCheck, getAnswer, hasAnswer, loading: dbLoading } = useDailyChecks(userId);
   const { windowStart, todaysQuestions, nextThree, prevThree } = useQuestionNavigation(today);
@@ -165,20 +166,27 @@ export default function DailyQuestionsPage() {
         }
       }
 
-      // Reset all answers and state
-      setAnswers({});
-      setPhotoUrls({});
+      // Mark questionnaire as saved and load saved answers as read-only
+      setQuestionnaireSaved(true);
       setStartedAt(null);
       setCompletionTime(null);
       
       // Refresh recent answers data
       await loadRecentAnswers();
       
-      alert('Questionnaire saved successfully! All answers have been reset.');
+      alert('Questionnaire saved successfully! Answers are now read-only. Start a new questionnaire to answer more questions.');
     } catch (error) {
       console.error('Error saving questionnaire:', error);
       alert('Failed to save questionnaire. Please try again.');
     }
+  }
+
+  function startNewQuestionnaire() {
+    setQuestionnaireSaved(false);
+    setAnswers({});
+    setPhotoUrls({});
+    setStartedAt(null);
+    setCompletionTime(null);
   }
 
 
@@ -289,16 +297,41 @@ export default function DailyQuestionsPage() {
               <>
                 {/* Save Questionnaire Tile */}
                 <div className="mb-6">
-                  <button
-                    onClick={saveQuestionnaire}
-                    className="w-full py-4 px-6 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
-                    type="button"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <span className="text-lg">Save Questionnaire</span>
-                  </button>
+                  {questionnaireSaved ? (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={startNewQuestionnaire}
+                        className="flex-1 py-4 px-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                        type="button"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span className="text-lg">Start New Questionnaire</span>
+                      </button>
+                      <button
+                        onClick={() => deleteDailyChecks(today)}
+                        className="px-6 py-4 rounded-lg bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                        type="button"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span className="text-lg">Delete</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={saveQuestionnaire}
+                      className="w-full py-4 px-6 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                      type="button"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span className="text-lg">Save Questionnaire</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Questions */}
@@ -314,6 +347,7 @@ export default function DailyQuestionsPage() {
                     userId={userId || undefined}
                     questionNumber={windowStart + index + 1}
                     onSave={saveIndividualAnswer}
+                    readOnly={questionnaireSaved}
                   />
                 ))}
                 </div>
