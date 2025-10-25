@@ -526,34 +526,28 @@ export default function DailyQuestionsPage() {
                   <div className="mb-6 space-y-6">
                     {(() => {
                       // Filter recent answers to only show current questionnaire session
-                      // Only show answers saved after the questionnaire was started
+                      // Show answers from today, but only if questionnaire has been started
                       console.log('=== FILTERING RECENT ANSWERS ===');
                       console.log('recentAnswers:', recentAnswers);
-                      console.log('startedAt:', startedAt);
+                      console.log('questionnaireStarted:', questionnaireStarted);
                       console.log('today:', today);
                       
                       const currentQuestionnaireAnswers = recentAnswers.filter(answer => {
                         console.log('Checking answer:', answer);
                         console.log('answer.date:', answer.date, 'today:', today, 'match:', answer.date === today);
-                        console.log('startedAt:', startedAt, 'exists:', !!startedAt);
+                        console.log('questionnaireStarted:', questionnaireStarted);
                         
                         if (answer.date !== today) {
                           console.log('Filtered out: wrong date');
                           return false;
                         }
-                        if (!startedAt) {
-                          console.log('Filtered out: no startedAt');
+                        if (!questionnaireStarted) {
+                          console.log('Filtered out: questionnaire not started');
                           return false; // No questionnaire started yet
                         }
                         
-                        // Only show answers saved after questionnaire started
-                        const answerTime = new Date(answer.created_at).getTime();
-                        console.log('answer.created_at:', answer.created_at);
-                        console.log('answerTime:', answerTime, 'startedAt:', startedAt, 'match:', answerTime >= startedAt);
-                        
-                        const result = answerTime >= startedAt;
-                        console.log('Final filter result:', result);
-                        return result;
+                        console.log('Answer included in current questionnaire');
+                        return true;
                       });
                       
                       console.log('Filtered answers:', currentQuestionnaireAnswers);
