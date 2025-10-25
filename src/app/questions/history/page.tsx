@@ -13,7 +13,7 @@ export default function QuestionsHistoryPage() {
   const [isGuest, setIsGuest] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteSession } = useHistoricalData(userId);
+  const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteSession, deleteDailyChecks } = useHistoricalData(userId);
 
   useEffect(() => {
     async function initializeUser() {
@@ -112,7 +112,10 @@ export default function QuestionsHistoryPage() {
     
     if (confirmed) {
       try {
+        // Delete both the session and all answers for this date
         await deleteSession(date);
+        await deleteDailyChecks(date);
+        
         // Reload data after deletion
         await loadSessions();
         await loadRecentAnswers();

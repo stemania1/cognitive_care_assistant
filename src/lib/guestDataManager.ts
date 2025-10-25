@@ -135,6 +135,14 @@ export class GuestDataManager {
     this.saveGuestData();
   }
 
+  public deleteSession(sessionId: string): void {
+    if (!this.guestData) return;
+    
+    // Remove the session with the specified ID
+    this.guestData.sessions = this.guestData.sessions.filter((session: any) => session.id !== sessionId);
+    this.saveGuestData();
+  }
+
   public clearAllData(): void {
     this.clearGuestData();
   }

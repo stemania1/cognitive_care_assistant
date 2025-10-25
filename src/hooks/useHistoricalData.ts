@@ -108,11 +108,9 @@ export function useHistoricalData(userId: string | null) {
       if (isGuest) {
         // For guest users, remove from localStorage
         const guestManager = getGuestDataManager();
-        const sessions = guestManager.getSessions();
-        const updatedSessions = sessions.filter(session => session.id !== sessionId);
+        guestManager.deleteSession(sessionId);
         
-        // Update localStorage (we need to modify the guest manager to support this)
-        // For now, we'll just reload the data
+        // Reload the data to reflect changes
         await loadSessions();
       } else {
         // For regular users, delete via API
