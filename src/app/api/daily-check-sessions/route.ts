@@ -89,21 +89,28 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    console.log('=== DELETE SESSION API DEBUG ===');
     const body = await request.json();
+    console.log('Request body:', body);
     const { userId, sessionId } = body;
+    console.log('UserId:', userId, 'SessionId:', sessionId);
+    
     if (!userId || !sessionId) {
+      console.log('Missing required fields');
       return NextResponse.json({ error: 'User ID and Session ID are required' }, { status: 400 });
     }
 
     // Create a Supabase client with service role key for admin operations
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+      console.log('Service role key not configured');
       return NextResponse.json({ 
         error: 'Service role key not configured', 
         details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
       }, { status: 500 });
     }
 
+    console.log('Creating Supabase admin client');
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       serviceRoleKey,
@@ -115,16 +122,27 @@ export async function DELETE(request: NextRequest) {
       }
     );
 
+    console.log('Attempting to delete session from database');
+    console.log('Query: DELETE FROM daily_check_sessions WHERE id =', sessionId, 'AND user_id =', userId);
+    
     const { error } = await supabaseAdmin
       .from('daily_check_sessions')
       .delete()
       .eq('id', sessionId)
       .eq('user_id', userId);
 
-    if (error) return NextResponse.json({ error: 'Failed to delete session' }, { status: 500 });
+    console.log('Delete result error:', error);
+    
+    if (error) {
+      console.error('Database delete error:', error);
+      return NextResponse.json({ error: 'Failed to delete session', details: error.message }, { status: 500 });
+    }
+    
+    console.log('Session deleted successfully');
     return NextResponse.json({ success: true });
   } catch (e) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Unexpected error in DELETE:', e);
+    return NextResponse.json({ error: 'Internal server error', details: e instanceof Error ? e.message : 'Unknown error' }, { status: 500 });
   }
 }
 

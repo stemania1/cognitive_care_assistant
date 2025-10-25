@@ -267,20 +267,34 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: true });
     } else {
       // Legacy behavior: delete all entries for a date (keeping for backward compatibility)
+      console.log('=== DELETE DAILY CHECKS API DEBUG ===');
       const body = await request.json();
+      console.log('Request body:', body);
       const { date } = body;
+      console.log('Date to delete:', date);
       
       if (!date) {
+        console.log('Date is required for bulk deletion');
         return NextResponse.json({ error: 'Date is required for bulk deletion' }, { status: 400 });
       }
 
+      console.log('Attempting to delete daily checks from database');
+      console.log('Query: DELETE FROM daily_checks WHERE user_id =', userId, 'AND date =', date);
+      
       const { error } = await supabaseAdmin
         .from('daily_checks')
         .delete()
         .eq('user_id', userId)
         .eq('date', date);
 
-      if (error) return NextResponse.json({ error: 'Failed to delete daily checks' }, { status: 500 });
+      console.log('Delete result error:', error);
+      
+      if (error) {
+        console.error('Database delete error:', error);
+        return NextResponse.json({ error: 'Failed to delete daily checks', details: error.message }, { status: 500 });
+      }
+      
+      console.log('Daily checks deleted successfully');
       return NextResponse.json({ success: true });
     }
   } catch (e) {
