@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@hcaptcha/react-hcaptcha": "^1.14.0",
     "@supabase/supabase-js": "^2.58.0",
     "chart.js": "^4.5.0",
     "cors": "^2.8.5",

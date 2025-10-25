@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -13,7 +14,7 @@ export default function SignIn() {
   const [error, setError] = useState("");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const router = useRouter();
-  const captchaRef = useRef<any>(null);
+  const captchaRef = useRef<HCaptcha>(null);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +44,7 @@ export default function SignIn() {
         setError(signInError.message || "Invalid email or password. Please try again.");
         // Reset CAPTCHA on error
         if (captchaRef.current) {
-          captchaRef.current.reset();
+          captchaRef.current.resetCaptcha();
         }
         setCaptchaToken(null);
         return;
@@ -53,7 +54,7 @@ export default function SignIn() {
       setError("Invalid email or password. Please try again.");
       // Reset CAPTCHA on error
       if (captchaRef.current) {
-        captchaRef.current.reset();
+        captchaRef.current.resetCaptcha();
       }
       setCaptchaToken(null);
     } finally {
@@ -112,35 +113,6 @@ export default function SignIn() {
     setCaptchaToken(null);
     setError("CAPTCHA verification failed. Please try again.");
   };
-
-  // Load Turnstile script
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-
-    // Set up global callback functions
-    (window as any).onTurnstileCallback = (token: string) => {
-      handleCaptchaVerify(token);
-    };
-
-    (window as any).onTurnstileExpired = () => {
-      handleCaptchaExpire();
-    };
-
-    (window as any).onTurnstileError = () => {
-      handleCaptchaError();
-    };
-
-    return () => {
-      // Cleanup
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
-      }
-    };
-  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
@@ -220,13 +192,12 @@ export default function SignIn() {
                   Security Verification
                 </label>
                 <div className="flex justify-center">
-                  <div 
-                    className="cf-turnstile" 
-                    data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"}
-                    data-callback="onTurnstileCallback"
-                    data-expired-callback="onTurnstileExpired"
-                    data-error-callback="onTurnstileError"
+                  <HCaptcha
                     ref={captchaRef}
+                    sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || "10000000-ffff-ffff-ffff-000000000001"}
+                    onVerify={handleCaptchaVerify}
+                    onExpire={handleCaptchaExpire}
+                    onError={handleCaptchaError}
                   />
                 </div>
                 <p className="text-xs text-gray-400 text-center">
