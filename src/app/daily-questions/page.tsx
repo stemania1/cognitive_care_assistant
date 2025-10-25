@@ -190,12 +190,15 @@ export default function DailyQuestionsPage() {
     }
   }
 
-  function startNewQuestionnaire() {
+  async function startNewQuestionnaire() {
     setQuestionnaireSaved(false);
     setAnswers({});
     setPhotoUrls({});
     setStartedAt(null);
     setCompletionTime(null);
+    
+    // Clear stored answers from database/localStorage
+    await deleteDailyChecks(today);
   }
 
 
