@@ -303,6 +303,8 @@ export default function EMGPage() {
   const [useRealData, setUseRealData] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isFetchingRef = useRef(false);
+  const consecutiveFailuresRef = useRef(0);
   const [showWorkoutList, setShowWorkoutList] = useState(false);
 
   // MyoWare 2.0 data processing functions
@@ -330,23 +332,50 @@ export default function EMGPage() {
     }
   };
 
-  // Fetch real-time data from API
-  const fetchRealTimeData = async () => {
+  // Fetch real-time data from API with retry mechanism
+  const fetchRealTimeData = async (retryCount = 0) => {
+    // Prevent multiple simultaneous requests
+    if (isFetchingRef.current) {
+      console.log('EMG API request already in progress, skipping...');
+      return;
+    }
+    
+    isFetchingRef.current = true;
     try {
-      console.log('Fetching EMG data from /api/emg/data...');
+      console.log(`Fetching EMG data from /api/emg/data... (attempt ${retryCount + 1})`);
       const response = await fetch('/api/emg/data', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        cache: 'no-cache'
+        cache: 'no-cache',
+        // Add timeout to prevent hanging requests
+        signal: AbortSignal.timeout(5000)
       });
       
       if (!response.ok) {
+        console.error(`EMG API Error: HTTP ${response.status} - ${response.statusText}`);
+        
+        // Retry logic for 404s and 500s
+        if ((response.status === 404 || response.status === 500) && retryCount < 2) {
+          console.log(`Retrying in 1 second... (attempt ${retryCount + 1}/3)`);
+          isFetchingRef.current = false;
+          setTimeout(() => fetchRealTimeData(retryCount + 1), 1000);
+          return;
+        }
+        
+        // Don't throw error for 404s after retries - just skip this update
+        if (response.status === 404) {
+          console.log('EMG API unavailable after retries, skipping this update');
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
+      
+      // Reset failure counter on successful request
+      consecutiveFailuresRef.current = 0;
       
       console.log('Fetched EMG data:', data); // Debug log
       console.log('Connection status:', data.isConnected, 'Data count:', data.data?.length || 0);
@@ -410,15 +439,34 @@ export default function EMGPage() {
         console.log('No EMG data available - device may be connected but not sending data'); // Debug log
       }
     } catch (error) {
+      // Increment failure counter
+      consecutiveFailuresRef.current += 1;
+      
       console.error('Failed to fetch real-time data:', error);
       
-      // Handle error with proper typing
+      // If too many consecutive failures, temporarily disable polling
+      if (consecutiveFailuresRef.current >= 5) {
+        console.log('Too many consecutive failures, temporarily disabling EMG polling');
+        setIsMyoWareConnected(false);
+        return;
+      }
+      
+      // Handle different types of errors
       if (error instanceof Error) {
         console.error('Error details:', {
           name: error.name,
           message: error.message,
           stack: error.stack
         });
+        
+        // Handle specific error types
+        if (error.name === 'AbortError') {
+          console.log('Request timed out, will retry on next interval');
+        } else if (error.message.includes('Failed to fetch')) {
+          console.log('Network error, will retry on next interval');
+        } else if (error.message.includes('HTTP error')) {
+          console.log('HTTP error, will retry on next interval');
+        }
       } else {
         console.error('Unknown error type:', error);
       }
@@ -428,13 +476,15 @@ export default function EMGPage() {
         setIsMyoWareConnected(false);
         console.log('Lost connection to EMG server');
       }
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
   // Poll for real-time data
   useEffect(() => {
     // Always poll for data to detect device connection/disconnection
-    const interval = setInterval(fetchRealTimeData, 1000); // Poll every 1 second for device detection
+    const interval = setInterval(fetchRealTimeData, 3000); // Poll every 3 seconds for device detection
     
     return () => clearInterval(interval);
   }, [isRecording]);
@@ -719,81 +769,21 @@ export default function EMGPage() {
             </div>
           </div>
           
-          {/* MyoWare Guidance */}
-          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-3">
-            <div className="flex items-start gap-3">
-              <div className="text-blue-400 text-xl">💡</div>
-              <div>
-                <h3 className="text-sm font-medium text-blue-200 mb-2">MyoWare 2.0 Sensor Guidance</h3>
-                <div className="text-xs text-gray-300 space-y-1">
-                  <p><span className="text-green-400">●</span> <strong>Green workouts</strong> are perfect for MyoWare monitoring - they involve arm movements that the sensor can track effectively.</p>
-                  <p><span className="text-orange-400">●</span> <strong>Orange workouts</strong> focus on other body parts (legs, neck, balance) where MyoWare won't provide useful data.</p>
-                  <p><strong>Sensor placement:</strong> For arm-focused workouts, place the MyoWare sensor on your upper arm (bicep) for best results.</p>
-                </div>
-              </div>
-            </div>
+          {/* Workout Demonstration Video */}
+          <div className="mb-4">
+            <h3 className="font-medium text-white mb-3">
+              {currentWorkout ? 'Exercise Demonstration' : 'Workout Preview'}
+            </h3>
+            <WorkoutVideo
+              videoUrl={(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).videoUrl}
+              exerciseId={(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).id}
+              exerciseName={(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).name}
+              className="w-full"
+            />
           </div>
           
-          {/* Connection Controls */}
-          <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
-            {!isMyoWareConnected ? (
-              <div className="px-6 py-3 bg-gray-600 text-gray-300 rounded-lg font-medium">
-                Waiting for MyoWare Device...
-              </div>
-            ) : !isConnected ? (
-              <button
-                onClick={connectEMG}
-                className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-600 transition-all duration-200"
-              >
-                Start Recording
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={disconnectEMG}
-                  className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200"
-                >
-                  Stop Recording
-                </button>
-                <button
-                  onClick={isCalibrating ? stopCalibration : startCalibration}
-                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                    isCalibrating 
-                      ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600' 
-                      : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'
-                  }`}
-                >
-                  {isCalibrating ? 'Finish Calibration' : 'Calibrate (5s)'}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
-          {/* MyoWare Client */}
-          <div className="xl:col-span-1">
-            <div className="sticky top-6">
-              <MyoWareClient 
-                onDataReceived={handleMyoWareData}
-                onConnectionChange={handleMyoWareConnection}
-                deviceConnected={isMyoWareConnected}
-              />
-              
-              {/* Device Help */}
-              <div className="mt-3 p-3 bg-gray-800 rounded-lg">
-                <h3 className="text-lg font-semibold text-white mb-2">Device Connection Help</h3>
-                <div className="text-xs text-gray-400 space-y-1">
-                  <p>• Power on the MyoWare device</p>
-                  <p>• Ensure it is connected to the same WiFi network</p>
-                  <p>• The device must POST to /api/emg/ws with type "heartbeat" and "emg_data"</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Workout Selection */}
-          <div className="xl:col-span-1">
+          <div className="mb-4">
             <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-3">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-blue-500/10 via-purple-500/5 to-pink-500/10 blur-xl" />
               <div className="relative">
@@ -942,6 +932,79 @@ export default function EMGPage() {
               </div>
             </div>
           </div>
+          
+          {/* MyoWare Guidance */}
+          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-3">
+            <div className="flex items-start gap-3">
+              <div className="text-blue-400 text-xl">💡</div>
+              <div>
+                <h3 className="text-sm font-medium text-blue-200 mb-2">MyoWare 2.0 Sensor Guidance</h3>
+                <div className="text-xs text-gray-300 space-y-1">
+                  <p><span className="text-green-400">●</span> <strong>Green workouts</strong> are perfect for MyoWare monitoring - they involve arm movements that the sensor can track effectively.</p>
+                  <p><span className="text-orange-400">●</span> <strong>Orange workouts</strong> focus on other body parts (legs, neck, balance) where MyoWare won't provide useful data.</p>
+                  <p><strong>Sensor placement:</strong> For arm-focused workouts, place the MyoWare sensor on your upper arm (bicep) for best results.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Connection Controls */}
+          <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+            {!isMyoWareConnected ? (
+              <div className="px-6 py-3 bg-gray-600 text-gray-300 rounded-lg font-medium">
+                Waiting for MyoWare Device...
+              </div>
+            ) : !isConnected ? (
+              <button
+                onClick={connectEMG}
+                className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-600 transition-all duration-200"
+              >
+                Start Recording
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={disconnectEMG}
+                  className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200"
+                >
+                  Stop Recording
+                </button>
+                <button
+                  onClick={isCalibrating ? stopCalibration : startCalibration}
+                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                    isCalibrating 
+                      ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600' 
+                      : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'
+                  }`}
+                >
+                  {isCalibrating ? 'Finish Calibration' : 'Calibrate (5s)'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+          {/* MyoWare Client */}
+          <div className="xl:col-span-1">
+            <div className="sticky top-6">
+              <MyoWareClient 
+                onDataReceived={handleMyoWareData}
+                onConnectionChange={handleMyoWareConnection}
+                deviceConnected={isMyoWareConnected}
+              />
+              
+              {/* Device Help */}
+              <div className="mt-3 p-3 bg-gray-800 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-2">Device Connection Help</h3>
+                <div className="text-xs text-gray-400 space-y-1">
+                  <p>• Power on the MyoWare device</p>
+                  <p>• Ensure it is connected to the same WiFi network</p>
+                  <p>• The device must POST to /api/emg/ws with type "heartbeat" and "emg_data"</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* EMG Visualization */}
           <div className="xl:col-span-2">
@@ -1052,7 +1115,6 @@ export default function EMGPage() {
                   />
                 </div>
 
-
                 {/* Workout Instructions */}
                 <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
                   <h3 className="font-medium text-white mb-3">
@@ -1075,19 +1137,6 @@ export default function EMGPage() {
                       </p>
                     </div>
                   )}
-                </div>
-
-                {/* Workout Demonstration Video */}
-                <div className="mb-4">
-                  <h3 className="font-medium text-white mb-3">
-                    {currentWorkout ? 'Exercise Demonstration' : 'Workout Preview'}
-                  </h3>
-                  <WorkoutVideo
-                    videoUrl={(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).videoUrl}
-                    exerciseId={(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).id}
-                    exerciseName={(currentWorkout || WORKOUT_ROUTINES[currentWorkoutIndex]).name}
-                    className="w-full"
-                  />
                 </div>
 
                 {/* Workout Controls */}

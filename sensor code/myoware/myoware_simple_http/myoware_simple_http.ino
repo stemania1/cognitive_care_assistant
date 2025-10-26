@@ -1,7 +1,7 @@
 /*
  * MyoWare 2.0 Simple HTTP Client
  * 
- * This sends data to the EMG server running on port 3001
+ * This sends data to the EMG server running on port 3000
  * 
  * Hardware: MyoWare 2.0 + MyoWare Wireless Shield (ESP32)
  */

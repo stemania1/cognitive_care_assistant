@@ -12,4 +12,35 @@ export const supabase = createClient(
   supabaseAnonKey || "placeholder-key"
 );
 
+// Function to clear all authentication data
+export const clearAuthSession = async () => {
+  try {
+    // Sign out from Supabase
+    await supabase.auth.signOut();
+    
+    // Clear local storage
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+      sessionStorage.clear();
+    }
+    
+    console.log('Authentication session cleared');
+    return true;
+  } catch (error) {
+    console.error('Error clearing auth session:', error);
+    return false;
+  }
+};
+
+// Function to handle refresh token errors
+export const handleRefreshTokenError = async () => {
+  console.log('Refresh token error detected, clearing session...');
+  await clearAuthSession();
+  
+  // Redirect to sign-in page
+  if (typeof window !== 'undefined') {
+    window.location.href = '/signin';
+  }
+};
+
 

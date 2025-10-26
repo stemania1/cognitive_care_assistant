@@ -105,7 +105,7 @@ export default function WorkoutVideo({
             onError={handleError}
             onPlay={handlePlay}
             className="w-full h-48 sm:h-56"
-            poster={`/images/workouts/${exerciseId}-thumbnail.jpg`}
+            poster={`/images/workouts/${exerciseId}-thumbnail.svg`}
             preload="none"
             playsInline
           >

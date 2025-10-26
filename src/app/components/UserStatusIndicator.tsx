@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, handleRefreshTokenError } from '@/lib/supabaseClient';
 import { isGuestUser } from '@/lib/guestDataManager';
 import Link from 'next/link';
 
@@ -35,6 +35,14 @@ export function UserStatusIndicator() {
         }
       } catch (error) {
         console.error('Error checking user status:', error);
+        
+        // Check if it's a refresh token error
+        if (error instanceof Error && error.message.includes('Refresh Token')) {
+          console.log('Refresh token error detected, handling...');
+          await handleRefreshTokenError();
+          return;
+        }
+        
         setUserEmail(null);
         setIsGuest(false);
       } finally {
@@ -45,13 +53,23 @@ export function UserStatusIndicator() {
     checkUserStatus();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUserEmail(session.user.email || null);
-        setIsGuest(false);
-      } else {
-        setUserEmail(null);
-        setIsGuest(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      try {
+        if (session?.user) {
+          setUserEmail(session.user.email || null);
+          setIsGuest(false);
+        } else {
+          setUserEmail(null);
+          setIsGuest(false);
+        }
+      } catch (error) {
+        console.error('Error in auth state change:', error);
+        
+        // Check if it's a refresh token error
+        if (error instanceof Error && error.message.includes('Refresh Token')) {
+          console.log('Refresh token error in auth state change, handling...');
+          await handleRefreshTokenError();
+        }
       }
     });
 

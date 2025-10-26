@@ -17,7 +17,7 @@ const char* password = "AnnoyingKid2010!";
 
 // Server Configuration - UPDATE THESE!
 const char* server_host = "192.168.254.204";  // Your computer's IP
-const int server_port = 3000;  // Use port 3000 for the Next.js app
+const int server_port = 3001;  // EMG Server Port
 const char* server_path = "/api/emg/ws";
 
 // MyoWare 2.0 sensor pin (ESP32 GPIO36 = A0)

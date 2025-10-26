@@ -52,14 +52,33 @@ io.on('connection', (socket) => {
 
 // HTTP endpoints for ESP32
 app.post('/api/emg/ws', (req, res) => {
-  const { type, data } = req.body;
+  console.log('Received request body:', JSON.stringify(req.body, null, 2));
   
-  console.log('Received EMG data via HTTP:', { type, data });
+  const { type, ...otherData } = req.body;
   
-  // Broadcast to all connected Socket.IO clients
-  io.emit('emg_data', { type, data, timestamp: Date.now() });
+  console.log('Parsed data - type:', type);
+  console.log('Parsed data - other:', otherData);
   
-  res.json({ status: 'received', timestamp: Date.now() });
+  // Handle different message types
+  if (type === 'emg_data') {
+    console.log('Received EMG data via HTTP:', req.body);
+    // Broadcast to all connected Socket.IO clients
+    io.emit('emg_data', req.body);
+    res.json({ status: 'received', message: 'EMG data received', timestamp: Date.now() });
+  } else if (type === 'test') {
+    console.log('Received test message:', req.body);
+    res.json({ status: 'test_received', message: 'Hello from EMG server!', timestamp: Date.now() });
+  } else if (type === 'calibration_data') {
+    console.log('Received calibration data:', req.body);
+    io.emit('calibration_data', req.body);
+    res.json({ status: 'calibrated', timestamp: Date.now(), calibration: req.body });
+  } else if (type === 'heartbeat') {
+    console.log('Received heartbeat:', req.body);
+    res.json({ status: 'alive', timestamp: Date.now() });
+  } else {
+    console.log('Received unknown message type:', type, req.body);
+    res.json({ status: 'received', timestamp: Date.now() });
+  }
 });
 
 app.get('/api/emg/ws', (req, res) => {
@@ -70,7 +89,6 @@ app.get('/api/emg/ws', (req, res) => {
   });
 });
 
-// Start server
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`EMG Server running on port ${PORT}`);

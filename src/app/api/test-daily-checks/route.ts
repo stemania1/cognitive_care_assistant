@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
     try {
       // Test both URLs
       const [response, uuidResponse] = await Promise.all([
-        fetch(`http://localhost:${process.env.PORT || 3001}${apiUrl}`),
-        fetch(`http://localhost:${process.env.PORT || 3001}${uuidApiUrl}`)
+        fetch(`http://localhost:${process.env.PORT || 3000}${apiUrl}`),
+        fetch(`http://localhost:${process.env.PORT || 3000}${uuidApiUrl}`)
       ]);
       
       console.log('API Response Status:', response.status);
