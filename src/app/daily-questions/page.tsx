@@ -649,41 +649,51 @@ export default function DailyQuestionsPage() {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {sessions.map((session, index) => (
-                            <div key={session.id} className="rounded-lg border border-purple-400/20 bg-purple-500/5 p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-lg font-medium text-purple-200">
-                                  Questionnaire #{sessions.length - index}
-                                </h3>
-                                <div className="text-sm text-purple-300/70">
-                                  {new Date(session.date).toLocaleDateString()} at {new Date(session.created_at).toLocaleTimeString()}
+                          {sessions.map((session, index) => {
+                            // Find all answers for this session (by date)
+                            const sessionAnswers = recentAnswers.filter(answer => answer.date === session.date);
+                            
+                            // Flatten the nested answers structure
+                            const flattenedAnswers = sessionAnswers.flatMap(answerGroup => 
+                              answerGroup.answers
+                            );
+                            
+                            return (
+                              <div key={session.id} className="rounded-lg border border-purple-400/20 bg-purple-500/5 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h3 className="text-lg font-medium text-purple-200">
+                                    Questionnaire #{sessions.length - index}
+                                  </h3>
+                                  <div className="text-sm text-purple-300/70">
+                                    {new Date(session.date).toLocaleDateString()} at {new Date(session.created_at).toLocaleTimeString()}
+                                  </div>
+                                </div>
+                                
+                                <div className="grid gap-3">
+                                  {flattenedAnswers.map((answer, answerIndex) => {
+                                    const question = ALL_QUESTIONS.find(q => q.id === answer.question_id);
+                                    return (
+                                      <div key={answerIndex} className="flex flex-col sm:flex-row sm:items-start gap-2 p-3 rounded-md bg-purple-500/10 border border-purple-400/10">
+                                        <div className="sm:w-1/3">
+                                          <div className="text-sm font-medium text-purple-300">
+                                            Q{ALL_QUESTIONS.findIndex(q => q.id === answer.question_id) + 1}
+                                          </div>
+                                          <div className="text-xs text-purple-300/70 mt-1">
+                                            {question?.text || 'Unknown Question'}
+                                          </div>
+                                        </div>
+                                        <div className="sm:w-2/3">
+                                          <div className="text-sm text-white/90 bg-white/5 rounded p-2">
+                                            {answer.answer}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
-                              
-                              <div className="grid gap-3">
-                                {session.answers.map((answer, answerIndex) => {
-                                  const question = ALL_QUESTIONS.find(q => q.id === answer.question_id);
-                                  return (
-                                    <div key={answerIndex} className="flex flex-col sm:flex-row sm:items-start gap-2 p-3 rounded-md bg-purple-500/10 border border-purple-400/10">
-                                      <div className="sm:w-1/3">
-                                        <div className="text-sm font-medium text-purple-300">
-                                          Q{ALL_QUESTIONS.findIndex(q => q.id === answer.question_id) + 1}
-                                        </div>
-                                        <div className="text-xs text-purple-300/70 mt-1">
-                                          {question?.text || 'Unknown Question'}
-                                        </div>
-                                      </div>
-                                      <div className="sm:w-2/3">
-                                        <div className="text-sm text-white/90 bg-white/5 rounded p-2">
-                                          {answer.answer}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
