@@ -23,6 +23,14 @@ type RemindersState = {
   customReminders: CustomReminder[];
 };
 
+type ReminderAlert = {
+  id: string;
+  type: string;
+  message: string;
+  time: string;
+  timestamp: number;
+};
+
 export default function RemindersPage() {
   const storageKey = "reminders:v2";
   const [state, setState] = useState<RemindersState>({
@@ -40,6 +48,12 @@ export default function RemindersPage() {
   const [waterTimeInput, setWaterTimeInput] = useState<string>("");
   const [foodTimeInput, setFoodTimeInput] = useState<string>("");
   const [customTimeInputs, setCustomTimeInputs] = useState<Record<string, string>>({});
+  const [countdown, setCountdown] = useState<string>("");
+  const [nextReminder, setNextReminder] = useState<{ message: string; time: string } | null>(null);
+  const [alerts, setAlerts] = useState<ReminderAlert[]>([]);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -47,6 +61,116 @@ export default function RemindersPage() {
       if (raw) setState((prev) => ({ ...prev, ...JSON.parse(raw) }));
     } catch {}
   }, []);
+
+  // Calculate countdown to next reminder
+  useEffect(() => {
+    const calculateNextReminder = () => {
+      const now = new Date();
+      const currentTimeInSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      
+      const allReminders: { time: string; message: string; priority: number }[] = [];
+      
+      // Collect all enabled reminders
+      if (state.drinkWater && state.waterTimes.length > 0) {
+        state.waterTimes.forEach(t => {
+          const [hours, minutes] = t.split(':').map(Number);
+          allReminders.push({ time: t, message: "💧 Time to drink water!", priority: 1 });
+        });
+      }
+      
+      if (state.takeMedicine && state.medicineTimes.length > 0) {
+        state.medicineTimes.forEach(t => {
+          allReminders.push({ 
+            time: t, 
+            message: `💊 Time to take medicine${state.medicineDosage ? ` (${state.medicineDosage})` : ''}`, 
+            priority: 2 
+          });
+        });
+      }
+      
+      if (state.eatFood && state.foodTimes.length > 0) {
+        state.foodTimes.forEach(t => {
+          allReminders.push({ time: t, message: "🍽️ Time to eat!", priority: 1 });
+        });
+      }
+      
+      state.customReminders
+        .filter(r => r.enabled && r.times.length > 0)
+        .forEach(reminder => {
+          reminder.times.forEach(t => {
+            allReminders.push({ time: t, message: `⏰ ${reminder.name || 'Custom reminder'}`, priority: 1 });
+          });
+        });
+      
+      // Find next reminder
+      const sortedReminders = allReminders
+        .map(r => {
+          const [hours, minutes] = r.time.split(':').map(Number);
+          const reminderTimeInSeconds = hours * 3600 + minutes * 60;
+          const diff = reminderTimeInSeconds >= currentTimeInSeconds
+            ? reminderTimeInSeconds - currentTimeInSeconds
+            : (24 * 3600) - currentTimeInSeconds + reminderTimeInSeconds;
+          return { ...r, diff };
+        })
+        .sort((a, b) => {
+          if (a.diff !== b.diff) return a.diff - b.diff;
+          return b.priority - a.priority;
+        });
+      
+      if (sortedReminders.length > 0) {
+        const next = sortedReminders[0];
+        setNextReminder({ message: next.message, time: next.time });
+        
+        // Calculate countdown with seconds
+        // next.diff is now in seconds
+        const hours = Math.floor(next.diff / 3600);
+        const minutes = Math.floor((next.diff % 3600) / 60);
+        const seconds = next.diff % 60;
+        
+        if (hours > 0) {
+          setCountdown(`${hours}h ${minutes}m ${seconds}s`);
+        } else if (minutes > 0) {
+          setCountdown(`${minutes}m ${seconds}s`);
+        } else {
+          setCountdown(`${seconds}s`);
+        }
+        
+        // Check if reminder is due (within 1 minute = 60 seconds)
+        if (next.diff <= 60) {
+          // Add alert
+          setAlerts(prev => {
+            const alertId = `${next.time}-${next.message}`;
+            if (!prev.some(a => a.id === alertId)) {
+              return [...prev, {
+                id: alertId,
+                type: 'reminder',
+                message: next.message,
+                time: next.time,
+                timestamp: Date.now()
+              }];
+            }
+            return prev;
+          });
+          
+          // Show floating notification when reminder is due (within 60 seconds)
+          if (next.diff <= 60) {
+            setNotificationMessage(next.message);
+            setShowNotification(true);
+            // Auto-hide after 5 seconds
+            setTimeout(() => setShowNotification(false), 5000);
+          }
+        }
+      } else {
+        setNextReminder(null);
+        setCountdown("");
+      }
+    };
+    
+    calculateNextReminder();
+    const interval = setInterval(calculateNextReminder, 1000);
+    
+    return () => clearInterval(interval);
+  }, [state]);
 
   function persist(next: RemindersState) {
     try {
@@ -214,6 +338,14 @@ export default function RemindersPage() {
     });
   }
 
+  const dismissAlert = (id: string) => {
+    setAlerts(prev => prev.filter(a => a.id !== id));
+  };
+
+  const clearAllAlerts = () => {
+    setAlerts([]);
+  };
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
@@ -227,6 +359,23 @@ export default function RemindersPage() {
           </div>
           {saved ? <span className="text-xs text-amber-400">Saved</span> : <span className="text-xs opacity-60">Auto-saves</span>}
         </div>
+
+        {/* Countdown Section */}
+        {nextReminder && (
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm opacity-80 mb-1">Next Reminder</p>
+                <p className="text-lg font-semibold text-amber-300">{nextReminder.message}</p>
+                <p className="text-xs opacity-60 mt-1">Scheduled for {nextReminder.time}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm opacity-80 mb-1">Time Remaining</p>
+                <p className="text-3xl font-bold text-amber-400">{countdown}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Drink Water */}
         <section className="rounded-xl border border-white/10 bg-white/5 p-4 mb-4">
@@ -509,6 +658,103 @@ export default function RemindersPage() {
       <Link href="/dashboard" className="fixed bottom-6 left-6 sm:bottom-8 sm:left-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15 transition">
         <span className="text-sm">← Back to Home</span>
       </Link>
+
+      {/* Mail Button for Alerts */}
+      <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8">
+        <button
+          onClick={() => setShowAlerts(!showAlerts)}
+          className="relative rounded-full border border-cyan-400/30 bg-cyan-500/10 p-4 hover:bg-cyan-500/20 transition-all shadow-lg"
+          aria-label="View alerts"
+        >
+          <span className="text-2xl text-cyan-300">✉️</span>
+          {alerts.length > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+              {alerts.length}
+            </span>
+          )}
+        </button>
+
+        {/* Alerts Panel */}
+        {showAlerts && (
+          <>
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setShowAlerts(false)}
+            />
+            <div className="absolute bottom-16 right-0 z-50 w-80 rounded-xl border border-cyan-400/30 bg-gradient-to-br from-cyan-950/95 to-blue-950/95 shadow-2xl p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-cyan-300">Reminders</h3>
+                <button
+                  onClick={() => setShowAlerts(false)}
+                  className="rounded-full p-1 hover:bg-white/10 text-xl"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              
+              {alerts.length === 0 ? (
+                <p className="py-8 text-center text-sm opacity-60">No active reminders</p>
+              ) : (
+                <>
+                  <div className="max-h-96 space-y-2 overflow-y-auto">
+                    {alerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        className="rounded-lg border border-cyan-400/20 bg-cyan-500/10 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-cyan-200">{alert.message}</p>
+                            <p className="mt-1 text-xs opacity-60">{alert.time}</p>
+                          </div>
+                          <button
+                            onClick={() => dismissAlert(alert.id)}
+                            className="rounded-full p-1 hover:bg-white/10 text-lg"
+                            aria-label="Dismiss"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {alerts.length > 0 && (
+                    <button
+                      onClick={clearAllAlerts}
+                      className="mt-3 w-full rounded-lg border border-red-400/30 bg-red-500/10 py-2 text-sm text-red-300 hover:bg-red-500/20"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Floating Notification */}
+      {showNotification && (
+        <div className="fixed top-6 right-6 sm:top-8 sm:right-8 z-50 animate-in slide-in-from-top-5 duration-300">
+          <div className="rounded-xl border border-amber-400/50 bg-gradient-to-br from-amber-500/20 to-orange-500/20 backdrop-blur-lg shadow-2xl p-6 max-w-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 text-3xl animate-pulse">🔔</div>
+              <div className="flex-1">
+                <h4 className="text-lg font-semibold text-amber-300 mb-1">Reminder!</h4>
+                <p className="text-white/90 text-sm">{notificationMessage}</p>
+              </div>
+              <button
+                onClick={() => setShowNotification(false)}
+                className="flex-shrink-0 rounded-full p-1 hover:bg-white/10 text-xl text-white/70"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
