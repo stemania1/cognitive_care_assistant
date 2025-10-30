@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,18 @@ export default function SignIn() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const router = useRouter();
   const captchaRef = useRef<HCaptcha>(null);
+  const overviewVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    // Attempt to autoplay when mounted; required by some browsers even with muted
+    const v = overviewVideoRef.current;
+    if (v) {
+      v.muted = true;
+      v.play().catch(() => {
+        // Ignore autoplay rejection; user can press play
+      });
+    }
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,15 +189,21 @@ export default function SignIn() {
         <div className="mb-8">
           <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
             <video
-              src="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4"
-              className="w-full h-full max-h-[360px] object-cover"
+              ref={overviewVideoRef}
+              className="w-full aspect-video object-cover"
               controls
               playsInline
               muted
               autoPlay
               loop
-              preload="metadata"
-            />
+              preload="auto"
+              controlsList="nodownload"
+            >
+              <source
+                src="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4"
+                type="video/mp4"
+              />
+            </video>
           </div>
           <p className="mt-2 text-xs text-gray-400 text-center">
             Cognitive Care Assistant – Overview & Behind the Scenes
