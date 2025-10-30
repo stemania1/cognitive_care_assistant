@@ -193,8 +193,8 @@ export default function SignIn() {
               />
             </div>
           </div>
-          <p className="mt-3 text-sm text-gray-300 text-center">
-            Cognitive Care Assistant – Overview & Behind the Scenes
+          <p className="mt-3 text-sm text-gray-300 text-center font-bold">
+            Care Assistant: Technology that Restores Freedom From Dementia (with User Overview)
           </p>
           <p className="mt-1 text-[11px] text-gray-400 text-center">
             Watch on YouTube: <a href={YOUTUBE_WATCH_URL} target="_blank" rel="noreferrer" className="underline">{YOUTUBE_WATCH_URL}</a>
