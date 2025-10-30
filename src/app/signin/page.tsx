@@ -19,10 +19,16 @@ export default function SignIn() {
   const [showPlayOverlay, setShowPlayOverlay] = useState(true);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [videoError, setVideoError] = useState(false);
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const videoMobilePath = "/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-mobile.mp4";
   const videoLargePath = "/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4";
-  const videoLargeUrl = `${baseUrl}${videoLargePath}`;
+  const [videoLargeUrl, setVideoLargeUrl] = useState<string>(videoLargePath);
+
+  useEffect(() => {
+    // Avoid hydration mismatch by setting absolute URL after mount
+    if (typeof window !== 'undefined') {
+      setVideoLargeUrl(`${window.location.origin}${videoLargePath}`);
+    }
+  }, [videoLargePath]);
 
   useEffect(() => {
     // No autoplay; rely on click-to-play for reliability on production/mobile
