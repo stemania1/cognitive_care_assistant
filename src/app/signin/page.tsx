@@ -16,33 +16,11 @@ export default function SignIn() {
   const router = useRouter();
   const captchaRef = useRef<HCaptcha>(null);
   const overviewVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [showPlayOverlay, setShowPlayOverlay] = useState(false);
+  const [showPlayOverlay, setShowPlayOverlay] = useState(true);
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
 
   useEffect(() => {
-    // Attempt to autoplay when mounted; required by some browsers even with muted
-    const v = overviewVideoRef.current;
-    if (v) {
-      v.muted = true;
-      const tryPlay = () => v.play().catch(() => setShowPlayOverlay(true));
-
-      // Try immediately
-      tryPlay();
-
-      // Try again once metadata/canplay are ready
-      const onCanPlay = () => tryPlay();
-      const onLoadedData = () => tryPlay();
-      v.addEventListener('canplay', onCanPlay);
-      v.addEventListener('loadeddata', onLoadedData);
-
-      // As a final fallback, try after a short delay (for iOS timing quirks)
-      const t = setTimeout(tryPlay, 800);
-
-      return () => {
-        v.removeEventListener('canplay', onCanPlay);
-        v.removeEventListener('loadeddata', onLoadedData);
-        clearTimeout(t);
-      };
-    }
+    // No autoplay; rely on click-to-play for reliability on production/mobile
   }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -177,7 +155,7 @@ export default function SignIn() {
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
       <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
 
-      <main className="relative mx-auto max-w-md px-6 sm:px-8 py-12 sm:py-20">
+      <main className="relative mx-auto max-w-3xl px-6 sm:px-8 py-12 sm:py-20">
         {/* Logo and Title */}
         <div className="flex flex-col items-center text-center gap-6 mb-10">
           <div className="relative">
@@ -203,7 +181,7 @@ export default function SignIn() {
         </div>
 
         {/* Overview Video */}
-        <div className="mb-8">
+        <div className="mb-10">
           <div className="relative rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
             <video
               ref={overviewVideoRef}
@@ -212,11 +190,11 @@ export default function SignIn() {
               playsInline
               webkit-playsinline="true"
               x5-playsinline="true"
-              muted
-              autoPlay
-              loop
-              preload="auto"
+              preload="none"
               controlsList="nodownload"
+              onLoadedData={() => setIsVideoLoading(false)}
+              onPlay={() => setShowPlayOverlay(false)}
+              onWaiting={() => setIsVideoLoading(true)}
             >
               <source
                 src="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4"
@@ -227,25 +205,35 @@ export default function SignIn() {
               <button
                 type="button"
                 aria-label="Play video"
-                onClick={() => {
+                onClick={async () => {
                   const v = overviewVideoRef.current;
                   if (!v) return;
-                  v.muted = true;
-                  v.play().then(() => setShowPlayOverlay(false)).catch(() => {});
+                  try {
+                    setIsVideoLoading(true);
+                    await v.play();
+                    setShowPlayOverlay(false);
+                  } catch {
+                    setIsVideoLoading(false);
+                  }
                 }}
                 className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition"
               >
-                <span className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/90 text-black text-2xl">▶</span>
+                <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/90 text-black text-3xl">▶</span>
               </button>
             )}
+            {isVideoLoading && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-10 h-10 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              </div>
+            )}
           </div>
-          <p className="mt-2 text-xs text-gray-400 text-center">
+          <p className="mt-3 text-sm text-gray-300 text-center">
             Cognitive Care Assistant – Overview & Behind the Scenes
           </p>
         </div>
 
         {/* Sign In Form */}
-        <div className="relative">
+        <div className="relative max-w-md mx-auto">
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/10 via-purple-500/5 to-cyan-500/10 blur-xl" />
           <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6 sm:p-8">
             <form onSubmit={handleSignIn} className="space-y-6">
