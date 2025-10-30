@@ -16,15 +16,32 @@ export default function SignIn() {
   const router = useRouter();
   const captchaRef = useRef<HCaptcha>(null);
   const overviewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [showPlayOverlay, setShowPlayOverlay] = useState(false);
 
   useEffect(() => {
     // Attempt to autoplay when mounted; required by some browsers even with muted
     const v = overviewVideoRef.current;
     if (v) {
       v.muted = true;
-      v.play().catch(() => {
-        // Ignore autoplay rejection; user can press play
-      });
+      const tryPlay = () => v.play().catch(() => setShowPlayOverlay(true));
+
+      // Try immediately
+      tryPlay();
+
+      // Try again once metadata/canplay are ready
+      const onCanPlay = () => tryPlay();
+      const onLoadedData = () => tryPlay();
+      v.addEventListener('canplay', onCanPlay);
+      v.addEventListener('loadeddata', onLoadedData);
+
+      // As a final fallback, try after a short delay (for iOS timing quirks)
+      const t = setTimeout(tryPlay, 800);
+
+      return () => {
+        v.removeEventListener('canplay', onCanPlay);
+        v.removeEventListener('loadeddata', onLoadedData);
+        clearTimeout(t);
+      };
     }
   }, []);
 
@@ -187,12 +204,14 @@ export default function SignIn() {
 
         {/* Overview Video */}
         <div className="mb-8">
-          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+          <div className="relative rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
             <video
               ref={overviewVideoRef}
               className="w-full aspect-video object-cover"
               controls
               playsInline
+              webkit-playsinline="true"
+              x5-playsinline="true"
               muted
               autoPlay
               loop
@@ -204,6 +223,21 @@ export default function SignIn() {
                 type="video/mp4"
               />
             </video>
+            {showPlayOverlay && (
+              <button
+                type="button"
+                aria-label="Play video"
+                onClick={() => {
+                  const v = overviewVideoRef.current;
+                  if (!v) return;
+                  v.muted = true;
+                  v.play().then(() => setShowPlayOverlay(false)).catch(() => {});
+                }}
+                className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition"
+              >
+                <span className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/90 text-black text-2xl">▶</span>
+              </button>
+            )}
           </div>
           <p className="mt-2 text-xs text-gray-400 text-center">
             Cognitive Care Assistant – Overview & Behind the Scenes
