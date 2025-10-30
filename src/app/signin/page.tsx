@@ -173,6 +173,25 @@ export default function SignIn() {
           </p>
         </div>
 
+        {/* Overview Video */}
+        <div className="mb-8">
+          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+            <video
+              src="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4"
+              className="w-full h-full max-h-[360px] object-cover"
+              controls
+              playsInline
+              muted
+              autoPlay
+              loop
+              preload="metadata"
+            />
+          </div>
+          <p className="mt-2 text-xs text-gray-400 text-center">
+            Cognitive Care Assistant – Overview & Behind the Scenes
+          </p>
+        </div>
+
         {/* Sign In Form */}
         <div className="relative">
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/10 via-purple-500/5 to-cyan-500/10 blur-xl" />
