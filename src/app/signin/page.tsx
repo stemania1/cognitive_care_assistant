@@ -18,6 +18,7 @@ export default function SignIn() {
   const overviewVideoRef = useRef<HTMLVideoElement | null>(null);
   const [showPlayOverlay, setShowPlayOverlay] = useState(true);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   useEffect(() => {
     // No autoplay; rely on click-to-play for reliability on production/mobile
@@ -195,7 +196,14 @@ export default function SignIn() {
               onLoadedData={() => setIsVideoLoading(false)}
               onPlay={() => setShowPlayOverlay(false)}
               onWaiting={() => setIsVideoLoading(true)}
+              onError={() => { setVideoError(true); setIsVideoLoading(false); setShowPlayOverlay(false); }}
+              poster="/digital_brain.png"
             >
+              <source
+                src="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-mobile.mp4"
+                type="video/mp4"
+                media="(max-width: 768px)"
+              />
               <source
                 src="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4"
                 type="video/mp4"
@@ -224,6 +232,16 @@ export default function SignIn() {
             {isVideoLoading && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-10 h-10 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              </div>
+            )}
+            {videoError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <div className="text-center p-4">
+                  <p className="text-sm text-red-300 mb-2">Unable to play video.</p>
+                  <a href="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4" target="_blank" className="text-cyan-300 underline">
+                    Open video in a new tab
+                  </a>
+                </div>
               </div>
             )}
           </div>

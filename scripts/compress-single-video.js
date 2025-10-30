@@ -11,7 +11,7 @@ async function ensureDir(dir) {
   }
 }
 
-async function compressVideo(inputPath, outputPath) {
+async function compressVideo(inputPath, outputPath, { mobile = false } = {}) {
   console.log(`🎥 Compressing: ${inputPath}`);
   try {
     await execAsync('ffmpeg -version');
@@ -21,7 +21,11 @@ async function compressVideo(inputPath, outputPath) {
   }
 
   // H.264 + aac, web-friendly, faststart for progressive playback
-  const cmd = `ffmpeg -y -i "${inputPath}" -c:v libx264 -preset fast -crf 28 -c:a aac -b:a 128k -movflags +faststart "${outputPath}"`;
+  // If mobile flag, scale down to 1280x720 max with higher CRF for smaller size
+  const vf = mobile ? "-vf scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" : '';
+  const crf = mobile ? 32 : 28;
+  const preset = mobile ? 'veryfast' : 'fast';
+  const cmd = `ffmpeg -y -i "${inputPath}" ${vf} -c:v libx264 -preset ${preset} -crf ${crf} -c:a aac -b:a 128k -movflags +faststart "${outputPath}"`;
   await execAsync(cmd);
 
   const sizeMB = (fs.statSync(outputPath).size / (1024 * 1024)).toFixed(2);
@@ -29,8 +33,11 @@ async function compressVideo(inputPath, outputPath) {
 }
 
 async function main() {
-  const input = process.argv[2];
-  let output = process.argv[3];
+  const argv = process.argv.slice(2);
+  const isMobile = argv.includes('--mobile');
+  const positional = argv.filter(a => !a.startsWith('--'));
+  const input = positional[0];
+  let output = positional[1];
 
   if (!input) {
     console.error('Usage: node scripts/compress-single-video.js <inputPath> [outputPath]');
@@ -49,13 +56,13 @@ async function main() {
     const base = path.basename(inputAbs).replace(/\s+/g, '-').toLowerCase();
     const ext = path.extname(base);
     const name = base.slice(0, -ext.length);
-    output = path.join(publicVideosDir, `${name}-compressed${ext || '.mp4'}`);
+    output = path.join(publicVideosDir, `${name}-${isMobile ? 'mobile' : 'compressed'}${ext || '.mp4'}`);
   } else {
     const outputDir = path.dirname(path.isAbsolute(output) ? output : path.resolve(process.cwd(), output));
     await ensureDir(outputDir);
   }
 
-  await compressVideo(inputAbs, output);
+  await compressVideo(inputAbs, output, { mobile: isMobile });
 }
 
 main().catch((e) => {
