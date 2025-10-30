@@ -19,6 +19,10 @@ export default function SignIn() {
   const [showPlayOverlay, setShowPlayOverlay] = useState(true);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const videoMobilePath = "/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-mobile.mp4";
+  const videoLargePath = "/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4";
+  const videoLargeUrl = `${baseUrl}${videoLargePath}`;
 
   useEffect(() => {
     // No autoplay; rely on click-to-play for reliability on production/mobile
@@ -238,7 +242,7 @@ export default function SignIn() {
               <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                 <div className="text-center p-4">
                   <p className="text-sm text-red-300 mb-2">Unable to play video.</p>
-                  <a href="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4" target="_blank" className="text-cyan-300 underline">
+                  <a href={videoLargeUrl} target="_blank" rel="noreferrer" className="text-cyan-300 underline">
                     Open video in a new tab
                   </a>
                 </div>
@@ -247,6 +251,9 @@ export default function SignIn() {
           </div>
           <p className="mt-3 text-sm text-gray-300 text-center">
             Cognitive Care Assistant – Overview & Behind the Scenes
+          </p>
+          <p className="mt-1 text-[11px] text-gray-400 text-center">
+            Direct video link: <a href={videoLargeUrl} target="_blank" rel="noreferrer" className="underline">{videoLargePath}</a>
           </p>
         </div>
 
