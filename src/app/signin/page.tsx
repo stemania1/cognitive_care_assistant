@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import videoMobileSrc from "@/../public/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-mobile.mp4";
+import videoLargeSrc from "@/../public/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -19,16 +21,9 @@ export default function SignIn() {
   const [showPlayOverlay, setShowPlayOverlay] = useState(true);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [videoError, setVideoError] = useState(false);
-  const videoMobilePath = "/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-mobile.mp4";
-  const videoLargePath = "/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4";
-  const [videoLargeUrl, setVideoLargeUrl] = useState<string>(videoLargePath);
-
-  useEffect(() => {
-    // Avoid hydration mismatch by setting absolute URL after mount
-    if (typeof window !== 'undefined') {
-      setVideoLargeUrl(`${window.location.origin}${videoLargePath}`);
-    }
-  }, [videoLargePath]);
+  const videoMobilePath = videoMobileSrc as unknown as string;
+  const videoLargePath = videoLargeSrc as unknown as string;
+  const [videoLargeUrl] = useState<string>(videoLargePath);
 
   useEffect(() => {
     // No autoplay; rely on click-to-play for reliability on production/mobile
