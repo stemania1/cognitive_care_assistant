@@ -15,22 +15,11 @@ export default function SignIn() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const router = useRouter();
   const captchaRef = useRef<HCaptcha>(null);
-  const overviewVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [showPlayOverlay, setShowPlayOverlay] = useState(true);
-  const [isVideoLoading, setIsVideoLoading] = useState(false);
-  const [videoError, setVideoError] = useState(false);
-  const videoMobilePath = "/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-mobile.mp4";
-  const videoLargePath = "/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4";
-  const [videoLargeUrl, setVideoLargeUrl] = useState<string>(videoLargePath);
+  const YOUTUBE_WATCH_URL = "https://youtu.be/pIXN4iN-VQA";
+  const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed/pIXN4iN-VQA";
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setVideoLargeUrl(`${window.location.origin}${videoLargePath}`);
-    }
-  }, [videoLargePath]);
-
-  useEffect(() => {
-    // No autoplay; rely on click-to-play for reliability on production/mobile
+    // No-op: keeping hook structure consistent
   }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -190,75 +179,25 @@ export default function SignIn() {
           </p>
         </div>
 
-        {/* Overview Video */}
+        {/* Overview Video (YouTube Embed) */}
         <div className="mb-10">
           <div className="relative rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-            <video
-              ref={overviewVideoRef}
-              className="w-full aspect-video object-cover"
-              controls
-              playsInline
-              webkit-playsinline="true"
-              x5-playsinline="true"
-              preload="none"
-              controlsList="nodownload"
-              onLoadedData={() => setIsVideoLoading(false)}
-              onPlay={() => setShowPlayOverlay(false)}
-              onWaiting={() => setIsVideoLoading(true)}
-              onError={() => { setVideoError(true); setIsVideoLoading(false); setShowPlayOverlay(false); }}
-              poster="/digital_brain.png"
-            >
-              <source
-                src="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-mobile.mp4"
-                type="video/mp4"
-                media="(max-width: 768px)"
+            <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
+              <iframe
+                src={`${YOUTUBE_EMBED_URL}?rel=0`}
+                title="Cognitive Care Assistant – Overview & Behind the Scenes"
+                className="absolute inset-0 w-full h-full"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
               />
-              <source
-                src="/videos/cognitive-care-assistant-user-overview-and-behind-the-scenes-compressed.mp4"
-                type="video/mp4"
-              />
-            </video>
-            {showPlayOverlay && (
-              <button
-                type="button"
-                aria-label="Play video"
-                onClick={async () => {
-                  const v = overviewVideoRef.current;
-                  if (!v) return;
-                  try {
-                    setIsVideoLoading(true);
-                    await v.play();
-                    setShowPlayOverlay(false);
-                  } catch {
-                    setIsVideoLoading(false);
-                  }
-                }}
-                className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition"
-              >
-                <span className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/90 text-black text-3xl">▶</span>
-              </button>
-            )}
-            {isVideoLoading && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-10 h-10 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              </div>
-            )}
-            {videoError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                <div className="text-center p-4">
-                  <p className="text-sm text-red-300 mb-2">Unable to play video.</p>
-                  <a href={videoLargeUrl} target="_blank" rel="noreferrer" className="text-cyan-300 underline">
-                    Open video in a new tab
-                  </a>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
           <p className="mt-3 text-sm text-gray-300 text-center">
             Cognitive Care Assistant – Overview & Behind the Scenes
           </p>
           <p className="mt-1 text-[11px] text-gray-400 text-center">
-            Direct video link: <a href={videoLargeUrl} target="_blank" rel="noreferrer" className="underline">{videoLargePath}</a>
+            Watch on YouTube: <a href={YOUTUBE_WATCH_URL} target="_blank" rel="noreferrer" className="underline">{YOUTUBE_WATCH_URL}</a>
           </p>
         </div>
 

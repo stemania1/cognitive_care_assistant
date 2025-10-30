@@ -1,3 +1,6 @@
+# Ignore large overview video uploaded locally
+public/videos/Cognitive Care Assistant User Overview and Behind the Scenes.mp4
+
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
