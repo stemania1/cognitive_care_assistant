@@ -370,6 +370,7 @@ export default function EMGPage() {
   const isFetchingRef = useRef(false);
   const consecutiveFailuresRef = useRef(0);
   const [showWorkoutList, setShowWorkoutList] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
 
   // MyoWare 2.0 data processing functions
   const processMyoWareData = (rawValue: number): number => {
@@ -1181,34 +1182,53 @@ export default function EMGPage() {
 
                 {/* EMG Metrics */}
                 <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
-                  <h3 className="font-medium text-white mb-3">
-                    EMG Metrics to Track
-                  </h3>
-                  <p className="text-sm text-gray-300 mb-3">
-                    These metrics help translate raw sensor data into actionable insights for both caregivers and clinicians.
-                  </p>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-white/10 text-sm text-left text-gray-200">
-                      <thead className="bg-white/10 text-xs uppercase tracking-wide text-gray-300">
-                        <tr>
-                          <th scope="col" className="px-4 py-3 font-semibold">Metric</th>
-                          <th scope="col" className="px-4 py-3 font-semibold">Type</th>
-                          <th scope="col" className="px-4 py-3 font-semibold">Definition / Calculation</th>
-                          <th scope="col" className="px-4 py-3 font-semibold">Purpose</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
-                        {EMG_METRICS.map((item) => (
-                          <tr key={item.metric} className="hover:bg-white/5 transition-colors duration-150">
-                            <td className="px-4 py-3 font-medium text-white">{item.metric}</td>
-                            <td className="px-4 py-3">{item.type}</td>
-                            <td className="px-4 py-3 text-gray-300">{item.definition}</td>
-                            <td className="px-4 py-3 text-gray-300">{item.purpose}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowMetrics((prev) => !prev)}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 transition-colors"
+                    aria-expanded={showMetrics}
+                    aria-controls="emg-metrics-panel"
+                  >
+                    <div>
+                      <h3 className="font-medium text-white">
+                        EMG Metrics to Track
+                      </h3>
+                      <p className="text-xs text-gray-300">
+                        Translate raw EMG data into caregiver- and clinician-friendly insights.
+                      </p>
+                    </div>
+                    <span className="text-lg text-gray-200">
+                      {showMetrics ? '−' : '+'}
+                    </span>
+                  </button>
+                  {showMetrics && (
+                    <div
+                      id="emg-metrics-panel"
+                      className="mt-4 space-y-3"
+                    >
+                      {EMG_METRICS.map((item) => (
+                        <div
+                          key={item.metric}
+                          className="rounded-xl border border-white/10 bg-white/10 p-4 shadow-inner"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+                            <h4 className="text-base font-semibold text-white">
+                              {item.metric}
+                            </h4>
+                            <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs uppercase tracking-wide text-gray-200">
+                              {item.type}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-200 mb-2">
+                            <span className="font-medium text-white">Definition:</span> {item.definition}
+                          </p>
+                          <p className="text-sm text-gray-200">
+                            <span className="font-medium text-white">Purpose:</span> {item.purpose}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Workout Instructions */}
