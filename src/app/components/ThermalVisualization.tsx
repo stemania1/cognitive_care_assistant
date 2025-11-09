@@ -141,7 +141,10 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
               setThermalData(smoothedData);
               setSensorInfo(data.sensor_info);
               setLastUpdate(new Date());
-              onDataReceived(data);
+              onDataReceived({
+                ...data,
+                thermal_data: smoothedData,
+              });
             }
           } catch (error) {
             console.error('Error parsing WebSocket data:', error);
@@ -327,7 +330,10 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
           setThermalData(smoothedData);
           setSensorInfo(data.sensor_info);
           setLastUpdate(new Date());
-          onDataReceived(data);
+          onDataReceived({
+            ...data,
+            thermal_data: smoothedData,
+          });
           
           // Update connection status to connected when we successfully receive data
           if (lastConnectionStatus.current !== 'connected') {

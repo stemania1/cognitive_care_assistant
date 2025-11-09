@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useAlertCenter } from "../components/AlertCenter";
 
 type ReminderKey = "drinkWater" | "takeMedicine" | "eatFood";
 
@@ -23,16 +24,10 @@ type RemindersState = {
   customReminders: CustomReminder[];
 };
 
-type ReminderAlert = {
-  id: string;
-  type: string;
-  message: string;
-  time: string;
-  timestamp: number;
-};
-
 export default function RemindersPage() {
   const storageKey = "reminders:v2";
+  const { addAlert } = useAlertCenter();
+  const triggeredAlertsRef = useRef<Map<string, number>>(new Map());
   const [state, setState] = useState<RemindersState>({
     drinkWater: false,
     takeMedicine: false,
@@ -50,8 +45,6 @@ export default function RemindersPage() {
   const [customTimeInputs, setCustomTimeInputs] = useState<Record<string, string>>({});
   const [countdown, setCountdown] = useState<string>("");
   const [nextReminder, setNextReminder] = useState<{ message: string; time: string } | null>(null);
-  const [alerts, setAlerts] = useState<ReminderAlert[]>([]);
-  const [showAlerts, setShowAlerts] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState<string>("");
 
@@ -137,28 +130,29 @@ export default function RemindersPage() {
         
         // Check if reminder is due (within 1 minute = 60 seconds)
         if (next.diff <= 60) {
-          // Add alert
-          setAlerts(prev => {
-            const alertId = `${next.time}-${next.message}`;
-            if (!prev.some(a => a.id === alertId)) {
-              return [...prev, {
-                id: alertId,
-                type: 'reminder',
-                message: next.message,
-                time: next.time,
-                timestamp: Date.now()
-              }];
+          const alertId = `${next.time}-${next.message}`;
+          const now = Date.now();
+
+          // Clear entries older than 4 hours so daily reminders can re-trigger
+          triggeredAlertsRef.current.forEach((timestamp, key) => {
+            if (now - timestamp > 4 * 60 * 60 * 1000) {
+              triggeredAlertsRef.current.delete(key);
             }
-            return prev;
           });
-          
-          // Show floating notification when reminder is due (within 60 seconds)
-          if (next.diff <= 60) {
-            setNotificationMessage(next.message);
-            setShowNotification(true);
-            // Auto-hide after 5 seconds
-            setTimeout(() => setShowNotification(false), 5000);
+
+          const lastTriggered = triggeredAlertsRef.current.get(alertId) ?? 0;
+          if (now - lastTriggered > 60_000) {
+            addAlert({
+              message: `${next.message} scheduled for ${next.time}`,
+              severity: "warning",
+              source: "Reminders",
+            });
+            triggeredAlertsRef.current.set(alertId, now);
           }
+
+          setNotificationMessage(next.message);
+          setShowNotification(true);
+          setTimeout(() => setShowNotification(false), 5000);
         }
       } else {
         setNextReminder(null);
@@ -337,14 +331,6 @@ export default function RemindersPage() {
       return next;
     });
   }
-
-  const dismissAlert = (id: string) => {
-    setAlerts(prev => prev.filter(a => a.id !== id));
-  };
-
-  const clearAllAlerts = () => {
-    setAlerts([]);
-  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
@@ -658,81 +644,6 @@ export default function RemindersPage() {
       <Link href="/dashboard" className="fixed bottom-6 left-6 sm:bottom-8 sm:left-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 hover:bg-white/15 transition">
         <span className="text-sm">← Back to Home</span>
       </Link>
-
-      {/* Mail Button for Alerts */}
-      <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8">
-        <button
-          onClick={() => setShowAlerts(!showAlerts)}
-          className="relative rounded-full border border-cyan-400/30 bg-cyan-500/10 p-4 hover:bg-cyan-500/20 transition-all shadow-lg"
-          aria-label="View alerts"
-        >
-          <span className="text-2xl text-cyan-300">✉️</span>
-          {alerts.length > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-              {alerts.length}
-            </span>
-          )}
-        </button>
-
-        {/* Alerts Panel */}
-        {showAlerts && (
-          <>
-            <div 
-              className="fixed inset-0 z-40" 
-              onClick={() => setShowAlerts(false)}
-            />
-            <div className="absolute bottom-16 right-0 z-50 w-80 rounded-xl border border-cyan-400/30 bg-gradient-to-br from-cyan-950/95 to-blue-950/95 shadow-2xl p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-cyan-300">Reminders</h3>
-                <button
-                  onClick={() => setShowAlerts(false)}
-                  className="rounded-full p-1 hover:bg-white/10 text-xl"
-                  aria-label="Close"
-                >
-                  ×
-                </button>
-              </div>
-              
-              {alerts.length === 0 ? (
-                <p className="py-8 text-center text-sm opacity-60">No active reminders</p>
-              ) : (
-                <>
-                  <div className="max-h-96 space-y-2 overflow-y-auto">
-                    {alerts.map((alert) => (
-                      <div
-                        key={alert.id}
-                        className="rounded-lg border border-cyan-400/20 bg-cyan-500/10 p-3"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-cyan-200">{alert.message}</p>
-                            <p className="mt-1 text-xs opacity-60">{alert.time}</p>
-                          </div>
-                          <button
-                            onClick={() => dismissAlert(alert.id)}
-                            className="rounded-full p-1 hover:bg-white/10 text-lg"
-                            aria-label="Dismiss"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {alerts.length > 0 && (
-                    <button
-                      onClick={clearAllAlerts}
-                      className="mt-3 w-full rounded-lg border border-red-400/30 bg-red-500/10 py-2 text-sm text-red-300 hover:bg-red-500/20"
-                    >
-                      Clear All
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </>
-        )}
-      </div>
 
       {/* Floating Notification */}
       {showNotification && (

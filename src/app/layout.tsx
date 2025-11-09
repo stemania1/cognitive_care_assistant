@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { UserStatusIndicator } from "./components/UserStatusIndicator";
+import { AlertProvider } from "./components/AlertCenter";
+import { GlobalAlertButton } from "./components/GlobalAlertButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,8 +30,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <UserStatusIndicator />
-        {children}
+        <AlertProvider>
+          <UserStatusIndicator />
+          {children}
+          <GlobalAlertButton />
+        </AlertProvider>
       </body>
     </html>
   );
