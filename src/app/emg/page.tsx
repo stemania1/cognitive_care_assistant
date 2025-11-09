@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from "next/link";
 import MyoWareClient from '../components/MyoWareClient';
 import EMGChart from '../components/EMGChart';
@@ -634,6 +634,95 @@ export default function EMGPage() {
     setTimeout(autoConnect, 1000);
   }, []);
 
+  const liveMetrics = useMemo(() => {
+    if (!chartData.length) {
+      return {
+        averageActivation: null,
+        peakActivation: null,
+        variability: null,
+        snr: null,
+        sampleCount: 0,
+        restSamples: 0,
+      };
+    }
+
+    const processedValues = chartData.map(d => d.muscleActivityProcessed).filter(v => Number.isFinite(v));
+    const rawValues = chartData.map(d => d.muscleActivity).filter(v => Number.isFinite(v));
+
+    if (!processedValues.length || !rawValues.length) {
+      return {
+        averageActivation: null,
+        peakActivation: null,
+        variability: null,
+        snr: null,
+        sampleCount: chartData.length,
+        restSamples: 0,
+      };
+    }
+
+    const mean = processedValues.reduce((acc, v) => acc + v, 0) / processedValues.length;
+    const peak = Math.max(...processedValues);
+    const variance = processedValues.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / processedValues.length;
+    const stdDev = Math.sqrt(variance);
+    const variability = mean > 0 ? (stdDev / mean) * 100 : 0;
+
+    const restSamples = chartData.filter(d => d.muscleActivityProcessed < 5);
+    let noise = 0;
+    if (restSamples.length > 5) {
+      const restValues = restSamples.map(d => d.muscleActivity);
+      const restMean = restValues.reduce((acc, v) => acc + v, 0) / restValues.length;
+      const restVariance = restValues.reduce((acc, v) => acc + Math.pow(v - restMean, 2), 0) / restValues.length;
+      noise = Math.sqrt(restVariance);
+    } else {
+      const rawMean = rawValues.reduce((acc, v) => acc + v, 0) / rawValues.length;
+      const rawVariance = rawValues.reduce((acc, v) => acc + Math.pow(v - rawMean, 2), 0) / rawValues.length;
+      noise = Math.sqrt(rawVariance);
+    }
+    const rawMean = rawValues.reduce((acc, v) => acc + v, 0) / rawValues.length;
+    const snr = noise > 0 ? rawMean / noise : null;
+
+    return {
+      averageActivation: mean,
+      peakActivation: peak,
+      variability,
+      snr,
+      sampleCount: processedValues.length,
+      restSamples: restSamples.length,
+    };
+  }, [chartData]);
+
+  const formatPercent = (value: number | null) => {
+    if (value === null || !Number.isFinite(value)) return '—';
+    return `${value.toFixed(1)}%`;
+  };
+
+  const formatVariability = (value: number | null) => {
+    if (value === null || !Number.isFinite(value)) return '—';
+    return `${value.toFixed(1)}% CV`;
+  };
+
+  const formatSnr = (value: number | null) => {
+    if (value === null || !Number.isFinite(value)) return '—';
+    return `${value.toFixed(1)} : 1`;
+  };
+
+  const getVariabilityStatus = (value: number | null) => {
+    if (value === null || !Number.isFinite(value)) return { label: 'No data yet', tone: 'bg-gray-500/20 text-gray-200 border-gray-500/30' };
+    if (value < 15) return { label: 'Steady', tone: 'bg-green-500/20 text-green-100 border-green-500/40' };
+    if (value < 30) return { label: 'Variable', tone: 'bg-yellow-500/20 text-yellow-100 border-yellow-500/40' };
+    return { label: 'Fatigued', tone: 'bg-red-500/25 text-red-100 border-red-500/40' };
+  };
+
+  const getSnrStatus = (value: number | null) => {
+    if (value === null || !Number.isFinite(value)) return { label: 'Need signal', tone: 'bg-gray-500/20 text-gray-200 border-gray-500/30' };
+    if (value >= 5) return { label: 'Excellent contact', tone: 'bg-green-500/20 text-green-100 border-green-500/40' };
+    if (value >= 3) return { label: 'Usable', tone: 'bg-yellow-500/20 text-yellow-100 border-yellow-500/40' };
+    return { label: 'Check sensor', tone: 'bg-red-500/25 text-red-100 border-red-500/40' };
+  };
+
+  const variabilityStatus = useMemo(() => getVariabilityStatus(liveMetrics.variability), [liveMetrics.variability]);
+  const snrStatus = useMemo(() => getSnrStatus(liveMetrics.snr), [liveMetrics.snr]);
+
   // Handle MyoWare connection changes
   const handleMyoWareConnection = (connected: boolean) => {
     // Do NOT set connected=true here. We only trust server data to mark connected.
@@ -1169,6 +1258,75 @@ export default function EMGPage() {
                         </div>
                       </div>
                     </div>
+
+                  {/* Live Metrics Summary */}
+                  <div className="mt-4 p-4 rounded-lg bg-white/5 border border-white/10">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Live Sensor Snapshot</h3>
+                        <p className="text-xs text-gray-300">
+                          Updates automatically while the MyoWare sensor is streaming data.
+                        </p>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {liveMetrics.sampleCount > 0
+                          ? `Window: last ${liveMetrics.sampleCount} samples`
+                          : 'Waiting for live samples...'}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                      <div className="rounded-xl border border-white/10 bg-white/10 p-4 shadow-inner">
+                        <h4 className="text-sm font-semibold text-white mb-1">Average Activation</h4>
+                        <div className="text-2xl font-bold text-blue-300 mb-2">
+                          {formatPercent(liveMetrics.averageActivation)}
+                        </div>
+                        <p className="text-xs text-gray-300">
+                          Typical muscle effort compared to your calibrated rest and max values.
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/10 p-4 shadow-inner">
+                        <h4 className="text-sm font-semibold text-white mb-1">Peak Activation</h4>
+                        <div className="text-2xl font-bold text-fuchsia-300 mb-2">
+                          {formatPercent(liveMetrics.peakActivation)}
+                        </div>
+                        <p className="text-xs text-gray-300">
+                          Highest activation detected in the current window.
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/10 p-4 shadow-inner">
+                        <h4 className="text-sm font-semibold text-white mb-1">Activation Steadiness</h4>
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <span className="text-2xl font-bold text-emerald-300">
+                            {formatVariability(liveMetrics.variability)}
+                          </span>
+                          <span
+                            className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-full border ${variabilityStatus.tone}`}
+                          >
+                            {variabilityStatus.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-300">
+                          Lower values mean steadier repetitions; higher values can signal fatigue.
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/10 p-4 shadow-inner">
+                        <h4 className="text-sm font-semibold text-white mb-1">Signal Quality (SNR)</h4>
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <span className="text-2xl font-bold text-cyan-300">
+                            {formatSnr(liveMetrics.snr)}
+                          </span>
+                          <span
+                            className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-full border ${snrStatus.tone}`}
+                          >
+                            {snrStatus.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-300">
+                          Higher ratios mean clean sensor contact; if low, reseat the pads.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   </div>
                 )}
 
@@ -1194,7 +1352,7 @@ export default function EMGPage() {
                         EMG Metrics to Track
                       </h3>
                       <p className="text-xs text-gray-300">
-                        Translate raw EMG data into caregiver- and clinician-friendly insights.
+                        Learn how the live numbers above are calculated so caregivers and clinicians can act quickly.
                       </p>
                     </div>
                     <span className="text-lg text-gray-200">
