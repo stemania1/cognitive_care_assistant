@@ -47,7 +47,7 @@ export default function Dashboard() {
       </main>
 
       {/* Floating Action Buttons */}
-      <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 flex flex-col gap-4">
+      <div className="fixed bottom-6 left-6 sm:bottom-8 sm:left-8 flex flex-col gap-4">
         {/* Sign Out Button */}
         <Link href="/signout" className="group">
           <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-red-500/40 via-pink-500/35 to-rose-500/40 blur-xl opacity-70 group-hover:opacity-90 transition-opacity" />
