@@ -26,6 +26,13 @@ interface WorkoutExercise {
   videoUrl?: string; // Optional demonstration video URL
 }
 
+interface EMGMetric {
+  metric: string;
+  type: string;
+  definition: string;
+  purpose: string;
+}
+
 const WORKOUT_ROUTINES: WorkoutExercise[] = [
   {
     id: 'chair_arm_swings',
@@ -283,6 +290,63 @@ const WORKOUT_ROUTINES: WorkoutExercise[] = [
     sensorPlacement: 'Place on upper arm (bicep) to track arm movement intensity',
     videoUrl: undefined // Will use getVideoUrl() to get Supabase URL in production
   }
+];
+
+const EMG_METRICS: EMGMetric[] = [
+  {
+    metric: 'Mean EMG amplitude (µV or %MVC)',
+    type: 'Quantitative',
+    definition: 'Average signal over active contraction period',
+    purpose: 'Measures average muscle activation intensity',
+  },
+  {
+    metric: 'Peak EMG amplitude (µV)',
+    type: 'Quantitative',
+    definition: 'Maximum signal reached per repetition',
+    purpose: 'Indicates maximal muscle engagement',
+  },
+  {
+    metric: 'EMG variability (Coefficient of Variation)',
+    type: 'Quantitative',
+    definition: '(SD / Mean) × 100',
+    purpose: 'Evaluates steadiness or fatigue during exercise',
+  },
+  {
+    metric: 'Signal-to-noise ratio (SNR)',
+    type: 'Quantitative',
+    definition: 'Mean signal amplitude ÷ baseline noise',
+    purpose: 'Assesses quality of sensor placement and contact',
+  },
+  {
+    metric: 'Latency / response time (ms)',
+    type: 'Quantitative',
+    definition: 'Delay between visual cue and EMG onset',
+    purpose: 'Evaluates neuromuscular response speed',
+  },
+  {
+    metric: 'Classification accuracy (if ML model used)',
+    type: 'Quantitative',
+    definition: '% of correctly classified muscle actions',
+    purpose: 'For pattern recognition or gesture detection modules',
+  },
+  {
+    metric: 'Session compliance rate (%)',
+    type: 'Behavioral',
+    definition: '# sessions with valid EMG data ÷ total sessions',
+    purpose: 'Ensures sensor usability by participants',
+  },
+  {
+    metric: 'User-rated ease of setup (1–10)',
+    type: 'Subjective',
+    definition: 'Likert score in survey',
+    purpose: 'Perceived usability of MyoWare setup and comfort',
+  },
+  {
+    metric: 'Healthcare interpretation utility (1–10)',
+    type: 'Subjective',
+    definition: 'Rated by clinician reviewers',
+    purpose: 'Determines clinical usefulness of EMG graphs',
+  },
 ];
 
 export default function EMGPage() {
@@ -1113,6 +1177,38 @@ export default function EMGPage() {
                     data={isMyoWareConnected ? chartData : []} 
                     isConnected={isMyoWareConnected} 
                   />
+                </div>
+
+                {/* EMG Metrics */}
+                <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+                  <h3 className="font-medium text-white mb-3">
+                    EMG Metrics to Track
+                  </h3>
+                  <p className="text-sm text-gray-300 mb-3">
+                    These metrics help translate raw sensor data into actionable insights for both caregivers and clinicians.
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-white/10 text-sm text-left text-gray-200">
+                      <thead className="bg-white/10 text-xs uppercase tracking-wide text-gray-300">
+                        <tr>
+                          <th scope="col" className="px-4 py-3 font-semibold">Metric</th>
+                          <th scope="col" className="px-4 py-3 font-semibold">Type</th>
+                          <th scope="col" className="px-4 py-3 font-semibold">Definition / Calculation</th>
+                          <th scope="col" className="px-4 py-3 font-semibold">Purpose</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {EMG_METRICS.map((item) => (
+                          <tr key={item.metric} className="hover:bg-white/5 transition-colors duration-150">
+                            <td className="px-4 py-3 font-medium text-white">{item.metric}</td>
+                            <td className="px-4 py-3">{item.type}</td>
+                            <td className="px-4 py-3 text-gray-300">{item.definition}</td>
+                            <td className="px-4 py-3 text-gray-300">{item.purpose}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 {/* Workout Instructions */}
