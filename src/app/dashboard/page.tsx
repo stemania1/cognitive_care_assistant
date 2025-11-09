@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import HomeCards from "../components/HomeCards";
 import { GuestIndicator } from "../components/GuestIndicator";
+import DementiaStagesButton from "../components/DementiaStagesButton";
 
 export default function Dashboard() {
   return (
@@ -36,7 +37,10 @@ export default function Dashboard() {
           </h1>
 
         </div>
-        
+
+        <div className="flex justify-center mb-6">
+          <DementiaStagesButton />
+        </div>
 
         {/* Options */}
         <HomeCards />
