@@ -45,7 +45,8 @@ export default function ThermalVisualization({
   const lastThermalData = useRef<number[][]>([]);
   const onDataReceivedRef = useRef(onDataReceived);
   const calibrationRef = useRef<number[][] | null>(null);
-  const smoothingFactor = 0.2; // Lower = more smoothing
+  const ENABLE_DENOISING = false;
+  const smoothingFactor = ENABLE_DENOISING ? 0.2 : 0; // No smoothing when disabled
   const calibrationDriftFactor = 0.02;
   const calibrationDriftThreshold = 0.6;
   const recentFramesRef = useRef<number[][][]>([]);
@@ -71,6 +72,9 @@ export default function ThermalVisualization({
   };
 
   const denoiseFrame = (frame: number[][]): number[][] => {
+    if (!ENABLE_DENOISING) {
+      return frame;
+    }
     recentFramesRef.current.push(frame.map((row) => [...row]));
     if (recentFramesRef.current.length > FRAMES_TO_AVERAGE) {
       recentFramesRef.current.shift();
@@ -112,6 +116,10 @@ export default function ThermalVisualization({
 
   // Smooth thermal data to reduce jumpiness
   const smoothThermalData = (newData: number[][]) => {
+    if (!ENABLE_DENOISING) {
+      lastThermalData.current = newData;
+      return newData;
+    }
     if (lastThermalData.current.length === 0) {
       lastThermalData.current = newData;
       return newData;
