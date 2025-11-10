@@ -35,7 +35,12 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastConnectionStatus = useRef<string>('disconnected');
   const lastThermalData = useRef<number[][]>([]);
+  const onDataReceivedRef = useRef(onDataReceived);
   const smoothingFactor = 0.3; // Lower = more smoothing
+
+  useEffect(() => {
+    onDataReceivedRef.current = onDataReceived;
+  }, [onDataReceived]);
 
   // Smooth thermal data to reduce jumpiness
   const smoothThermalData = (newData: number[][]) => {
@@ -141,7 +146,7 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
               setThermalData(smoothedData);
               setSensorInfo(data.sensor_info);
               setLastUpdate(new Date());
-              onDataReceived({
+              onDataReceivedRef.current({
                 ...data,
                 thermal_data: smoothedData,
               });
@@ -195,7 +200,7 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
         websocketRef.current = null;
       }
     };
-  }, [isActive, onDataReceived]);
+  }, [isActive, discoveredIP]);
 
   // Calculate average temperature
   const averageTemperature = thermalData.length > 0 
@@ -330,7 +335,7 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
           setThermalData(smoothedData);
           setSensorInfo(data.sensor_info);
           setLastUpdate(new Date());
-          onDataReceived({
+          onDataReceivedRef.current({
             ...data,
             thermal_data: smoothedData,
           });
@@ -358,7 +363,7 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
 
     const interval = setInterval(pollData, 3000); // Poll every 3 seconds
     return () => clearInterval(interval);
-  }, [isActive, discoveredIP, onDataReceived]);
+  }, [isActive, discoveredIP]);
 
   const getStatusColor = () => {
     switch (connectionStatus) {
