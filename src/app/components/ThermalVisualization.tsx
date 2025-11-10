@@ -494,11 +494,28 @@ export default function ThermalVisualization({
       {/* Thermal Visualization */}
       <div className="relative">
         <div className="aspect-square max-w-lg mx-auto flex items-center justify-center">
-          <canvas
-            ref={canvasRef}
-            className="rounded-lg border border-white/20 bg-gray-900"
-            style={{ imageRendering: 'pixelated' }}
-          />
+          <div className="relative w-full">
+            <canvas
+              ref={canvasRef}
+              className="rounded-lg border border-white/20 bg-gray-900"
+              style={{ imageRendering: 'pixelated', width: '100%', height: '100%' }}
+            />
+            {thermalData.length > 0 && (
+              <div className="pointer-events-none absolute inset-0 grid grid-cols-8 grid-rows-8 text-[10px] sm:text-xs font-semibold text-white/80">
+                {thermalData.map((row, rowIndex) =>
+                  row.map((value, colIndex) => (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      className="flex items-center justify-center"
+                      style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
+                    >
+                      {value.toFixed(1)}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Temperature Legend */}
