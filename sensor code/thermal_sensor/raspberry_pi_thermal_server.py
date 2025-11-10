@@ -4,15 +4,12 @@ AMG8833 Thermal Sensor Server
 ---------------------------------
 - Streams raw 8x8 frames from the AMG8833 over HTTP and WebSocket.
 - Leaves all filtering, calibration, and visualization to the client.
-- Falls back to a lightweight simulation when the sensor is unavailable.
+- Exits with an error if the sensor is unavailable.
 """
 
 import asyncio
 import json
 import logging
-import math
-import random
-import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -33,8 +30,7 @@ try:
 
     HAVE_AMG8833 = True
 except ImportError as exc:
-    print(f"AMG8833 dependencies missing ({exc}); running in simulation mode.")
-    HAVE_AMG8833 = False
+    raise SystemExit(f"AMG8833 dependencies missing ({exc}). Install adafruit-blinka and adafruit-circuitpython-amg88xx.")
 
 # Server configuration
 HTTP_PORT = 8091
@@ -57,9 +53,7 @@ if HAVE_AMG8833:
         sensor = adafruit_amg88xx.AMG88XX(i2c)
         logger.info("✅ AMG8833 sensor initialized.")
     except Exception as exc:  # pragma: no cover
-        logger.error(f"Failed to initialize AMG8833 sensor: {exc}")
-        sensor = None
-        HAVE_AMG8833 = False
+        raise SystemExit(f"Failed to initialize AMG8833 sensor: {exc}")
 
 
 def read_sensor_frame():
@@ -71,30 +65,8 @@ def read_sensor_frame():
     return [[float(frame[row][col]) for col in range(GRID_WIDTH)] for row in range(GRID_HEIGHT)]
 
 
-def generate_simulation_frame():
-    """Return a synthetic frame when the sensor is unavailable."""
-    now = time.time()
-    grid = []
-    for y in range(GRID_HEIGHT):
-        row = []
-        for x in range(GRID_WIDTH):
-            cx, cy = GRID_WIDTH / 2, GRID_HEIGHT / 2
-            dist = math.hypot(x - cx, y - cy)
-            center_bias = max(0, (2.5 - dist) * 2.5)
-            wobble = math.sin(now * 0.6 + x * 0.4 + y * 0.2) * 0.8
-            noise = random.uniform(-0.35, 0.35)
-            row.append(22.0 + center_bias + wobble + noise)
-        grid.append(row)
-    return grid
-
-
 def get_frame():
-    if HAVE_AMG8833 and sensor is not None:
-        try:
-            return read_sensor_frame()
-        except Exception as exc:  # pragma: no cover
-            logger.error(f"Error reading AMG8833 frame: {exc}")
-    return generate_simulation_frame()
+    return read_sensor_frame()
 
 
 def build_payload(frame):
@@ -105,7 +77,7 @@ def build_payload(frame):
         "sensor_info": {
             "model": "AMG8833",
             "temperature_unit": "C",
-            "data_source": "sensor" if HAVE_AMG8833 and sensor else "simulation",
+            "data_source": "sensor",
         },
         "status": "active",
     }
