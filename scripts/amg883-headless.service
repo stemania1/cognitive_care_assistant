@@ -1,0 +1,19 @@
+[Unit]
+Description=AMG883 Thermal Sensor Headless Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Update the WorkingDirectory path if your repo lives somewhere else
+WorkingDirectory=/home/pi/cognitive_care_assistant
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/pi/cognitive_care_assistant/sensor\x20code/thermal_sensor/raspberry_pi_thermal_server.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/amg883-headless.log
+StandardError=append:/var/log/amg883-headless.log
+
+[Install]
+WantedBy=multi-user.target
+
