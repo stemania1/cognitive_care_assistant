@@ -104,6 +104,8 @@ export default function SleepBehaviors() {
   const [showThermalMetrics, setShowThermalMetrics] = useState(false);
   const [thermalCalibrationMatrix, setThermalCalibrationMatrix] = useState<number[][] | null>(null);
   const [thermalCalibrationTimestamp, setThermalCalibrationTimestamp] = useState<string | null>(null);
+  const [isThermalBaselineCalibrating, setIsThermalBaselineCalibrating] = useState(false);
+  const [baselineSampleCount, setBaselineSampleCount] = useState(0);
 
   const frameStatsRef = useRef<
     Array<{ timestamp: number; average: number; min: number; max: number; variance: number }>
@@ -119,6 +121,8 @@ export default function SleepBehaviors() {
     outOfFrame: 0,
   });
   const sessionStartRef = useRef<number | null>(null);
+  const baselineSamplesRef = useRef<number[][][]>([]);
+  const BASELINE_SAMPLE_TARGET = 25;
 
   const formatTemperature = (value: number | null, suffix = "°C") =>
     value === null ? "—" : `${value.toFixed(1)}${suffix}`;
@@ -214,6 +218,30 @@ export default function SleepBehaviors() {
 
     const temps = data.thermal_data.flat();
     if (temps.length === 0) return;
+
+    if (isThermalBaselineCalibrating) {
+      baselineSamplesRef.current.push(
+        data.thermal_data.map((row) => [...row])
+      );
+      setBaselineSampleCount(baselineSamplesRef.current.length);
+      if (baselineSamplesRef.current.length >= BASELINE_SAMPLE_TARGET) {
+        const sampleCount = baselineSamplesRef.current.length;
+        const avgMatrix = baselineSamplesRef.current[0].map((row, y) =>
+          row.map((_, x) => {
+            let sum = 0;
+            for (const sample of baselineSamplesRef.current) {
+              sum += sample[y][x];
+            }
+            return Math.round((sum / sampleCount) * 10) / 10;
+          })
+        );
+        setThermalCalibrationMatrix(avgMatrix);
+        setThermalCalibrationTimestamp(new Date().toLocaleTimeString());
+        setIsThermalBaselineCalibrating(false);
+        baselineSamplesRef.current = [];
+        setBaselineSampleCount(0);
+      }
+    }
 
     const avgTemp = temps.reduce((sum, temp) => sum + temp, 0) / temps.length;
     const minTemp = Math.min(...temps);
@@ -431,15 +459,18 @@ export default function SleepBehaviors() {
   };
 
   const calibrateThermalBaseline = () => {
-    if (!thermalData?.thermal_data?.length) return;
-    const baseline = thermalData.thermal_data.map((row) => [...row]);
-    setThermalCalibrationMatrix(baseline);
-    setThermalCalibrationTimestamp(new Date().toLocaleTimeString());
+    if (!isThermalActive) return;
+    setIsThermalBaselineCalibrating(true);
+    baselineSamplesRef.current = [];
+    setBaselineSampleCount(0);
   };
 
   const clearThermalCalibration = () => {
     setThermalCalibrationMatrix(null);
     setThermalCalibrationTimestamp(null);
+    setIsThermalBaselineCalibrating(false);
+    baselineSamplesRef.current = [];
+    setBaselineSampleCount(0);
   };
 
   return (
@@ -543,19 +574,28 @@ export default function SleepBehaviors() {
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={calibrateThermalBaseline}
-                      disabled={!thermalData}
+                      disabled={!thermalData || isThermalBaselineCalibrating}
                       className="flex-1 py-3 px-4 rounded-lg border border-cyan-400/40 bg-cyan-500/10 text-cyan-100 font-medium hover:bg-cyan-500/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {thermalCalibrationMatrix ? 'Recalibrate Baseline' : 'Calibrate Baseline'}
+                      {isThermalBaselineCalibrating
+                        ? 'Calibrating...'
+                        : thermalCalibrationMatrix
+                          ? 'Recalibrate Baseline'
+                          : 'Calibrate Baseline'}
                     </button>
                     <button
                       onClick={clearThermalCalibration}
-                      disabled={!thermalCalibrationMatrix}
+                      disabled={!thermalCalibrationMatrix && !isThermalBaselineCalibrating}
                       className="flex-1 py-3 px-4 rounded-lg border border-white/15 bg-white/5 text-gray-200 font-medium hover:bg-white/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Clear Calibration
                     </button>
                   </div>
+                  {isThermalBaselineCalibrating && (
+                    <p className="text-xs text-cyan-200">
+                      Capturing baseline ({baselineSampleCount}/{BASELINE_SAMPLE_TARGET}) — keep the scene steady.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
