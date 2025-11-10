@@ -45,6 +45,7 @@ export default function ThermalVisualization({
   const lastThermalData = useRef<number[][]>([]);
   const onDataReceivedRef = useRef(onDataReceived);
   const calibrationRef = useRef<number[][] | null>(null);
+  const USE_BASELINE = false;
   const ENABLE_DENOISING = false;
   const smoothingFactor = ENABLE_DENOISING ? 0.2 : 0; // No smoothing when disabled
   const calibrationDriftFactor = 0.02;
@@ -53,6 +54,7 @@ export default function ThermalVisualization({
   const FRAMES_TO_AVERAGE = 5;
 
   const applyCalibration = (frame: number[][]): number[][] => {
+    if (!USE_BASELINE) return frame;
     const ref = calibrationRef.current;
     if (!ref) return frame;
     return frame.map((row, y) =>
