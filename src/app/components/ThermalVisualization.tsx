@@ -23,9 +23,15 @@ interface ThermalVisualizationProps {
   isActive: boolean;
   onDataReceived: (data: ThermalData) => void;
   onConnectionStatusChange?: (connected: boolean) => void;
+  calibrationMatrix?: number[][] | null;
 }
 
-export default function ThermalVisualization({ isActive, onDataReceived, onConnectionStatusChange }: ThermalVisualizationProps) {
+export default function ThermalVisualization({
+  isActive,
+  onDataReceived,
+  onConnectionStatusChange,
+  calibrationMatrix = null,
+}: ThermalVisualizationProps) {
   const [thermalData, setThermalData] = useState<number[][]>([]);
   const [sensorInfo, setSensorInfo] = useState<any>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'discovering'>('disconnected');
@@ -37,6 +43,18 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
   const lastThermalData = useRef<number[][]>([]);
   const onDataReceivedRef = useRef(onDataReceived);
   const smoothingFactor = 0.3; // Lower = more smoothing
+
+  const applyCalibration = (frame: number[][]): number[][] => {
+    if (!calibrationMatrix) return frame;
+    return frame.map((row, y) =>
+      row.map((value, x) => {
+        const baseline = calibrationMatrix[y]?.[x];
+        if (baseline === undefined) return value;
+        const adjusted = value - baseline;
+        return Math.round(adjusted * 10) / 10;
+      })
+    );
+  };
 
   useEffect(() => {
     onDataReceivedRef.current = onDataReceived;
@@ -71,6 +89,10 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
       onConnectionStatusChange(isConnected);
     }
   }, [connectionStatus, onConnectionStatusChange]);
+
+  useEffect(() => {
+    lastThermalData.current = [];
+  }, [calibrationMatrix]);
 
   // Auto-discover Raspberry Pi when component becomes active
   useEffect(() => {
@@ -142,14 +164,12 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
             
             const data: ThermalData = JSON.parse(event.data);
             if (data.type === 'thermal_data') {
-              const smoothedData = smoothThermalData(data.thermal_data);
+              const calibrated = applyCalibration(data.thermal_data);
+              const smoothedData = smoothThermalData(calibrated);
               setThermalData(smoothedData);
               setSensorInfo(data.sensor_info);
               setLastUpdate(new Date());
-              onDataReceivedRef.current({
-                ...data,
-                thermal_data: smoothedData,
-              });
+              onDataReceivedRef.current(data);
             }
           } catch (error) {
             console.error('Error parsing WebSocket data:', error);
@@ -331,14 +351,12 @@ export default function ThermalVisualization({ isActive, onDataReceived, onConne
         const response = await fetch(`/api/thermal${query}`, { cache: 'no-store' });
         if (response.ok) {
           const data: ThermalData = await response.json();
-          const smoothedData = smoothThermalData(data.thermal_data);
+          const calibrated = applyCalibration(data.thermal_data);
+          const smoothedData = smoothThermalData(calibrated);
           setThermalData(smoothedData);
           setSensorInfo(data.sensor_info);
           setLastUpdate(new Date());
-          onDataReceivedRef.current({
-            ...data,
-            thermal_data: smoothedData,
-          });
+          onDataReceivedRef.current(data);
           
           // Update connection status to connected when we successfully receive data
           if (lastConnectionStatus.current !== 'connected') {

@@ -102,6 +102,8 @@ export default function SleepBehaviors() {
     thermalSleepCorrelation: null,
   });
   const [showThermalMetrics, setShowThermalMetrics] = useState(false);
+  const [thermalCalibrationMatrix, setThermalCalibrationMatrix] = useState<number[][] | null>(null);
+  const [thermalCalibrationTimestamp, setThermalCalibrationTimestamp] = useState<string | null>(null);
 
   const frameStatsRef = useRef<
     Array<{ timestamp: number; average: number; min: number; max: number; variance: number }>
@@ -428,6 +430,18 @@ export default function SleepBehaviors() {
     }
   };
 
+  const calibrateThermalBaseline = () => {
+    if (!thermalData?.thermal_data?.length) return;
+    const baseline = thermalData.thermal_data.map((row) => [...row]);
+    setThermalCalibrationMatrix(baseline);
+    setThermalCalibrationTimestamp(new Date().toLocaleTimeString());
+  };
+
+  const clearThermalCalibration = () => {
+    setThermalCalibrationMatrix(null);
+    setThermalCalibrationTimestamp(null);
+  };
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
       {/* Background gradients */}
@@ -484,6 +498,7 @@ export default function SleepBehaviors() {
                         isActive={isThermalActive}
                         onDataReceived={handleThermalDataReceived}
                         onConnectionStatusChange={handleConnectionStatusChange}
+                        calibrationMatrix={thermalCalibrationMatrix}
                       />
                     </div>
                   ) : (
@@ -500,29 +515,47 @@ export default function SleepBehaviors() {
                 </div>
 
                 {/* Control Buttons */}
-                <div className="flex gap-4">
-                  <button
-                    onClick={toggleThermal}
-                    className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
-                      isThermalActive
-                        ? 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600'
-                        : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
-                    }`}
-                  >
-                    {isThermalActive ? 'Stop Sensor' : 'Start Sensor'}
-                  </button>
-                  
-                  <button
-                    onClick={toggleRecording}
-                    disabled={!isThermalActive}
-                    className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
-                      isRecording
-                        ? 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600'
-                        : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {isRecording ? 'Stop Recording' : 'Start Recording'}
-                  </button>
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                      onClick={toggleThermal}
+                      className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
+                        isThermalActive
+                          ? 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600'
+                          : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
+                      }`}
+                    >
+                      {isThermalActive ? 'Stop Sensor' : 'Start Sensor'}
+                    </button>
+                    
+                    <button
+                      onClick={toggleRecording}
+                      disabled={!isThermalActive}
+                      className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
+                        isRecording
+                          ? 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600'
+                          : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {isRecording ? 'Stop Recording' : 'Start Recording'}
+                    </button>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={calibrateThermalBaseline}
+                      disabled={!thermalData}
+                      className="flex-1 py-3 px-4 rounded-lg border border-cyan-400/40 bg-cyan-500/10 text-cyan-100 font-medium hover:bg-cyan-500/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {thermalCalibrationMatrix ? 'Recalibrate Baseline' : 'Calibrate Baseline'}
+                    </button>
+                    <button
+                      onClick={clearThermalCalibration}
+                      disabled={!thermalCalibrationMatrix}
+                      className="flex-1 py-3 px-4 rounded-lg border border-white/15 bg-white/5 text-gray-200 font-medium hover:bg-white/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Clear Calibration
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -565,6 +598,11 @@ export default function SleepBehaviors() {
                 <p className="text-xs text-gray-300">
                   Auto-generated from the latest sensor frames so caregivers can act fast.
                 </p>
+                {thermalCalibrationMatrix && (
+                  <p className="text-[11px] text-cyan-200 mt-1">
+                    Displaying values relative to baseline captured at {thermalCalibrationTimestamp}.
+                  </p>
+                )}
               </div>
               <div className="space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-4">
