@@ -47,6 +47,7 @@ export default function ThermalVisualization({
   const calibrationRef = useRef<number[][] | null>(null);
   const smoothingFactor = 0.2; // Lower = more smoothing
   const calibrationDriftFactor = 0.02;
+  const calibrationDriftThreshold = 0.6;
   const recentFramesRef = useRef<number[][][]>([]);
   const FRAMES_TO_AVERAGE = 5;
 
@@ -58,7 +59,7 @@ export default function ThermalVisualization({
         const baseline = ref[y]?.[x];
         if (baseline === undefined) return value;
         const diff = value - baseline;
-        if (!isBaselineCalibrating) {
+        if (!isBaselineCalibrating && Math.abs(diff) < calibrationDriftThreshold) {
           const nextBaseline = baseline + calibrationDriftFactor * diff;
           if (ref[y]) {
             ref[y][x] = Math.round(nextBaseline * 10) / 10;
