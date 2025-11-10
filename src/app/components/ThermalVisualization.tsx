@@ -24,6 +24,7 @@ interface ThermalVisualizationProps {
   onDataReceived: (data: ThermalData) => void;
   onConnectionStatusChange?: (connected: boolean) => void;
   calibrationMatrix?: number[][] | null;
+  isBaselineCalibrating?: boolean;
 }
 
 export default function ThermalVisualization({
@@ -31,6 +32,7 @@ export default function ThermalVisualization({
   onDataReceived,
   onConnectionStatusChange,
   calibrationMatrix = null,
+  isBaselineCalibrating = false,
 }: ThermalVisualizationProps) {
   const [thermalData, setThermalData] = useState<number[][]>([]);
   const [sensorInfo, setSensorInfo] = useState<any>(null);
@@ -42,16 +44,25 @@ export default function ThermalVisualization({
   const lastConnectionStatus = useRef<string>('disconnected');
   const lastThermalData = useRef<number[][]>([]);
   const onDataReceivedRef = useRef(onDataReceived);
+  const calibrationRef = useRef<number[][] | null>(null);
   const smoothingFactor = 0.3; // Lower = more smoothing
+  const calibrationDriftFactor = 0.02;
 
   const applyCalibration = (frame: number[][]): number[][] => {
-    if (!calibrationMatrix) return frame;
+    const ref = calibrationRef.current;
+    if (!ref) return frame;
     return frame.map((row, y) =>
       row.map((value, x) => {
-        const baseline = calibrationMatrix[y]?.[x];
+        const baseline = ref[y]?.[x];
         if (baseline === undefined) return value;
-        const adjusted = value - baseline;
-        return Math.round(adjusted * 10) / 10;
+        const diff = value - baseline;
+        if (!isBaselineCalibrating) {
+          const nextBaseline = baseline + calibrationDriftFactor * diff;
+          if (ref[y]) {
+            ref[y][x] = Math.round(nextBaseline * 10) / 10;
+          }
+        }
+        return Math.round(diff * 10) / 10;
       })
     );
   };
@@ -59,6 +70,15 @@ export default function ThermalVisualization({
   useEffect(() => {
     onDataReceivedRef.current = onDataReceived;
   }, [onDataReceived]);
+
+  useEffect(() => {
+    if (!calibrationMatrix) {
+      calibrationRef.current = null;
+      return;
+    }
+    calibrationRef.current = calibrationMatrix.map((row) => [...row]);
+    lastThermalData.current = [];
+  }, [calibrationMatrix]);
 
   // Smooth thermal data to reduce jumpiness
   const smoothThermalData = (newData: number[][]) => {
@@ -89,10 +109,6 @@ export default function ThermalVisualization({
       onConnectionStatusChange(isConnected);
     }
   }, [connectionStatus, onConnectionStatusChange]);
-
-  useEffect(() => {
-    lastThermalData.current = [];
-  }, [calibrationMatrix]);
 
   // Auto-discover Raspberry Pi when component becomes active
   useEffect(() => {

@@ -530,6 +530,7 @@ export default function SleepBehaviors() {
                         onDataReceived={handleThermalDataReceived}
                         onConnectionStatusChange={handleConnectionStatusChange}
                         calibrationMatrix={thermalCalibrationMatrix}
+                        isBaselineCalibrating={isThermalBaselineCalibrating}
                       />
                     </div>
                   ) : (
