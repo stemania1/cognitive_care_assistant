@@ -10,6 +10,7 @@ AMG8833 Thermal Sensor Server
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -39,11 +40,13 @@ WEBSOCKET_PORT = 8092
 # Sensor configuration
 GRID_WIDTH = 8
 GRID_HEIGHT = 8
+DEFAULT_INTERVAL = 0.1
+try:
+    UPDATE_INTERVAL = max(float(os.getenv("AMG8833_UPDATE_INTERVAL", DEFAULT_INTERVAL)), 0.02)
+except ValueError:
+    UPDATE_INTERVAL = DEFAULT_INTERVAL
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("amg8833-server")
 
 sensor = None
@@ -139,7 +142,7 @@ async def websocket_handler(websocket):
         while True:
             payload = build_payload(get_frame())
             await websocket.send(json.dumps(payload))
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(UPDATE_INTERVAL)
     except websockets.exceptions.ConnectionClosed:
         logger.info(f"WebSocket client disconnected: {peer}")
     except Exception as exc:  # pragma: no cover
