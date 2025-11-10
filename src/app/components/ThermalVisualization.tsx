@@ -45,8 +45,10 @@ export default function ThermalVisualization({
   const lastThermalData = useRef<number[][]>([]);
   const onDataReceivedRef = useRef(onDataReceived);
   const calibrationRef = useRef<number[][] | null>(null);
-  const smoothingFactor = 0.3; // Lower = more smoothing
+  const smoothingFactor = 0.2; // Lower = more smoothing
   const calibrationDriftFactor = 0.02;
+  const recentFramesRef = useRef<number[][][]>([]);
+  const FRAMES_TO_AVERAGE = 5;
 
   const applyCalibration = (frame: number[][]): number[][] => {
     const ref = calibrationRef.current;
@@ -67,6 +69,24 @@ export default function ThermalVisualization({
     );
   };
 
+  const denoiseFrame = (frame: number[][]): number[][] => {
+    recentFramesRef.current.push(frame.map((row) => [...row]));
+    if (recentFramesRef.current.length > FRAMES_TO_AVERAGE) {
+      recentFramesRef.current.shift();
+    }
+    const frameCount = recentFramesRef.current.length;
+    if (frameCount === 0) return frame;
+    return frame.map((row, y) =>
+      row.map((_, x) => {
+        let sum = 0;
+        for (const sample of recentFramesRef.current) {
+          sum += sample[y][x];
+        }
+        return Math.round((sum / frameCount) * 10) / 10;
+      })
+    );
+  };
+
   useEffect(() => {
     onDataReceivedRef.current = onDataReceived;
   }, [onDataReceived]);
@@ -74,11 +94,20 @@ export default function ThermalVisualization({
   useEffect(() => {
     if (!calibrationMatrix) {
       calibrationRef.current = null;
+      recentFramesRef.current = [];
       return;
     }
     calibrationRef.current = calibrationMatrix.map((row) => [...row]);
     lastThermalData.current = [];
+    recentFramesRef.current = [];
   }, [calibrationMatrix]);
+
+  useEffect(() => {
+    if (!isActive) {
+      recentFramesRef.current = [];
+      lastThermalData.current = [];
+    }
+  }, [isActive]);
 
   // Smooth thermal data to reduce jumpiness
   const smoothThermalData = (newData: number[][]) => {
@@ -181,7 +210,8 @@ export default function ThermalVisualization({
             const data: ThermalData = JSON.parse(event.data);
             if (data.type === 'thermal_data') {
               const calibrated = applyCalibration(data.thermal_data);
-              const smoothedData = smoothThermalData(calibrated);
+              const denoised = denoiseFrame(calibrated);
+              const smoothedData = smoothThermalData(denoised);
               setThermalData(smoothedData);
               setSensorInfo(data.sensor_info);
               setLastUpdate(new Date());
@@ -368,7 +398,8 @@ export default function ThermalVisualization({
         if (response.ok) {
           const data: ThermalData = await response.json();
           const calibrated = applyCalibration(data.thermal_data);
-          const smoothedData = smoothThermalData(calibrated);
+          const denoised = denoiseFrame(calibrated);
+          const smoothedData = smoothThermalData(denoised);
           setThermalData(smoothedData);
           setSensorInfo(data.sensor_info);
           setLastUpdate(new Date());
