@@ -292,15 +292,16 @@ export default function ThermalVisualization({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size to 32x32 for upscaling
-    const GRID_SIZE = 32;
+    // Set canvas size to 96x96 for larger upscaling (bigger visual)
+    const GRID_SIZE = 96;
     
     // Get the container size and set canvas to fit properly
     const container = canvas.parentElement;
     if (container) {
       const containerRect = container.getBoundingClientRect();
-      const size = Math.min(containerRect.width, containerRect.height);
-      const pixelSize = Math.floor(size / GRID_SIZE);
+      // Use a larger minimum size for the canvas
+      const minSize = Math.max(600, Math.min(containerRect.width, containerRect.height) * 0.95);
+      const pixelSize = Math.floor(minSize / GRID_SIZE);
       const actualSize = pixelSize * GRID_SIZE;
       
       canvas.width = actualSize;
@@ -308,9 +309,12 @@ export default function ThermalVisualization({
       canvas.style.width = `${actualSize}px`;
       canvas.style.height = `${actualSize}px`;
     } else {
-      // Fallback to default size
-      canvas.width = GRID_SIZE;
-      canvas.height = GRID_SIZE;
+      // Fallback to larger default size
+      const defaultSize = 600;
+      canvas.width = defaultSize;
+      canvas.height = defaultSize;
+      canvas.style.width = `${defaultSize}px`;
+      canvas.style.height = `${defaultSize}px`;
     }
 
     // Use requestAnimationFrame for smooth rendering
@@ -399,8 +403,9 @@ export default function ThermalVisualization({
   }, [thermalData]);
 
   // Fallback to HTTP polling via Next.js API proxy (avoids CORS/mixed content)
+  // Only poll if WebSocket is not connected
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || connectionStatus === 'connected' || !discoveredIP) return;
 
     const pollData = async () => {
       try {
@@ -437,9 +442,10 @@ export default function ThermalVisualization({
       }
     };
 
-    const interval = setInterval(pollData, 3000); // Poll every 3 seconds
+    // Poll every 100ms (10 FPS) for fast updates when WebSocket is not available
+    const interval = setInterval(pollData, 100); // Poll every 100ms (10 FPS)
     return () => clearInterval(interval);
-  }, [isActive, discoveredIP]);
+  }, [isActive, discoveredIP, connectionStatus]);
 
   const getStatusColor = () => {
     switch (connectionStatus) {
@@ -478,45 +484,15 @@ export default function ThermalVisualization({
         )}
       </div>
 
-      {/* Sensor Info */}
-      {sensorInfo && (
-        <div className="text-xs text-gray-400 space-y-1">
-          <div>Sensor: {sensorInfo.type}</div>
-          <div>Status: {sensorInfo.status}</div>
-          {sensorInfo.bus !== 'none' && <div>Bus: {sensorInfo.bus}</div>}
-          {thermalData.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-gray-600">
-              <div>Current Temperature: <span className="text-blue-400 font-semibold">{averageTemperature.toFixed(1)}°C</span></div>
-              <div>Range: {Math.min(...thermalData.flat()).toFixed(1)}°C - {Math.max(...thermalData.flat()).toFixed(1)}°C</div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Thermal Visualization */}
-      <div className="relative">
-        <div className="aspect-square max-w-lg mx-auto flex items-center justify-center">
+      <div className="relative w-full h-full flex items-center justify-center">
+        <div className="aspect-square w-full h-full max-w-full flex items-center justify-center">
           <div className="relative w-full">
             <canvas
               ref={canvasRef}
               className="rounded-lg border border-white/20 bg-gray-900"
               style={{ imageRendering: 'pixelated', width: '100%', height: '100%' }}
             />
-            {thermalData.length > 0 && (
-              <div className="pointer-events-none absolute inset-0 grid grid-cols-8 grid-rows-8 text-[10px] sm:text-xs font-semibold text-white/80">
-                {thermalData.map((row, rowIndex) =>
-                  row.map((value, colIndex) => (
-                    <div
-                      key={`${rowIndex}-${colIndex}`}
-                      className="flex items-center justify-center"
-                      style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
-                    >
-                      {value.toFixed(1)}
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
           </div>
         </div>
         

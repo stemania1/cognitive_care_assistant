@@ -5,6 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import ThermalVisualization from "../components/ThermalVisualization";
 import { useAlertCenter } from "../components/AlertCenter";
+import { supabase } from "@/lib/supabaseClient";
+import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
 
 interface ThermalData {
   type: string;
@@ -106,6 +108,9 @@ export default function SleepBehaviors() {
   const [thermalCalibrationTimestamp, setThermalCalibrationTimestamp] = useState<string | null>(null);
   const [isThermalBaselineCalibrating, setIsThermalBaselineCalibrating] = useState(false);
   const [baselineSampleCount, setBaselineSampleCount] = useState(0);
+  const [subjectIdentifier, setSubjectIdentifier] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const frameStatsRef = useRef<
     Array<{ timestamp: number; average: number; min: number; max: number; variance: number }>
@@ -123,6 +128,7 @@ export default function SleepBehaviors() {
   const sessionStartRef = useRef<number | null>(null);
   const baselineSamplesRef = useRef<number[][][]>([]);
   const BASELINE_SAMPLE_TARGET = 25;
+  const sessionSamplesRef = useRef<Array<{ sampleIndex: number; timestamp: number; heatmapVariance: number | null; patternStability: number | null }>>([]);
 
   const formatTemperature = (value: number | null, suffix = "°C") =>
     value === null ? "—" : `${value.toFixed(1)}${suffix}`;
@@ -151,8 +157,9 @@ export default function SleepBehaviors() {
   const varianceDescriptor = useMemo(() => {
     const value = metricSnapshot.heatmapVariance;
     if (value === null) return { label: "Collecting data", tone: "text-gray-300" };
-    if (value < 2) return { label: "Minimal motion", tone: "text-emerald-300" };
-    if (value < 5) return { label: "Moderate motion", tone: "text-yellow-200" };
+    // Adjusted thresholds to account for sensor noise (5.1 is noise, not motion)
+    if (value < 6) return { label: "Minimal motion", tone: "text-emerald-300" };
+    if (value < 12) return { label: "Moderate motion", tone: "text-yellow-200" };
     return { label: "High motion", tone: "text-red-300" };
   }, [metricSnapshot.heatmapVariance]);
 
@@ -216,8 +223,10 @@ export default function SleepBehaviors() {
       return;
     }
 
-    const temps = data.thermal_data.flat();
-    if (temps.length === 0) return;
+    // Calculate variance on RAW thermal data (before any calibration/smoothing)
+    // This ensures motion detection works correctly
+    const rawTemps = data.thermal_data.flat();
+    if (rawTemps.length === 0) return;
 
     if (isThermalBaselineCalibrating) {
       baselineSamplesRef.current.push(
@@ -243,13 +252,15 @@ export default function SleepBehaviors() {
       }
     }
 
-    const avgTemp = temps.reduce((sum, temp) => sum + temp, 0) / temps.length;
-    const minTemp = Math.min(...temps);
-    const maxTemp = Math.max(...temps);
+    // Calculate statistics on RAW data for accurate variance detection
+    const avgTemp = rawTemps.reduce((sum, temp) => sum + temp, 0) / rawTemps.length;
+    const minTemp = Math.min(...rawTemps);
+    const maxTemp = Math.max(...rawTemps);
     const range = maxTemp - minTemp;
+    // Variance calculated on raw thermal data to detect motion accurately
     const variance =
-      temps.reduce((acc, temp) => acc + Math.pow(temp - avgTemp, 2), 0) /
-      temps.length;
+      rawTemps.reduce((acc, temp) => acc + Math.pow(temp - avgTemp, 2), 0) /
+      rawTemps.length;
 
     setCurrentTemp(avgTemp);
 
@@ -278,15 +289,18 @@ export default function SleepBehaviors() {
       setBaselineTemp(computedBaseline);
     }
 
+    // A stable frame has low variance (sensor noise level) and reasonable temperature range
+    // Adjusted thresholds to account for sensor noise - range and variance thresholds are more lenient
+    // when still, range can be 2-4°C due to sensor noise and thermal variation across the frame
     const stableFrame =
-      range < 1.0 && variance < 2.0 && baselineForFrame !== null;
+      range < 4.0 && variance < 8.0 && baselineForFrame !== null; // Adjusted for sensor noise
     if (stableFrame) {
       stableFrameCountRef.current += 1;
     }
 
     const HIGH_TEMP_THRESHOLD = 2.0;
     const RESTLESS_RANGE_THRESHOLD = 2.5;
-    const RESTLESS_VARIANCE_THRESHOLD = 4.0;
+    const RESTLESS_VARIANCE_THRESHOLD = 12.0; // Adjusted for sensor noise (was 4.0)
     const OUT_OF_FRAME_TEMP_DROP = 4.0;
     const OUT_OF_FRAME_WARM_RATIO = 0.2;
     const ALERT_COOLDOWN_MS = 2 * 60 * 1000;
@@ -294,7 +308,7 @@ export default function SleepBehaviors() {
     if (baselineForFrame !== null) {
       const tempDiff = avgTemp - baselineForFrame;
       const warmPixelRatio =
-        temps.filter((temp) => temp >= baselineForFrame - 1).length / temps.length;
+        rawTemps.filter((temp) => temp >= baselineForFrame - 1).length / rawTemps.length;
 
       const isHighTemp = tempDiff >= HIGH_TEMP_THRESHOLD;
       const isLowTemp = tempDiff <= -HIGH_TEMP_THRESHOLD;
@@ -390,21 +404,29 @@ export default function SleepBehaviors() {
         ? (avgTemp - baselineForFrame) / elapsedMinutes
         : null;
 
+    const finalStability = stabilityPercent !== null
+      ? Math.min(100, Math.max(0, stabilityPercent))
+      : null;
+
     setMetricSnapshot({
       averageSurfaceTemperature: avgTemp,
       temperatureRange: range,
       thermalEventCount: eventCountRef.current,
       heatmapVariance: variance,
-      thermalPatternStability:
-        stabilityPercent !== null
-          ? Math.min(100, Math.max(0, stabilityPercent))
-          : null,
+      thermalPatternStability: finalStability,
       calibrationDrift,
       thermalSleepCorrelation: null,
     });
 
     if (isRecording) {
       setSessionData((prev) => [...prev, data]);
+      // Store sample data for saving to database
+      sessionSamplesRef.current.push({
+        sampleIndex: sessionSamplesRef.current.length,
+        timestamp: data.timestamp ?? now,
+        heatmapVariance: variance,
+        patternStability: finalStability,
+      });
     }
   };
 
@@ -449,11 +471,115 @@ export default function SleepBehaviors() {
     }
   };
 
-  const toggleRecording = () => {
+  // Get user ID on mount
+  useEffect(() => {
+    async function initializeUser() {
+      try {
+        const guestStatus = await isGuestUser();
+        if (guestStatus) {
+          const guestUserId = getGuestUserId();
+          setUserId(guestUserId);
+        } else {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.id) {
+            setUserId(user.id);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user:', error);
+      }
+    }
+    initializeUser();
+  }, []);
+
+  const toggleRecording = async () => {
     if (isThermalActive) {
-      setIsRecording(!isRecording);
       if (!isRecording) {
+        // Starting recording - reset counters and session data
         setSessionDuration(0);
+        eventCountRef.current = 0;
+        setSessionData([]);
+        sessionSamplesRef.current = [];
+        sessionStartRef.current = Date.now();
+        setIsRecording(true);
+      } else {
+        // Stopping recording - save to database
+        if (!subjectIdentifier.trim()) {
+          addAlert({
+            message: "Please enter a subject identifier before saving the session.",
+            severity: "warning",
+            source: "Thermal Sensor",
+          });
+          return;
+        }
+
+        if (!userId) {
+          addAlert({
+            message: "Unable to save session: user not authenticated.",
+            severity: "error",
+            source: "Thermal Sensor",
+          });
+          setIsRecording(false);
+          return;
+        }
+
+        const startedAt = sessionStartRef.current ?? Date.now();
+        const endedAt = Date.now();
+        const durationSeconds = Math.floor((endedAt - startedAt) / 1000);
+
+        // Calculate averages from frameStatsRef
+        const recordingFrames = frameStatsRef.current.filter(
+          (frame) => frame.timestamp >= startedAt && frame.timestamp <= endedAt
+        );
+
+        const averageSurfaceTemp = recordingFrames.length > 0
+          ? recordingFrames.reduce((sum, f) => sum + f.average, 0) / recordingFrames.length
+          : null;
+
+        const averageTempRange = recordingFrames.length > 0
+          ? recordingFrames.reduce((sum, f) => sum + (f.max - f.min), 0) / recordingFrames.length
+          : null;
+
+        setIsSaving(true);
+        try {
+          const response = await fetch('/api/thermal-sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              subjectIdentifier: subjectIdentifier.trim(),
+              startedAt: new Date(startedAt).toISOString(),
+              endedAt: new Date(endedAt).toISOString(),
+              durationSeconds,
+              averageSurfaceTemp,
+              averageTemperatureRange: averageTempRange,
+              thermalEventCount: eventCountRef.current,
+              samples: sessionSamplesRef.current,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || result.details || 'Failed to save session');
+          }
+
+          addAlert({
+            message: `Session saved successfully for Subject: ${subjectIdentifier.trim()}.`,
+            severity: "info",
+            source: "Thermal Sensor",
+          });
+        } catch (error) {
+          console.error('Error saving session:', error);
+          addAlert({
+            message: `Failed to save session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            severity: "error",
+            source: "Thermal Sensor",
+          });
+        } finally {
+          setIsSaving(false);
+          setIsRecording(false);
+        }
       }
     }
   };
@@ -506,9 +632,152 @@ export default function SleepBehaviors() {
              </div>
         </div>
 
-        {/* Main Dashboard Grid */}
+        {/* Main Layout: Live Thermal Metrics (Left) and Thermal Sensor Display (Right) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-          {/* Thermal Sensor Monitor */}
+          {/* Live Thermal Metrics - Left Side */}
+          <div className="lg:col-span-1">
+            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-blue-500/5 to-indigo-500/10 blur-xl" />
+              <div className="relative">
+                <div className="mb-4">
+                  <h3 className="text-lg font-medium">Live Thermal Metrics</h3>
+                  <p className="text-xs text-gray-300">
+                    Auto-generated from the latest sensor frames so caregivers can act fast.
+                  </p>
+                  {thermalCalibrationMatrix && (
+                    <p className="text-[11px] text-cyan-200 mt-1">
+                      Displaying values relative to baseline captured at {thermalCalibrationTimestamp}.
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-gray-300">Average surface temp</p>
+                      <p className="text-xs text-gray-400">
+                        {baselineTemp !== null
+                          ? `Baseline ${baselineTemp.toFixed(1)}°C`
+                          : "Baseline calibrating"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-semibold text-cyan-200">
+                        {formatTemperature(metricSnapshot.averageSurfaceTemperature)}
+                      </p>
+                      <p className="text-xs text-gray-400">{formatDelta(baselineDelta)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-gray-300">Temperature range (ΔT)</p>
+                    <p className="text-lg font-semibold text-cyan-200">
+                      {metricSnapshot.temperatureRange === null
+                        ? "—"
+                        : `${metricSnapshot.temperatureRange.toFixed(1)}°C`}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-gray-300">Heatmap variance</p>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-cyan-200">
+                        {metricSnapshot.heatmapVariance === null
+                          ? "—"
+                          : metricSnapshot.heatmapVariance.toFixed(1)}
+                      </p>
+                      <p className={`text-xs ${varianceDescriptor.tone}`}>{varianceDescriptor.label}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-gray-300">Pattern stability</p>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-cyan-200">
+                        {metricSnapshot.thermalPatternStability === null
+                          ? "—"
+                          : `${metricSnapshot.thermalPatternStability.toFixed(0)}%`}
+                      </p>
+                      <p className={`text-xs ${stabilityDescriptor.tone}`}>{stabilityDescriptor.label}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-gray-300">Thermal event count</p>
+                    <p className="text-lg font-semibold text-cyan-200">
+                      {metricSnapshot.thermalEventCount}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-gray-300">Calibration drift</p>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-cyan-200">
+                        {metricSnapshot.calibrationDrift === null
+                          ? "—"
+                          : `${metricSnapshot.calibrationDrift.toFixed(2)}°C/min`}
+                      </p>
+                      <p className={`text-xs ${calibrationDescriptor.tone}`}>
+                        {calibrationDescriptor.label}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sensor Info Section */}
+                  {thermalData && thermalData.sensor_info && (
+                    <>
+                      <div className="pt-4 mt-4 border-t border-white/10">
+                        <p className="text-xs text-gray-400 mb-3 uppercase tracking-wide">Sensor Information</p>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-center justify-between gap-4">
+                            <p className="text-gray-300">Sensor Model</p>
+                            <p className="text-sm font-medium text-cyan-200">
+                              {thermalData.sensor_info.model || thermalData.sensor_info.type || "AMG8833"}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between gap-4">
+                            <p className="text-gray-300">Sensor Status</p>
+                            <p className="text-sm font-medium text-cyan-200">
+                              {thermalData.sensor_info.status || "Active"}
+                            </p>
+                          </div>
+                          {thermalData.sensor_info.bus && thermalData.sensor_info.bus !== 'none' && (
+                            <div className="flex items-center justify-between gap-4">
+                              <p className="text-gray-300">I2C Bus</p>
+                              <p className="text-sm font-medium text-cyan-200">
+                                {thermalData.sensor_info.bus}
+                              </p>
+                            </div>
+                          )}
+                          {thermalData.thermal_data && thermalData.thermal_data.length > 0 && (
+                            <>
+                              <div className="flex items-center justify-between gap-4 pt-2 mt-2 border-t border-white/5">
+                                <p className="text-gray-300">Current Temperature</p>
+                                <p className="text-lg font-semibold text-cyan-200">
+                                  {(() => {
+                                    const temps = thermalData.thermal_data.flat();
+                                    const avg = temps.reduce((sum, temp) => sum + temp, 0) / temps.length;
+                                    return avg.toFixed(1);
+                                  })()}°C
+                                </p>
+                              </div>
+                              <div className="flex items-center justify-between gap-4">
+                                <p className="text-gray-300">Temperature Range</p>
+                                <p className="text-sm font-medium text-cyan-200">
+                                  {Math.min(...thermalData.thermal_data.flat()).toFixed(1)}°C - {Math.max(...thermalData.thermal_data.flat()).toFixed(1)}°C
+                                </p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Thermal Sensor Display - Right Side */}
           <div className="lg:col-span-2">
             <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-sky-500/5 to-blue-500/10 blur-xl" />
@@ -522,32 +791,57 @@ export default function SleepBehaviors() {
                 </div>
 
                 {/* Thermal Sensor Display */}
-                <div className="relative aspect-video rounded-xl border border-white/20 bg-gradient-to-br from-gray-900 to-gray-800 overflow-hidden mb-6">
-                  {isThermalActive ? (
-                    <div className="absolute inset-0 flex items-center justify-center p-4">
-                      <ThermalVisualization 
-                        isActive={isThermalActive}
-                        onDataReceived={handleThermalDataReceived}
-                        onConnectionStatusChange={handleConnectionStatusChange}
-                        calibrationMatrix={thermalCalibrationMatrix}
-                        isBaselineCalibrating={isThermalBaselineCalibrating}
-                      />
-                    </div>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <svg className="w-16 h-16 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <p className="text-gray-400">Sensor Offline</p>
-                        <p className="text-xs text-gray-500 mt-2">Click "Start Sensor" to connect to thermal sensor</p>
+                <div className="flex justify-center mb-6">
+                  <div className="relative inline-flex items-center justify-center rounded-xl border border-white/20 bg-gradient-to-br from-gray-900 to-gray-800 overflow-hidden">
+                    {isThermalActive ? (
+                      <div className="flex items-center justify-center p-4">
+                        <ThermalVisualization 
+                          isActive={isThermalActive}
+                          onDataReceived={handleThermalDataReceived}
+                          onConnectionStatusChange={handleConnectionStatusChange}
+                          calibrationMatrix={thermalCalibrationMatrix}
+                          isBaselineCalibrating={isThermalBaselineCalibrating}
+                        />
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                          <svg className="w-16 h-16 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="text-gray-400">Sensor Offline</p>
+                          <p className="text-xs text-gray-500 mt-2">Click "Start Sensor" to connect to thermal sensor</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Control Buttons */}
                 <div className="flex flex-col gap-3">
+                  {/* Subject Identifier Input */}
+                  <div>
+                    <label htmlFor="subject-identifier" className="block text-sm font-medium text-gray-300 mb-2">
+                      Subject
+                    </label>
+                    <input
+                      id="subject-identifier"
+                      type="text"
+                      value={subjectIdentifier}
+                      onChange={(e) => setSubjectIdentifier(e.target.value)}
+                      placeholder="Enter subject ID or name"
+                      disabled={isRecording}
+                      className={`w-full py-2 px-4 rounded-lg border ${
+                        isRecording
+                          ? 'border-white/10 bg-white/5 text-gray-400 cursor-not-allowed'
+                          : 'border-white/20 bg-white/10 text-white placeholder-gray-400 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20'
+                      } transition-all`}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Required before saving a recording session
+                    </p>
+                  </div>
+
                   <div className="flex flex-col sm:flex-row gap-4">
                     <button
                       onClick={toggleThermal}
@@ -562,14 +856,14 @@ export default function SleepBehaviors() {
                     
                     <button
                       onClick={toggleRecording}
-                      disabled={!isThermalActive}
+                      disabled={!isThermalActive || isSaving}
                       className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
                         isRecording
                           ? 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600'
                           : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      {isRecording ? 'Stop Recording' : 'Start Recording'}
+                      {isSaving ? 'Saving...' : isRecording ? 'Stop Recording' : 'Start Recording'}
                     </button>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -593,7 +887,7 @@ export default function SleepBehaviors() {
                     </button>
                   </div>
                   {isThermalBaselineCalibrating && (
-                    <p className="text-xs text-cyan-200">
+                    <p className="text-xs text-cyan-200 text-center">
                       Capturing baseline ({baselineSampleCount}/{BASELINE_SAMPLE_TARGET}) — keep the scene steady.
                     </p>
                   )}
@@ -601,125 +895,34 @@ export default function SleepBehaviors() {
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Quick Stats */}
-          <div className="space-y-6">
-            {/* Temperature Display */}
-            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-orange-500/10 via-red-500/5 to-pink-500/10 blur-xl" />
-              <div className="relative text-center">
-                <h3 className="text-lg font-medium mb-4">Current Temperature</h3>
-                <div className="text-4xl font-bold text-orange-400 mb-2">
-                  {currentTemp.toFixed(1)}°C
-                </div>
-                <p className="text-sm text-gray-300">Room Temperature</p>
-              </div>
-            </div>
-
-            {/* Recording Status */}
-            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-purple-500/10 via-fuchsia-500/5 to-pink-500/10 blur-xl" />
-              <div className="relative text-center">
-                <h3 className="text-lg font-medium mb-4">Recording Status</h3>
-                <div className="text-2xl font-bold text-purple-400 mb-2">
-                  {isRecording ? formatTime(sessionDuration) : '00:00'}
-                </div>
-                <p className="text-sm text-gray-300">
-                  {isRecording ? 'Session Active' : 'Not Recording'}
-                </p>
-              </div>
-            </div>
-
-          {/* Live Thermal Metrics */}
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          {/* Temperature Display */}
           <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-blue-500/5 to-indigo-500/10 blur-xl" />
-            <div className="relative">
-              <div className="mb-4">
-                <h3 className="text-lg font-medium">Live Thermal Metrics</h3>
-                <p className="text-xs text-gray-300">
-                  Auto-generated from the latest sensor frames so caregivers can act fast.
-                </p>
-                {thermalCalibrationMatrix && (
-                  <p className="text-[11px] text-cyan-200 mt-1">
-                    Displaying values relative to baseline captured at {thermalCalibrationTimestamp}.
-                  </p>
-                )}
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-orange-500/10 via-red-500/5 to-pink-500/10 blur-xl" />
+            <div className="relative text-center">
+              <h3 className="text-lg font-medium mb-4">Current Temperature</h3>
+              <div className="text-4xl font-bold text-orange-400 mb-2">
+                {currentTemp.toFixed(1)}°C
               </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-gray-300">Average surface temp</p>
-                    <p className="text-xs text-gray-400">
-                      {baselineTemp !== null
-                        ? `Baseline ${baselineTemp.toFixed(1)}°C`
-                        : "Baseline calibrating"}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-semibold text-cyan-200">
-                      {formatTemperature(metricSnapshot.averageSurfaceTemperature)}
-                    </p>
-                    <p className="text-xs text-gray-400">{formatDelta(baselineDelta)}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-gray-300">Temperature range (ΔT)</p>
-                  <p className="text-lg font-semibold text-cyan-200">
-                    {metricSnapshot.temperatureRange === null
-                      ? "—"
-                      : `${metricSnapshot.temperatureRange.toFixed(1)}°C`}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-gray-300">Heatmap variance</p>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-cyan-200">
-                      {metricSnapshot.heatmapVariance === null
-                        ? "—"
-                        : metricSnapshot.heatmapVariance.toFixed(1)}
-                    </p>
-                    <p className={`text-xs ${varianceDescriptor.tone}`}>{varianceDescriptor.label}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-gray-300">Pattern stability</p>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-cyan-200">
-                      {metricSnapshot.thermalPatternStability === null
-                        ? "—"
-                        : `${metricSnapshot.thermalPatternStability.toFixed(0)}%`}
-                    </p>
-                    <p className={`text-xs ${stabilityDescriptor.tone}`}>{stabilityDescriptor.label}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-gray-300">Thermal event count</p>
-                  <p className="text-lg font-semibold text-cyan-200">
-                    {metricSnapshot.thermalEventCount}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-gray-300">Calibration drift</p>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-cyan-200">
-                      {metricSnapshot.calibrationDrift === null
-                        ? "—"
-                        : `${metricSnapshot.calibrationDrift.toFixed(2)}°C/min`}
-                    </p>
-                    <p className={`text-xs ${calibrationDescriptor.tone}`}>
-                      {calibrationDescriptor.label}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <p className="text-sm text-gray-300">Room Temperature</p>
             </div>
           </div>
 
+          {/* Recording Status */}
+          <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-purple-500/10 via-fuchsia-500/5 to-pink-500/10 blur-xl" />
+            <div className="relative text-center">
+              <h3 className="text-lg font-medium mb-4">Recording Status</h3>
+              <div className="text-2xl font-bold text-purple-400 mb-2">
+                {isRecording ? formatTime(sessionDuration) : '00:00'}
+              </div>
+              <p className="text-sm text-gray-300">
+                {isRecording ? 'Session Active' : 'Not Recording'}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -829,7 +1032,7 @@ export default function SleepBehaviors() {
         </div>
 
         {/* Navigation Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
             href="/dashboard"
             className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-5 py-6 hover:bg-white/10 transition-all duration-200"
@@ -838,6 +1041,19 @@ export default function SleepBehaviors() {
               <div>
                 <h3 className="text-lg font-medium mb-2">Dashboard</h3>
                 <p className="text-sm text-gray-300">Return to main dashboard</p>
+              </div>
+              <span className="text-2xl opacity-60 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          <Link
+            href="/thermal-history"
+            className="group relative block rounded-xl border border-cyan-400/30 bg-cyan-500/10 backdrop-blur px-5 py-6 hover:bg-cyan-500/20 transition-all duration-200"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Session History</h3>
+                <p className="text-sm text-gray-300">View past thermal recordings</p>
               </div>
               <span className="text-2xl opacity-60 transition-transform group-hover:translate-x-1">→</span>
             </div>
