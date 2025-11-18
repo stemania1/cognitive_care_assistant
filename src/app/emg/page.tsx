@@ -474,25 +474,22 @@ export default function EMGPage() {
         lastHeartbeat: data.lastHeartbeat
       });
       
-      // Consider connected ONLY if we have RECENT activity (not just historical data):
-      // Priority order:
-      // 1. Server explicitly says it's connected (heartbeat within 30s) - STRONGEST indicator
-      // 2. Recent heartbeat (within 10 seconds) - device sends data every 1 second, so 10s is safe
-      // 3. Recent data in array AND recent heartbeat - double check
+      // Consider connected ONLY if we have RECENT activity (within 10 seconds):
+      // Device sends data every 1 second, so if heartbeat is > 10 seconds old, device is disconnected
+      // Note: We DON'T use serverSaysConnected (30s threshold) because it's too lenient
       // Note: We DON'T check dataCount > 0 alone because old data can remain in store after device disconnects
-      const shouldBeConnected = serverSaysConnected || hasRecentHeartbeat;
+      const shouldBeConnected = hasRecentHeartbeat; // Only recent heartbeat (10s), not server's 30s check
       
       console.log('Connection decision:', {
         shouldBeConnected,
         currentState: isMyoWareConnected,
         willUpdate: shouldBeConnected !== isMyoWareConnected,
-        detectionMethod: serverSaysConnected ? 'server' : hasRecentHeartbeat ? 'heartbeat' : 'none'
+        detectionMethod: hasRecentHeartbeat ? 'heartbeat' : 'none'
       });
       
       // Update connection state immediately when we detect connection
       if (shouldBeConnected && !isMyoWareConnected) {
-        console.log('✅ MyoWare device CONNECTED - detected via:', {
-          serverSaysConnected,
+        console.log('✅ MyoWare device CONNECTED - recent heartbeat detected:', {
           hasRecentHeartbeat,
           timeSinceLastHeartbeat: data.timeSinceLastHeartbeat,
           dataCount: data.dataCount || 0,
@@ -501,11 +498,9 @@ export default function EMGPage() {
         setIsMyoWareConnected(true);
       } else if (!shouldBeConnected && isMyoWareConnected) {
         // Disconnect if heartbeat is stale (no recent activity)
-        // Since device sends data every 1 second, if heartbeat is > 10 seconds old, device is likely disconnected
-        if (!hasRecentHeartbeat && !serverSaysConnected) {
-          console.log('❌ MyoWare device DISCONNECTED - no recent heartbeat (last:', data.timeSinceLastHeartbeat, 'ms ago)');
-          setIsMyoWareConnected(false);
-        }
+        // Since device sends data every 1 second, if heartbeat is > 10 seconds old, device is disconnected
+        console.log('❌ MyoWare device DISCONNECTED - no recent heartbeat (last:', data.timeSinceLastHeartbeat, 'ms ago, threshold: 10000ms)');
+        setIsMyoWareConnected(false);
       }
       
       if (data.data && data.data.length > 0) {
@@ -631,17 +626,15 @@ export default function EMGPage() {
             const dataData = await dataResponse.json();
             console.log('EMG data status:', dataData);
             
-            // Use the same connection detection logic as polling - only check RECENT activity
+            // Use the same connection detection logic as polling - only check RECENT activity (10 seconds)
             const hasRecentHeartbeat = dataData.timeSinceLastHeartbeat !== undefined && dataData.timeSinceLastHeartbeat !== null && dataData.timeSinceLastHeartbeat < 10000; // 10 seconds
-            const serverSaysConnected = dataData.isConnected === true;
             
-            const shouldBeConnected = serverSaysConnected || hasRecentHeartbeat;
+            const shouldBeConnected = hasRecentHeartbeat; // Only recent heartbeat, not server's 30s check
             
             if (shouldBeConnected) {
               setIsMyoWareConnected(true);
               setUseRealData(true);
-              console.log('Auto-connected to MyoWare device - detected via:', {
-                serverSaysConnected,
+              console.log('Auto-connected to MyoWare device - recent heartbeat detected:', {
                 hasRecentHeartbeat,
                 timeSinceLastHeartbeat: dataData.timeSinceLastHeartbeat,
                 dataCount: dataData.dataCount || 0
