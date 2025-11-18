@@ -443,16 +443,17 @@ export default function EMGPage() {
       consecutiveFailuresRef.current = 0;
       
       console.log('Fetched EMG data:', data); // Debug log
-      console.log('Connection status:', data.isConnected, 'Data count:', data.data?.length || 0);
       
       // Update connection status based on actual data availability
       // If we have data in the store (dataCount > 0), device is connected
       // Also check heartbeat as a fallback
       const hasDataInStore = (data.dataCount && data.dataCount > 0);
-      const hasRecentData = (data.data && data.data.length > 0);
+      const hasRecentData = (data.data && Array.isArray(data.data) && data.data.length > 0);
       const hasRecentHeartbeat = data.timeSinceLastHeartbeat !== undefined && data.timeSinceLastHeartbeat < 60000; // 60 seconds (more lenient)
+      const serverSaysConnected = data.isConnected === true; // Explicitly check for true
       
       console.log('Connection check:', {
+        serverSaysConnected,
         isConnected: data.isConnected,
         dataCount: data.dataCount || 0,
         recentDataCount: data.data?.length || 0,
@@ -464,27 +465,45 @@ export default function EMGPage() {
       });
       
       // Consider connected if ANY of these conditions are true:
-      // 1. Server says it's connected
-      // 2. We have data in the store (dataCount > 0)
-      // 3. We have recent data points
-      // 4. We have a recent heartbeat
-      const shouldBeConnected = data.isConnected || hasDataInStore || hasRecentData || hasRecentHeartbeat;
+      // 1. Server explicitly says it's connected (from heartbeat calculation)
+      // 2. We have data in the store (dataCount > 0) - indicates device is actively sending
+      // 3. We have recent data points in the response array
+      // 4. We have a recent heartbeat (within 60 seconds)
+      const shouldBeConnected = serverSaysConnected || hasDataInStore || hasRecentData || hasRecentHeartbeat;
       
-      if (shouldBeConnected) {
-        if (!isMyoWareConnected) {
-          setIsMyoWareConnected(true);
-          console.log('✅ MyoWare device connected - starting data collection');
-        }
-      } else {
-        // Only disconnect if we haven't had data for a while AND no heartbeat for over 60 seconds
-        if (isMyoWareConnected) {
-          const noDataForLongTime = (!data.dataCount || data.dataCount === 0);
-          const noHeartbeatForLongTime = !data.timeSinceLastHeartbeat || data.timeSinceLastHeartbeat > 90000; // 90 seconds
-          
-          if (noDataForLongTime && noHeartbeatForLongTime) {
-            setIsMyoWareConnected(false);
-            console.log('❌ MyoWare device disconnected - no data or heartbeat for over 90 seconds');
-          }
+      console.log('Connection decision:', {
+        shouldBeConnected,
+        currentState: isMyoWareConnected,
+        willUpdate: shouldBeConnected !== isMyoWareConnected,
+        detectionMethod: serverSaysConnected ? 'server' : hasDataInStore ? 'dataCount' : hasRecentData ? 'recentData' : hasRecentHeartbeat ? 'heartbeat' : 'none'
+      });
+      
+      // Update connection state immediately when we detect connection
+      if (shouldBeConnected && !isMyoWareConnected) {
+        console.log('✅ MyoWare device CONNECTED - detected via:', {
+          serverSaysConnected,
+          hasDataInStore,
+          hasRecentData,
+          hasRecentHeartbeat,
+          dataCount: data.dataCount || 0,
+          dataLength: data.data?.length || 0
+        });
+        setIsMyoWareConnected(true);
+      } else if (!shouldBeConnected && isMyoWareConnected) {
+        // Only disconnect if we haven't had data for a while AND no heartbeat for over 90 seconds
+        const noDataForLongTime = (!data.dataCount || data.dataCount === 0) && (!data.data || data.data.length === 0);
+        const noHeartbeatForLongTime = !data.timeSinceLastHeartbeat || data.timeSinceLastHeartbeat > 90000; // 90 seconds
+        
+        if (noDataForLongTime && noHeartbeatForLongTime) {
+          console.log('❌ MyoWare device DISCONNECTED - no data or heartbeat for over 90 seconds');
+          setIsMyoWareConnected(false);
+        } else {
+          console.log('⚠️ Connection check failed but keeping connected due to recent activity:', {
+            noDataForLongTime,
+            noHeartbeatForLongTime,
+            dataCount: data.dataCount,
+            timeSinceHeartbeat: data.timeSinceLastHeartbeat
+          });
         }
       }
       
@@ -608,13 +627,31 @@ export default function EMGPage() {
             const dataData = await dataResponse.json();
             console.log('EMG data status:', dataData);
             
-            // Only connect if we have actual data AND the server says it's connected
-            if (dataData.isConnected && dataData.data && dataData.data.length > 0) {
+            // Use the same connection detection logic as polling
+            const hasDataInStore = (dataData.dataCount && dataData.dataCount > 0);
+            const hasRecentData = (dataData.data && Array.isArray(dataData.data) && dataData.data.length > 0);
+            const hasRecentHeartbeat = dataData.timeSinceLastHeartbeat !== undefined && dataData.timeSinceLastHeartbeat < 60000;
+            const serverSaysConnected = dataData.isConnected === true;
+            
+            const shouldBeConnected = serverSaysConnected || hasDataInStore || hasRecentData || hasRecentHeartbeat;
+            
+            if (shouldBeConnected) {
               setIsMyoWareConnected(true);
               setUseRealData(true);
-              console.log('Auto-connected to MyoWare device with data');
+              console.log('Auto-connected to MyoWare device - detected via:', {
+                serverSaysConnected,
+                hasDataInStore,
+                hasRecentData,
+                hasRecentHeartbeat,
+                dataCount: dataData.dataCount || 0
+              });
             } else {
-              console.log('EMG server running but no device connected');
+              console.log('EMG server running but no device connected yet:', {
+                isConnected: dataData.isConnected,
+                dataCount: dataData.dataCount || 0,
+                dataLength: dataData.data?.length || 0,
+                timeSinceHeartbeat: dataData.timeSinceLastHeartbeat
+              });
               setIsMyoWareConnected(false);
               setUseRealData(false);
             }
