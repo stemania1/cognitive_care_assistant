@@ -19,11 +19,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🔔 POST /api/emg/ws - Request received at:', new Date().toISOString());
+  console.log('🔔 Request headers:', Object.fromEntries(request.headers.entries()));
+  
   try {
     const body = await request.json();
+    console.log('🔔 POST /api/emg/ws - Request body:', JSON.stringify(body, null, 2));
+    
     const { type, data, timestamp, muscleActivity, muscleActivityProcessed, voltage, calibrated } = body;
     
-    console.log('Received EMG data:', { type, data, timestamp, muscleActivity, muscleActivityProcessed });
+    console.log('📥 Received EMG data:', { type, data, timestamp, muscleActivity, muscleActivityProcessed });
     
     // Handle different message types from MyoWare client
     switch (type) {
@@ -125,8 +130,17 @@ export async function POST(request: NextRequest) {
         });
     }
   } catch (error) {
-    console.error('Error processing EMG message:', error);
-    return new Response(JSON.stringify({ error: 'Invalid request' }), {
+    console.error('❌ Error processing EMG message:', error);
+    console.error('❌ Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    });
+    
+    return new Response(JSON.stringify({ 
+      error: 'Invalid request',
+      details: error instanceof Error ? error.message : String(error)
+    }), {
       status: 400,
       headers: {
         'Content-Type': 'application/json',
