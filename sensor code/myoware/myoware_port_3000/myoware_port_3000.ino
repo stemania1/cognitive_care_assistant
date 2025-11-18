@@ -121,6 +121,10 @@ void setupWiFi() {
     Serial.println("IP address: " + WiFi.localIP().toString());
     Serial.println("MAC address: " + WiFi.macAddress());
     isConnected = true;
+    
+    // Auto-start transmission when WiFi connects
+    Serial.println("Auto-starting EMG data transmission...");
+    startTransmission();
   } else {
     Serial.println("");
     Serial.println("WiFi connection failed!");
