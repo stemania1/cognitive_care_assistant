@@ -530,7 +530,7 @@ export default function SleepBehaviors() {
         if (!userId) {
           addAlert({
             message: "Unable to save session: user not authenticated.",
-            severity: "error",
+            severity: "critical",
             source: "Thermal Sensor",
           });
           setIsRecording(false);
@@ -587,7 +587,7 @@ export default function SleepBehaviors() {
           console.error('Error saving session:', error);
           addAlert({
             message: `Failed to save session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            severity: "error",
+            severity: "critical",
             source: "Thermal Sensor",
           });
         } finally {
