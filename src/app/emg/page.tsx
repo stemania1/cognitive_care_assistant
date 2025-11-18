@@ -457,68 +457,54 @@ export default function EMGPage() {
         timeSinceLastHeartbeatValue: data.timeSinceLastHeartbeat
       });
       
-      // Update connection status based on actual data availability
-      // If we have data in the store (dataCount > 0), device is connected
-      // Also check heartbeat as a fallback
-      const hasDataInStore = (data.dataCount && data.dataCount > 0);
+      // Update connection status based on RECENT activity only (not historical data)
+      // Check if we have recent heartbeat (device sends data every 1 second, so heartbeat should be recent)
       const hasRecentData = (data.data && Array.isArray(data.data) && data.data.length > 0);
-      const hasRecentHeartbeat = data.timeSinceLastHeartbeat !== undefined && data.timeSinceLastHeartbeat !== null && data.timeSinceLastHeartbeat < 60000; // 60 seconds (more lenient)
-      const serverSaysConnected = data.isConnected === true; // Explicitly check for true
+      const hasRecentHeartbeat = data.timeSinceLastHeartbeat !== undefined && data.timeSinceLastHeartbeat !== null && data.timeSinceLastHeartbeat < 10000; // 10 seconds - device sends data every 1 second
+      const serverSaysConnected = data.isConnected === true; // Explicitly check for true (heartbeat within 30s)
       
       console.log('Connection check:', {
         serverSaysConnected,
         isConnected: data.isConnected,
         dataCount: data.dataCount || 0,
         recentDataCount: data.data?.length || 0,
-        hasDataInStore,
         hasRecentData,
         hasRecentHeartbeat,
         timeSinceLastHeartbeat: data.timeSinceLastHeartbeat,
         lastHeartbeat: data.lastHeartbeat
       });
       
-      // Consider connected if ANY of these conditions are true:
+      // Consider connected ONLY if we have RECENT activity (not just historical data):
       // Priority order:
-      // 1. We have data in the store (dataCount > 0) - STRONGEST indicator that device is actively sending
-      // 2. We have recent data points in the response array - also strong indicator
-      // 3. Server explicitly says it's connected (from heartbeat calculation within 30s)
-      // 4. We have a recent heartbeat (within 60 seconds) - fallback check
-      // Note: dataCount > 0 takes priority because even if heartbeat is stale, if we have data, device is active
-      const shouldBeConnected = hasDataInStore || hasRecentData || serverSaysConnected || hasRecentHeartbeat;
+      // 1. Server explicitly says it's connected (heartbeat within 30s) - STRONGEST indicator
+      // 2. Recent heartbeat (within 10 seconds) - device sends data every 1 second, so 10s is safe
+      // 3. Recent data in array AND recent heartbeat - double check
+      // Note: We DON'T check dataCount > 0 alone because old data can remain in store after device disconnects
+      const shouldBeConnected = serverSaysConnected || hasRecentHeartbeat;
       
       console.log('Connection decision:', {
         shouldBeConnected,
         currentState: isMyoWareConnected,
         willUpdate: shouldBeConnected !== isMyoWareConnected,
-        detectionMethod: serverSaysConnected ? 'server' : hasDataInStore ? 'dataCount' : hasRecentData ? 'recentData' : hasRecentHeartbeat ? 'heartbeat' : 'none'
+        detectionMethod: serverSaysConnected ? 'server' : hasRecentHeartbeat ? 'heartbeat' : 'none'
       });
       
       // Update connection state immediately when we detect connection
       if (shouldBeConnected && !isMyoWareConnected) {
         console.log('✅ MyoWare device CONNECTED - detected via:', {
           serverSaysConnected,
-          hasDataInStore,
-          hasRecentData,
           hasRecentHeartbeat,
+          timeSinceLastHeartbeat: data.timeSinceLastHeartbeat,
           dataCount: data.dataCount || 0,
           dataLength: data.data?.length || 0
         });
         setIsMyoWareConnected(true);
       } else if (!shouldBeConnected && isMyoWareConnected) {
-        // Only disconnect if we haven't had data for a while AND no heartbeat for over 90 seconds
-        const noDataForLongTime = (!data.dataCount || data.dataCount === 0) && (!data.data || data.data.length === 0);
-        const noHeartbeatForLongTime = !data.timeSinceLastHeartbeat || data.timeSinceLastHeartbeat > 90000; // 90 seconds
-        
-        if (noDataForLongTime && noHeartbeatForLongTime) {
-          console.log('❌ MyoWare device DISCONNECTED - no data or heartbeat for over 90 seconds');
+        // Disconnect if heartbeat is stale (no recent activity)
+        // Since device sends data every 1 second, if heartbeat is > 10 seconds old, device is likely disconnected
+        if (!hasRecentHeartbeat && !serverSaysConnected) {
+          console.log('❌ MyoWare device DISCONNECTED - no recent heartbeat (last:', data.timeSinceLastHeartbeat, 'ms ago)');
           setIsMyoWareConnected(false);
-        } else {
-          console.log('⚠️ Connection check failed but keeping connected due to recent activity:', {
-            noDataForLongTime,
-            noHeartbeatForLongTime,
-            dataCount: data.dataCount,
-            timeSinceHeartbeat: data.timeSinceLastHeartbeat
-          });
         }
       }
       
@@ -645,22 +631,19 @@ export default function EMGPage() {
             const dataData = await dataResponse.json();
             console.log('EMG data status:', dataData);
             
-            // Use the same connection detection logic as polling
-            const hasDataInStore = (dataData.dataCount && dataData.dataCount > 0);
-            const hasRecentData = (dataData.data && Array.isArray(dataData.data) && dataData.data.length > 0);
-            const hasRecentHeartbeat = dataData.timeSinceLastHeartbeat !== undefined && dataData.timeSinceLastHeartbeat < 60000;
+            // Use the same connection detection logic as polling - only check RECENT activity
+            const hasRecentHeartbeat = dataData.timeSinceLastHeartbeat !== undefined && dataData.timeSinceLastHeartbeat !== null && dataData.timeSinceLastHeartbeat < 10000; // 10 seconds
             const serverSaysConnected = dataData.isConnected === true;
             
-            const shouldBeConnected = serverSaysConnected || hasDataInStore || hasRecentData || hasRecentHeartbeat;
+            const shouldBeConnected = serverSaysConnected || hasRecentHeartbeat;
             
             if (shouldBeConnected) {
               setIsMyoWareConnected(true);
               setUseRealData(true);
               console.log('Auto-connected to MyoWare device - detected via:', {
                 serverSaysConnected,
-                hasDataInStore,
-                hasRecentData,
                 hasRecentHeartbeat,
+                timeSinceLastHeartbeat: dataData.timeSinceLastHeartbeat,
                 dataCount: dataData.dataCount || 0
               });
             } else {
