@@ -118,6 +118,8 @@ export default function SleepBehaviors() {
   const totalFramesRef = useRef(0);
   const stableFrameCountRef = useRef(0);
   const eventCountRef = useRef(0);
+  const recordingTotalFramesRef = useRef(0);
+  const recordingStableFramesRef = useRef(0);
   const restlessnessStreakRef = useRef(0);
   const outOfFrameStreakRef = useRef(0);
   const lastAlertsRef = useRef<{ highTemp: number; restlessness: number; outOfFrame: number }>({
@@ -265,6 +267,9 @@ export default function SleepBehaviors() {
     setCurrentTemp(avgTemp);
 
     totalFramesRef.current += 1;
+    if (isRecording) {
+      recordingTotalFramesRef.current += 1;
+    }
     frameStatsRef.current.push({
       timestamp: data.timestamp ?? now,
       average: avgTemp,
@@ -296,6 +301,9 @@ export default function SleepBehaviors() {
       range < 4.0 && variance < 8.0 && baselineForFrame !== null; // Adjusted for sensor noise
     if (stableFrame) {
       stableFrameCountRef.current += 1;
+      if (isRecording) {
+        recordingStableFramesRef.current += 1;
+      }
     }
 
     const HIGH_TEMP_THRESHOLD = 2.0;
@@ -386,10 +394,14 @@ export default function SleepBehaviors() {
       }
     }
 
-    const stabilityPercent =
-      totalFramesRef.current > 0
-        ? (stableFrameCountRef.current / totalFramesRef.current) * 100
-        : null;
+    // Calculate pattern stability: use recording-specific counters if recording, otherwise use all-time counters
+    const stabilityPercent = isRecording
+      ? (recordingTotalFramesRef.current > 0
+          ? (recordingStableFramesRef.current / recordingTotalFramesRef.current) * 100
+          : null)
+      : (totalFramesRef.current > 0
+          ? (stableFrameCountRef.current / totalFramesRef.current) * 100
+          : null);
 
     const elapsedMinutes =
       sessionStartRef.current !== null
@@ -498,6 +510,8 @@ export default function SleepBehaviors() {
         // Starting recording - reset counters and session data
         setSessionDuration(0);
         eventCountRef.current = 0;
+        recordingTotalFramesRef.current = 0;
+        recordingStableFramesRef.current = 0;
         setSessionData([]);
         sessionSamplesRef.current = [];
         sessionStartRef.current = Date.now();

@@ -1,18 +1,14 @@
 import { NextRequest } from 'next/server';
-import { storeEMGData, storeCalibrationData, updateHeartbeat } from '@/lib/emg-data-store';
-
-// EMG data storage (in production, use a database)
-let emgData: any[] = [];
-let calibrationData: any = null;
-let lastHeartbeat = Date.now();
+import { storeEMGData, storeCalibrationData, updateHeartbeat, getEMGData } from '@/lib/emg-data-store';
 
 export async function GET(request: NextRequest) {
+  const emgDataState = getEMGData();
   return new Response(JSON.stringify({
     status: 'EMG WebSocket server running',
     connectedDevices: 1,
     timestamp: Date.now(),
-    dataCount: emgData.length,
-    lastHeartbeat: lastHeartbeat
+    dataCount: emgDataState.dataCount,
+    lastHeartbeat: emgDataState.lastHeartbeat
   }), {
     status: 200,
     headers: {
@@ -42,22 +38,20 @@ export async function POST(request: NextRequest) {
           calibrated: calibrated
         };
         
-        emgData.push(emgEntry);
+        // Store in shared data store (this is the source of truth)
         storeEMGData(emgEntry);
         // Update heartbeat on data receipt to reflect active device
-        lastHeartbeat = Date.now();
         updateHeartbeat();
         
-        // Keep only last 1000 entries
-        if (emgData.length > 1000) {
-          emgData = emgData.slice(-1000);
-        }
+        // Get current data count from shared store
+        const currentData = getEMGData();
         
-        console.log('EMG Data stored:', emgEntry);
+        console.log('EMG Data stored:', emgEntry, 'Total data count:', currentData.dataCount);
         return new Response(JSON.stringify({ 
           status: 'received', 
           timestamp: Date.now(),
-          dataCount: emgData.length 
+          dataCount: currentData.dataCount,
+          isConnected: true
         }), {
           status: 200,
           headers: {
@@ -68,19 +62,19 @@ export async function POST(request: NextRequest) {
         
       case 'calibration_data':
         // Store calibration data
-        calibrationData = {
+        const calibrationEntry = {
           min: data?.min || body.min,
           max: data?.max || body.max,
           range: data?.range || body.range,
           timestamp: Date.now()
         };
         
-        storeCalibrationData(calibrationData);
-        console.log('Calibration Data stored:', calibrationData);
+        storeCalibrationData(calibrationEntry);
+        console.log('Calibration Data stored:', calibrationEntry);
         return new Response(JSON.stringify({ 
           status: 'calibrated', 
           timestamp: Date.now(),
-          calibration: calibrationData 
+          calibration: calibrationEntry 
         }), {
           status: 200,
           headers: {
@@ -91,13 +85,13 @@ export async function POST(request: NextRequest) {
         
       case 'heartbeat':
         // Update heartbeat
-        lastHeartbeat = Date.now();
         updateHeartbeat();
+        const heartbeatData = getEMGData();
         console.log('Heartbeat received:', data);
         return new Response(JSON.stringify({ 
           status: 'alive', 
           timestamp: Date.now(),
-          lastHeartbeat: lastHeartbeat 
+          lastHeartbeat: heartbeatData.lastHeartbeat 
         }), {
           status: 200,
           headers: {

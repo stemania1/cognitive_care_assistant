@@ -301,7 +301,7 @@ export default function ThermalHistoryPage() {
     plugins: {
       title: {
         display: true,
-        text: `Thermal Sample Data (Started: ${startTimeStr})`,
+        text: `Sleep Activity - Subject: ${session.subject_identifier} (Started: ${startTimeStr})`,
         color: 'rgb(156, 163, 175)',
         font: {
           size: 16,
@@ -393,7 +393,7 @@ export default function ThermalHistoryPage() {
         plugins: {
           title: {
             display: true,
-            text: 'Thermal Sample Data',
+            text: session ? `Sleep Activity - Subject: ${session.subject_identifier}` : 'Sleep Activity',
             color: 'rgb(156, 163, 175)',
           },
         },
@@ -573,7 +573,7 @@ export default function ThermalHistoryPage() {
                     <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xl font-semibold">
-                          Sample Data Chart ({selectedSession.samples.length} samples)
+                          Sleep Activity - Subject: {selectedSession.subject_identifier} ({selectedSession.samples.length} samples)
                         </h3>
                         <button
                           onClick={() => exportToCSV(selectedSession)}
@@ -594,7 +594,7 @@ export default function ThermalHistoryPage() {
                     </div>
                   ) : (
                     <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
-                      <h3 className="text-xl font-semibold mb-4">Sample Data</h3>
+                      <h3 className="text-xl font-semibold mb-4">Sleep Activity - Subject: {selectedSession.subject_identifier}</h3>
                       <p className="text-gray-400 text-center py-8">No sample data available for this session.</p>
                     </div>
                   )}

@@ -446,29 +446,46 @@ export default function EMGPage() {
       console.log('Connection status:', data.isConnected, 'Data count:', data.data?.length || 0);
       
       // Update connection status based on actual data availability
+      // If we have data in the store (dataCount > 0), device is connected
+      // Also check heartbeat as a fallback
+      const hasDataInStore = (data.dataCount && data.dataCount > 0);
       const hasRecentData = (data.data && data.data.length > 0);
-      const hasRecentHeartbeat = data.timeSinceLastHeartbeat < 30000; // 30 seconds
+      const hasRecentHeartbeat = data.timeSinceLastHeartbeat !== undefined && data.timeSinceLastHeartbeat < 60000; // 60 seconds (more lenient)
       
       console.log('Connection check:', {
         isConnected: data.isConnected,
-        dataCount: data.data?.length || 0,
+        dataCount: data.dataCount || 0,
+        recentDataCount: data.data?.length || 0,
+        hasDataInStore,
         hasRecentData,
         hasRecentHeartbeat,
-        timeSinceLastHeartbeat: data.timeSinceLastHeartbeat
+        timeSinceLastHeartbeat: data.timeSinceLastHeartbeat,
+        lastHeartbeat: data.lastHeartbeat
       });
       
-      // Consider connected if we have recent data OR a recent heartbeat
-      if (hasRecentData || hasRecentHeartbeat) {
+      // Consider connected if ANY of these conditions are true:
+      // 1. Server says it's connected
+      // 2. We have data in the store (dataCount > 0)
+      // 3. We have recent data points
+      // 4. We have a recent heartbeat
+      const shouldBeConnected = data.isConnected || hasDataInStore || hasRecentData || hasRecentHeartbeat;
+      
+      if (shouldBeConnected) {
         if (!isMyoWareConnected) {
           setIsMyoWareConnected(true);
-          console.log('MyoWare device connected - starting data collection');
+          console.log('✅ MyoWare device connected - starting data collection');
         }
       } else {
+        // Only disconnect if we haven't had data for a while AND no heartbeat for over 60 seconds
         if (isMyoWareConnected) {
-          setIsMyoWareConnected(false);
-          console.log('MyoWare device disconnected - no recent data or server not connected');
+          const noDataForLongTime = (!data.dataCount || data.dataCount === 0);
+          const noHeartbeatForLongTime = !data.timeSinceLastHeartbeat || data.timeSinceLastHeartbeat > 90000; // 90 seconds
+          
+          if (noDataForLongTime && noHeartbeatForLongTime) {
+            setIsMyoWareConnected(false);
+            console.log('❌ MyoWare device disconnected - no data or heartbeat for over 90 seconds');
+          }
         }
-        return; // Stop processing if no device connected
       }
       
       if (data.data && data.data.length > 0) {
