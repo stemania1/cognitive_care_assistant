@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       .from('thermal_sessions')
       .select('*')
       .eq('user_id', userId)
-      .order('session_number', { ascending: true, nullsLast: true })
+      .order('session_number', { ascending: true, nullsFirst: false })
       .limit(limit);
 
     if (error) {
