@@ -442,14 +442,27 @@ export default function EMGPage() {
       // Reset failure counter on successful request
       consecutiveFailuresRef.current = 0;
       
-      console.log('Fetched EMG data:', data); // Debug log
+      // Log the full response structure for debugging
+      console.log('🔍 Full EMG API Response:', JSON.stringify(data, null, 2));
+      console.log('📊 Response fields:', {
+        hasStatus: 'status' in data,
+        hasData: 'data' in data,
+        hasDataCount: 'dataCount' in data,
+        hasIsConnected: 'isConnected' in data,
+        hasTimeSinceLastHeartbeat: 'timeSinceLastHeartbeat' in data,
+        dataType: Array.isArray(data.data) ? 'array' : typeof data.data,
+        dataLength: Array.isArray(data.data) ? data.data.length : 'N/A',
+        dataCountValue: data.dataCount,
+        isConnectedValue: data.isConnected,
+        timeSinceLastHeartbeatValue: data.timeSinceLastHeartbeat
+      });
       
       // Update connection status based on actual data availability
       // If we have data in the store (dataCount > 0), device is connected
       // Also check heartbeat as a fallback
       const hasDataInStore = (data.dataCount && data.dataCount > 0);
       const hasRecentData = (data.data && Array.isArray(data.data) && data.data.length > 0);
-      const hasRecentHeartbeat = data.timeSinceLastHeartbeat !== undefined && data.timeSinceLastHeartbeat < 60000; // 60 seconds (more lenient)
+      const hasRecentHeartbeat = data.timeSinceLastHeartbeat !== undefined && data.timeSinceLastHeartbeat !== null && data.timeSinceLastHeartbeat < 60000; // 60 seconds (more lenient)
       const serverSaysConnected = data.isConnected === true; // Explicitly check for true
       
       console.log('Connection check:', {
@@ -465,11 +478,13 @@ export default function EMGPage() {
       });
       
       // Consider connected if ANY of these conditions are true:
-      // 1. Server explicitly says it's connected (from heartbeat calculation)
-      // 2. We have data in the store (dataCount > 0) - indicates device is actively sending
-      // 3. We have recent data points in the response array
-      // 4. We have a recent heartbeat (within 60 seconds)
-      const shouldBeConnected = serverSaysConnected || hasDataInStore || hasRecentData || hasRecentHeartbeat;
+      // Priority order:
+      // 1. We have data in the store (dataCount > 0) - STRONGEST indicator that device is actively sending
+      // 2. We have recent data points in the response array - also strong indicator
+      // 3. Server explicitly says it's connected (from heartbeat calculation within 30s)
+      // 4. We have a recent heartbeat (within 60 seconds) - fallback check
+      // Note: dataCount > 0 takes priority because even if heartbeat is stale, if we have data, device is active
+      const shouldBeConnected = hasDataInStore || hasRecentData || serverSaysConnected || hasRecentHeartbeat;
       
       console.log('Connection decision:', {
         shouldBeConnected,
@@ -584,11 +599,14 @@ export default function EMGPage() {
 
   // Poll for real-time data
   useEffect(() => {
+    // Poll immediately on mount and then every 3 seconds
+    fetchRealTimeData(); // Initial poll
+    
     // Always poll for data to detect device connection/disconnection
     const interval = setInterval(fetchRealTimeData, 3000); // Poll every 3 seconds for device detection
     
     return () => clearInterval(interval);
-  }, [isRecording]);
+  }, []); // Run once on mount - fetchRealTimeData is stable and doesn't need to be in deps
 
   // Auto-connect to MyoWare when page loads
   useEffect(() => {
