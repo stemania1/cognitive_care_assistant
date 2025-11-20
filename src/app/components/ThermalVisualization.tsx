@@ -52,6 +52,7 @@ export default function ThermalVisualization({
   const calibrationDriftThreshold = 0.6;
   const recentFramesRef = useRef<number[][][]>([]);
   const FRAMES_TO_AVERAGE = 5;
+  const isPollingRef = useRef(false); // Guard to prevent concurrent polling requests
 
   const applyCalibration = (frame: number[][]): number[][] => {
     if (!USE_BASELINE) return frame;
@@ -194,10 +195,24 @@ export default function ThermalVisualization({
         const ws = new WebSocket(wsUrl);
         websocketRef.current = ws;
 
+        // Set connection timeout to prevent hanging
+        const connectionTimeout = setTimeout(() => {
+          if (ws.readyState === WebSocket.CONNECTING) {
+            console.warn('⚠️ WebSocket connection timeout after 5 seconds - closing and falling back to HTTP polling');
+            ws.close();
+            if (lastConnectionStatus.current !== 'disconnected') {
+              lastConnectionStatus.current = 'disconnected';
+              setConnectionStatus('disconnected');
+            }
+          }
+        }, 5000); // 5 second connection timeout
+
         // Set a timeout to check if we receive data
         let dataTimeout: NodeJS.Timeout;
         
         ws.onopen = () => {
+          clearTimeout(connectionTimeout);
+          
           if (lastConnectionStatus.current !== 'connected') {
             lastConnectionStatus.current = 'connected';
             setConnectionStatus('connected');
@@ -234,6 +249,11 @@ export default function ThermalVisualization({
         };
 
         ws.onclose = (event) => {
+          clearTimeout(connectionTimeout);
+          if (dataTimeout) {
+            clearTimeout(dataTimeout);
+          }
+          
           console.log('WebSocket closed', { 
             wsUrl, 
             code: event.code, 
@@ -245,11 +265,12 @@ export default function ThermalVisualization({
             setConnectionStatus('disconnected');
           }
           
-          // Auto-reconnect after a delay if connection was not clean
-          if (!event.wasClean && isActive) {
+          // Auto-reconnect after a delay if connection was not clean and not a timeout
+          // Limit reconnect attempts to prevent infinite loops
+          if (!event.wasClean && isActive && event.code !== 1006) { // 1006 = abnormal closure
             console.log('Attempting to reconnect in 3 seconds...');
             setTimeout(() => {
-              if (isActive && discoveredIP) {
+              if (isActive && discoveredIP && websocketRef.current?.readyState === WebSocket.CLOSED) {
                 connectWebSocket();
               }
             }, 3000);
@@ -257,7 +278,9 @@ export default function ThermalVisualization({
         };
 
         ws.onerror = (error) => {
-          // Silently handle WebSocket errors - HTTP polling will handle data retrieval
+          clearTimeout(connectionTimeout);
+          console.error('❌ WebSocket error:', error);
+          // Handle WebSocket errors - HTTP polling will handle data retrieval
           if (lastConnectionStatus.current !== 'disconnected') {
             lastConnectionStatus.current = 'disconnected';
             setConnectionStatus('disconnected');
@@ -319,11 +342,23 @@ export default function ThermalVisualization({
 
     // Use requestAnimationFrame for smooth rendering
     const renderFrame = () => {
-      // Find temperature range for color mapping
-      const allTemps = thermalData.flat();
-      const minTemp = Math.min(...allTemps);
-      const maxTemp = Math.max(...allTemps);
-      const tempRange = maxTemp - minTemp;
+      try {
+        // Validate thermal data before processing
+        if (!thermalData || thermalData.length === 0 || !Array.isArray(thermalData[0])) {
+          console.warn('⚠️ Invalid thermal data, skipping render');
+          return;
+        }
+        
+        // Find temperature range for color mapping
+        const allTemps = thermalData.flat();
+        if (allTemps.length === 0) {
+          console.warn('⚠️ Empty thermal data array, skipping render');
+          return;
+        }
+        
+        const minTemp = Math.min(...allTemps);
+        const maxTemp = Math.max(...allTemps);
+        const tempRange = maxTemp - minTemp;
 
       // Create upscaled thermal data (32x32 from 8x8)
       const upscaledData: number[][] = [];
@@ -392,6 +427,10 @@ export default function ThermalVisualization({
           ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
         });
       });
+      } catch (error) {
+        console.error('❌ Error rendering thermal canvas:', error);
+        // Don't throw - just skip this frame to prevent lockup
+      }
     };
 
     // Use requestAnimationFrame for smooth updates
@@ -408,9 +447,26 @@ export default function ThermalVisualization({
     if (!isActive || connectionStatus === 'connected' || !discoveredIP) return;
 
     const pollData = async () => {
+      // Prevent concurrent polling requests
+      if (isPollingRef.current) {
+        console.log('⏭️ Skipping thermal poll - previous request still in progress');
+        return;
+      }
+      
+      isPollingRef.current = true;
+      
+      // Create abort controller with timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 second timeout (slightly longer than API's 5s)
+      
       try {
         const query = discoveredIP ? `?ip=${encodeURIComponent(discoveredIP)}&port=${SENSOR_CONFIG.HTTP_PORT}` : "";
-        const response = await fetch(`/api/thermal${query}`, { cache: 'no-store' });
+        const response = await fetch(`/api/thermal${query}`, { 
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
         if (response.ok) {
           const data: ThermalData = await response.json();
           const calibrated = applyCalibration(data.thermal_data);
@@ -433,12 +489,27 @@ export default function ThermalVisualization({
             setConnectionStatus('disconnected');
           }
         }
-      } catch (error) {
-        // Update connection status to disconnected on error
-        if (lastConnectionStatus.current !== 'disconnected') {
-          lastConnectionStatus.current = 'disconnected';
-          setConnectionStatus('disconnected');
+        } catch (error: any) {
+        clearTimeout(timeoutId);
+        
+        // Handle abort/timeout specifically
+        if (error?.name === 'AbortError') {
+          console.warn('⚠️ Thermal sensor polling timeout - request aborted after 6 seconds');
+          if (lastConnectionStatus.current !== 'disconnected') {
+            lastConnectionStatus.current = 'disconnected';
+            setConnectionStatus('disconnected');
+          }
+        } else {
+          // Update connection status to disconnected on error
+          console.error('❌ Thermal sensor polling error:', error);
+          if (lastConnectionStatus.current !== 'disconnected') {
+            lastConnectionStatus.current = 'disconnected';
+            setConnectionStatus('disconnected');
+          }
         }
+      } finally {
+        // Always reset polling flag
+        isPollingRef.current = false;
       }
     };
 
