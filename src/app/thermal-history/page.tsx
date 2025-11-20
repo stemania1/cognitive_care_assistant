@@ -251,18 +251,6 @@ export default function ThermalHistoryPage() {
           pointHoverRadius: 5,
           yAxisID: 'y',
         },
-        {
-          label: 'Pattern Stability (%)',
-          data: samples.map(s => s.patternStability ?? null),
-          borderColor: 'rgb(168, 85, 247)',
-          backgroundColor: 'rgba(168, 85, 247, 0.1)',
-          borderWidth: 2,
-          fill: true,
-          tension: 0.4,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          yAxisID: 'y1',
-        },
       ],
     };
     } catch (error) {
@@ -328,9 +316,6 @@ export default function ThermalHistoryPage() {
           label: function(context: any) {
             const label = context.dataset.label || '';
             const value = context.parsed.y;
-            if (label.includes('Stability')) {
-              return `${label}: ${value !== null ? value.toFixed(1) + '%' : 'N/A'}`;
-            }
             return `${label}: ${value !== null ? value.toFixed(2) : 'N/A'}`;
           },
         },
@@ -365,22 +350,6 @@ export default function ThermalHistoryPage() {
         },
         grid: {
           color: 'rgba(255, 255, 255, 0.1)',
-        },
-      },
-      y1: {
-        type: 'linear' as const,
-        display: true,
-        position: 'right' as const,
-        title: {
-          display: true,
-          text: 'Pattern Stability (%)',
-          color: 'rgb(168, 85, 247)',
-        },
-        ticks: {
-          color: 'rgb(168, 85, 247)',
-        },
-        grid: {
-          drawOnChartArea: false,
         },
       },
     },
