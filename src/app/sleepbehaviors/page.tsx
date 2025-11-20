@@ -517,29 +517,38 @@ export default function SleepBehaviors() {
         sessionStartRef.current = Date.now();
         setIsRecording(true);
       } else {
-        // Stopping recording - save to database
+        // Stopping recording - stop immediately, then try to save
+        const startedAt = sessionStartRef.current ?? Date.now();
+        const endedAt = Date.now();
+        const durationSeconds = Math.floor((endedAt - startedAt) / 1000);
+        
+        // Stop recording immediately (better UX - user doesn't wait for save)
+        setIsRecording(false);
+        
+        // Validate and save in background
         if (!subjectIdentifier.trim()) {
           addAlert({
-            message: "Please enter a subject identifier before saving the session.",
+            message: "Recording stopped. Please enter a subject identifier to save the session.",
             severity: "warning",
             source: "Thermal Sensor",
           });
+          // Reset session data since we can't save without subject identifier
+          setSessionData([]);
+          sessionSamplesRef.current = [];
           return;
         }
 
         if (!userId) {
           addAlert({
-            message: "Unable to save session: user not authenticated.",
+            message: "Recording stopped. Unable to save session: user not authenticated.",
             severity: "critical",
             source: "Thermal Sensor",
           });
-          setIsRecording(false);
+          // Reset session data since we can't save without user ID
+          setSessionData([]);
+          sessionSamplesRef.current = [];
           return;
         }
-
-        const startedAt = sessionStartRef.current ?? Date.now();
-        const endedAt = Date.now();
-        const durationSeconds = Math.floor((endedAt - startedAt) / 1000);
 
         // Calculate averages from frameStatsRef
         const recordingFrames = frameStatsRef.current.filter(
@@ -554,46 +563,52 @@ export default function SleepBehaviors() {
           ? recordingFrames.reduce((sum, f) => sum + (f.max - f.min), 0) / recordingFrames.length
           : null;
 
+        // Save to database in background (non-blocking)
         setIsSaving(true);
-        try {
-          const response = await fetch('/api/thermal-sessions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId,
-              subjectIdentifier: subjectIdentifier.trim(),
-              startedAt: new Date(startedAt).toISOString(),
-              endedAt: new Date(endedAt).toISOString(),
-              durationSeconds,
-              averageSurfaceTemp,
-              averageTemperatureRange: averageTempRange,
-              thermalEventCount: eventCountRef.current,
-              samples: sessionSamplesRef.current,
-            }),
-          });
+        (async () => {
+          try {
+            const response = await fetch('/api/thermal-sessions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId,
+                subjectIdentifier: subjectIdentifier.trim(),
+                startedAt: new Date(startedAt).toISOString(),
+                endedAt: new Date(endedAt).toISOString(),
+                durationSeconds,
+                averageSurfaceTemp,
+                averageTemperatureRange: averageTempRange,
+                thermalEventCount: eventCountRef.current,
+                samples: sessionSamplesRef.current,
+              }),
+            });
 
-          const result = await response.json();
+            const result = await response.json();
 
-          if (!response.ok) {
-            throw new Error(result.error || result.details || 'Failed to save session');
+            if (!response.ok) {
+              throw new Error(result.error || result.details || 'Failed to save session');
+            }
+
+            addAlert({
+              message: `Session saved successfully for Subject: ${subjectIdentifier.trim()}.`,
+              severity: "info",
+              source: "Thermal Sensor",
+            });
+            
+            // Clear session data after successful save
+            setSessionData([]);
+            sessionSamplesRef.current = [];
+          } catch (error) {
+            console.error('Error saving session:', error);
+            addAlert({
+              message: `Failed to save session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              severity: "critical",
+              source: "Thermal Sensor",
+            });
+          } finally {
+            setIsSaving(false);
           }
-
-          addAlert({
-            message: `Session saved successfully for Subject: ${subjectIdentifier.trim()}.`,
-            severity: "info",
-            source: "Thermal Sensor",
-          });
-        } catch (error) {
-          console.error('Error saving session:', error);
-          addAlert({
-            message: `Failed to save session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            severity: "critical",
-            source: "Thermal Sensor",
-          });
-        } finally {
-          setIsSaving(false);
-          setIsRecording(false);
-        }
+        })();
       }
     }
   };
