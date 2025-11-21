@@ -615,6 +615,25 @@ export default function SleepBehaviors() {
         variance > RESTLESS_VARIANCE_THRESHOLD ||
         Math.abs(tempDiff) > HIGH_TEMP_THRESHOLD;
 
+      // Debug logging for movement detection (only during recording to avoid spam)
+      if (isRecording && (restlessFrame || restlessnessStreakRef.current > 0)) {
+        console.log(`🔍 Movement Detection Debug:`, {
+          range: range.toFixed(2),
+          rangeThreshold: RESTLESS_RANGE_THRESHOLD,
+          rangeExceeded: range > RESTLESS_RANGE_THRESHOLD,
+          variance: variance.toFixed(2),
+          varianceThreshold: RESTLESS_VARIANCE_THRESHOLD,
+          varianceExceeded: variance > RESTLESS_VARIANCE_THRESHOLD,
+          tempDiff: tempDiff.toFixed(2),
+          tempThreshold: HIGH_TEMP_THRESHOLD,
+          tempExceeded: Math.abs(tempDiff) > HIGH_TEMP_THRESHOLD,
+          restlessFrame,
+          currentStreak: restlessnessStreakRef.current,
+          baselineTemp: baselineForFrame?.toFixed(2) || 'null',
+          avgTemp: avgTemp.toFixed(2)
+        });
+      }
+
       // Calculate restlessness value: 1 if restless, 0 if not
       const restlessnessValue = restlessFrame ? 1 : 0;
 
@@ -626,6 +645,7 @@ export default function SleepBehaviors() {
         // Record immediately when streak reaches exactly 3 (first detection of a movement period)
         if (isRecording && sessionStartRef.current && restlessnessStreakRef.current === 3) {
           const secondsFromStart = Math.floor((now - sessionStartRef.current) / 1000);
+          console.log(`🎯 MOVEMENT DETECTED! Adding to movementDetectedRef at ${secondsFromStart}s`);
           movementDetectedRef.current.push({
             timestamp: now,
             secondsFromStart: secondsFromStart,
@@ -846,12 +866,42 @@ export default function SleepBehaviors() {
         movementDetectedRef.current = [];
         setMoveEventCount(0);
         sessionStartRef.current = Date.now();
+        
+        console.log(`🎬 RECORDING STARTED:`, {
+          baselineTemp: baselineTemp?.toFixed(2) || 'null',
+          currentTemp: currentTemp.toFixed(2),
+          thresholds: {
+            RESTLESS_RANGE_THRESHOLD: 2.5,
+            RESTLESS_VARIANCE_THRESHOLD: 12.0,
+            HIGH_TEMP_THRESHOLD: 2.0
+          },
+          resetStates: {
+            restlessnessStreak: 0,
+            movementDetected: 0,
+            moveEvents: 0
+          }
+        });
+        
+        // Reset detection state
+        restlessnessStreakRef.current = 0;
+        
         setIsRecording(true);
       } else {
         // Stopping recording - stop immediately, then try to save
         const startedAt = sessionStartRef.current ?? Date.now();
         const endedAt = Date.now();
         const durationSeconds = Math.floor((endedAt - startedAt) / 1000);
+        
+        console.log('🛑 RECORDING STOPPED - Final Summary:', {
+          sessionSamples: sessionSamplesRef.current.length,
+          moveEvents: moveEventsRef.current.length,
+          movementDetected: movementDetectedRef.current.length,
+          movementDetectedEvents: movementDetectedRef.current,
+          subjectIdentifier,
+          userId,
+          sessionDuration: `${durationSeconds}s`,
+          baselineTemp: baselineTemp?.toFixed(2) || 'null'
+        });
         
         // Stop recording immediately (better UX - user doesn't wait for save)
         setIsRecording(false);

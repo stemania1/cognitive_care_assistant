@@ -109,6 +109,97 @@ function MoveEventChart({ data, options, session }: { data: any; options: any; s
     ctx.restore();
   };
 
+  // Helper function to draw triangles for movement detection
+  const drawMovementTriangles = (
+    chart: any,
+    events: MoveEvent[] | null | undefined
+  ) => {
+    if (!events || !Array.isArray(events) || events.length === 0) {
+      console.log('🔺 No movement events to draw triangles for');
+      return;
+    }
+
+    console.log('🔺 Drawing triangles for', events.length, 'movement events:', events);
+
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+
+    if (!xScale || !yScale) {
+      console.log('🔺 Missing chart scales');
+      return;
+    }
+
+    const labels = chart.data?.labels || [];
+    if (labels.length === 0) {
+      console.log('🔺 No chart labels available');
+      return;
+    }
+
+    console.log('🔺 Chart labels:', labels);
+
+    ctx.save();
+    ctx.fillStyle = 'rgb(250, 204, 21)'; // Yellow color
+    ctx.strokeStyle = 'rgb(217, 119, 6)'; // Darker yellow border
+    ctx.lineWidth = 1;
+
+    events.forEach((event: MoveEvent, index: number) => {
+      // Find the closest label index for this event
+      const targetLabel = `${event.secondsFromStart}s`;
+      const labelIndex = labels.findIndex((label: string) => label === targetLabel);
+      
+      console.log(`🔺 Event ${index}: looking for "${targetLabel}", found at index ${labelIndex}`);
+      
+      if (labelIndex === -1) {
+        // Try to find the closest label if exact match not found
+        const closestIndex = labels.reduce((closest: number, label: string, idx: number) => {
+          const labelSeconds = parseInt(label.replace('s', ''));
+          const currentClosest = parseInt(labels[closest].replace('s', ''));
+          return Math.abs(labelSeconds - event.secondsFromStart) < Math.abs(currentClosest - event.secondsFromStart) ? idx : closest;
+        }, 0);
+        
+        console.log(`🔺 Using closest label at index ${closestIndex}: "${labels[closestIndex]}"`);
+        
+        if (closestIndex >= 0) {
+          const xPos = xScale.getPixelForValue(closestIndex);
+          const yTop = yScale.top + 10;
+          const triangleSize = 8;
+
+          ctx.beginPath();
+          ctx.moveTo(xPos, yTop);
+          ctx.lineTo(xPos - triangleSize, yTop + triangleSize);
+          ctx.lineTo(xPos + triangleSize, yTop + triangleSize);
+          ctx.closePath();
+          
+          ctx.fill();
+          ctx.stroke();
+          console.log(`🔺 Drew triangle at x=${xPos}, y=${yTop}`);
+        }
+        return;
+      }
+
+      // Get x position for this label
+      const xPos = xScale.getPixelForValue(labelIndex);
+      
+      // Position triangle at the top of the chart area
+      const yTop = yScale.top + 10; // 10px from top
+      const triangleSize = 8;
+
+      // Draw triangle pointing down
+      ctx.beginPath();
+      ctx.moveTo(xPos, yTop); // Top point
+      ctx.lineTo(xPos - triangleSize, yTop + triangleSize); // Bottom left
+      ctx.lineTo(xPos + triangleSize, yTop + triangleSize); // Bottom right
+      ctx.closePath();
+      
+      ctx.fill();
+      ctx.stroke();
+      console.log(`🔺 Drew triangle at x=${xPos}, y=${yTop} for event at ${event.secondsFromStart}s`);
+    });
+
+    ctx.restore();
+  };
+
   // Custom plugin to draw move event lines and motion threshold
   const moveEventPlugin = {
     id: 'moveEventLines',
@@ -198,8 +289,8 @@ function MoveEventChart({ data, options, session }: { data: any; options: any; s
       // Draw manual move events (yellow, dashed)
       drawEventLines(chart, currentSession?.move_events, 'rgb(250, 204, 21)', 2, [5, 5]);
       
-      // Draw detected movement events (orange, solid)
-      drawEventLines(chart, currentSession?.movement_detected, 'rgb(251, 146, 60)', 2, []);
+      // Draw detected movement events as yellow triangles
+      drawMovementTriangles(chart, currentSession?.movement_detected);
     },
   };
 
@@ -1395,7 +1486,7 @@ This indicates a problem with the session saving process.`);
                       {selectedSession.movement_detected && selectedSession.movement_detected.length > 0 && (
                         <div>
                           <p className="text-sm text-gray-400">Movement Detected (Auto)</p>
-                          <p className="text-lg font-medium text-orange-400">
+                          <p className="text-lg font-medium text-yellow-400">
                             {selectedSession.movement_detected.length} event(s)
                           </p>
                         </div>
@@ -1428,7 +1519,7 @@ This indicates a problem with the session saving process.`);
                         </div>
                           <div className="text-xs text-gray-400 space-y-1">
                           <p><span className="text-orange-400">━━━</span> Orange line: Motion threshold (12.0) - values above indicate motion detected</p>
-                          <p><span className="text-yellow-400">━━ ━━</span> Yellow dashed: Manual move events | <span className="text-orange-400">━━━━</span> Orange solid: Auto-detected movement</p>
+                          <p><span className="text-yellow-400">━━ ━━</span> Yellow dashed: Manual move events | <span className="text-yellow-400">▼</span> Yellow triangles: Auto-detected movement</p>
                           <p>Lines: <span className="text-cyan-400">Cyan</span> = Motion/Variance | <span className="text-green-400">Green</span> = Avg Temperature | <span className="text-orange-400">Orange</span> = Temp Range | <span className="text-purple-400">Purple</span> = Temp Change</p>
                         </div>
                       </div>
@@ -1442,6 +1533,21 @@ This indicates a problem with the session saving process.`);
                         ) : (
                           <div className="flex items-center justify-center h-full">
                             <p className="text-gray-400">Unable to generate chart from sample data</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Debug info for movement events */}
+                      <div className="mt-4 p-3 bg-gray-800 rounded text-sm">
+                        <p className="text-yellow-400 font-semibold">Debug: Movement Events</p>
+                        <p>Manual move events: {selectedSession.move_events?.length || 0}</p>
+                        <p>Auto-detected events: {selectedSession.movement_detected?.length || 0}</p>
+                        {selectedSession.movement_detected && selectedSession.movement_detected.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-yellow-300">Auto-detected events data:</p>
+                            <pre className="text-xs text-gray-300 mt-1">
+                              {JSON.stringify(selectedSession.movement_detected, null, 2)}
+                            </pre>
                           </div>
                         )}
                       </div>
