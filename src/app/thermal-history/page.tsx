@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
@@ -214,6 +214,8 @@ interface ThermalSample {
   temperatureRange?: number | null;
   temperatureChange?: number | null;
   restlessness?: number | null;
+  averageTemperature?: number | null;
+  thermalData?: number[][] | null;
 }
 
 interface MoveEvent {
@@ -252,6 +254,7 @@ export default function ThermalHistoryPage() {
   const [isPlayingBack, setIsPlayingBack] = useState(false);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const playbackCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     async function initializeUser() {
@@ -288,6 +291,141 @@ export default function ThermalHistoryPage() {
       loadSessions();
     }
   }, [userId]);
+
+  // Render thermal canvas for playback (using same code as ThermalVisualization)
+  useEffect(() => {
+    if (!playbackCanvasRef.current || !selectedSession?.samples?.[playbackIndex]?.thermalData) return;
+
+    const canvas = playbackCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const thermalData = selectedSession.samples[playbackIndex].thermalData;
+
+    // Set canvas size to 96x96 for larger upscaling (same as original)
+    const GRID_SIZE = 96;
+    
+    // Get the container size and set canvas to fit properly
+    const container = canvas.parentElement;
+    if (container) {
+      const containerRect = container.getBoundingClientRect();
+      // Use a larger minimum size for the canvas
+      const minSize = Math.max(400, Math.min(containerRect.width, containerRect.height) * 0.95);
+      const pixelSize = Math.floor(minSize / GRID_SIZE);
+      const actualSize = pixelSize * GRID_SIZE;
+      
+      canvas.width = actualSize;
+      canvas.height = actualSize;
+      canvas.style.width = `${actualSize}px`;
+      canvas.style.height = `${actualSize}px`;
+    } else {
+      // Fallback to default size
+      const defaultSize = 400;
+      canvas.width = defaultSize;
+      canvas.height = defaultSize;
+      canvas.style.width = `${defaultSize}px`;
+      canvas.style.height = `${defaultSize}px`;
+    }
+
+    // Use requestAnimationFrame for smooth rendering
+    const renderFrame = () => {
+      try {
+        // Validate thermal data before processing
+        if (!thermalData || thermalData.length === 0 || !Array.isArray(thermalData[0])) {
+          console.warn('⚠️ Invalid thermal data, skipping render');
+          return;
+        }
+        
+        // Find temperature range for color mapping
+        const allTemps = thermalData.flat();
+        if (allTemps.length === 0) {
+          console.warn('⚠️ Empty thermal data array, skipping render');
+          return;
+        }
+        
+        const minTemp = Math.min(...allTemps);
+        const maxTemp = Math.max(...allTemps);
+        const tempRange = maxTemp - minTemp;
+
+        // Create upscaled thermal data (96x96 from 8x8)
+        const upscaledData: number[][] = [];
+        for (let y = 0; y < GRID_SIZE; y++) {
+          upscaledData[y] = [];
+          for (let x = 0; x < GRID_SIZE; x++) {
+            // Map 96x96 coordinates to 8x8 coordinates with interpolation
+            const sourceX = (x / GRID_SIZE) * 8;
+            const sourceY = (y / GRID_SIZE) * 8;
+            
+            const x1 = Math.floor(sourceX);
+            const y1 = Math.floor(sourceY);
+            const x2 = Math.min(x1 + 1, 7);
+            const y2 = Math.min(y1 + 1, 7);
+            
+            const fx = sourceX - x1;
+            const fy = sourceY - y1;
+            
+            // Bilinear interpolation
+            const temp = 
+              thermalData[y1][x1] * (1 - fx) * (1 - fy) +
+              thermalData[y1][x2] * fx * (1 - fy) +
+              thermalData[y2][x1] * (1 - fx) * fy +
+              thermalData[y2][x2] * fx * fy;
+            
+            upscaledData[y][x] = temp;
+          }
+        }
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Calculate pixel size for drawing
+        const pixelSize = Math.floor(canvas.width / GRID_SIZE);
+
+        // Draw upscaled thermal grid (same color mapping as original)
+        upscaledData.forEach((row, y) => {
+          row.forEach((temp, x) => {
+            const normalizedTemp = tempRange > 0 ? (temp - minTemp) / tempRange : 0.5;
+            
+            // Enhanced color mapping: blue (cold) to red (hot) with better contrast
+            let r, g, b;
+            
+            // Use the same vibrant color scheme as original
+            if (normalizedTemp < 0.33) {
+              // Blue to cyan
+              const factor = normalizedTemp / 0.33;
+              r = Math.floor(0);
+              g = Math.floor(255 * factor);
+              b = Math.floor(255);
+            } else if (normalizedTemp < 0.66) {
+              // Cyan to yellow
+              const factor = (normalizedTemp - 0.33) / 0.33;
+              r = Math.floor(255 * factor);
+              g = Math.floor(255);
+              b = Math.floor(255 * (1 - factor));
+            } else {
+              // Yellow to red
+              const factor = (normalizedTemp - 0.66) / 0.34;
+              r = Math.floor(255);
+              g = Math.floor(255 * (1 - factor));
+              b = Math.floor(0);
+            }
+
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+          });
+        });
+      } catch (error) {
+        console.error('❌ Error rendering thermal canvas:', error);
+      }
+    };
+
+    // Use requestAnimationFrame for smooth updates
+    const animationId = requestAnimationFrame(renderFrame);
+    
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
+  }, [selectedSession, playbackIndex]);
 
   const loadSessions = async () => {
     if (!userId) return;
@@ -1145,7 +1283,7 @@ This indicates a problem with the session saving process.`);
                             <input
                               type="checkbox"
                               checked={selectedSessions.has(session.id)}
-                              onChange={(e) => toggleSessionSelection(session.id, e)}
+                              onChange={(e) => toggleSessionSelection(session.id, e as any)}
                               className="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500 focus:ring-2"
                               onClick={(e) => e.stopPropagation()}
                             />
@@ -1340,7 +1478,7 @@ This indicates a problem with the session saving process.`);
                                 // Auto-play through samples
                                 const interval = setInterval(() => {
                                   setPlaybackIndex(prev => {
-                                    if (prev >= selectedSession.samples.length - 1) {
+                                    if (prev >= (selectedSession.samples?.length || 0) - 1) {
                                       setIsPlayingBack(false);
                                       clearInterval(interval);
                                       return 0;
@@ -1367,9 +1505,9 @@ This indicates a problem with the session saving process.`);
                             Sample {playbackIndex + 1} of {selectedSession.samples.length}
                           </span>
                           <span className="text-sm text-gray-400">
-                            {selectedSession.samples[playbackIndex] ? 
-                              `${Math.floor((selectedSession.samples[playbackIndex].timestamp - selectedSession.samples[0].timestamp) / 1000)}s` 
-                              : '0s'}
+                          {selectedSession.samples && selectedSession.samples[playbackIndex] ? 
+                            `${Math.floor((selectedSession.samples[playbackIndex].timestamp - selectedSession.samples[0].timestamp) / 1000)}s` 
+                            : '0s'}
                           </span>
                         </div>
                         <input
@@ -1462,64 +1600,23 @@ This indicates a problem with the session saving process.`);
                           <h4 className="text-lg font-medium text-cyan-200">Thermal Heatmap</h4>
                           <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
                             <div className="text-center text-gray-400 text-sm mb-4">
-                              Actual Recorded Thermal Data (8x8 sensor upscaled to 32x32 display)
+                              Actual Recorded Thermal Data (8x8 sensor upscaled to 96x96 display)
                             </div>
                             {selectedSession.samples[playbackIndex]?.thermalData ? (
                               <div className="space-y-3">
-                                <div className="grid grid-cols-32 gap-0 max-w-96 mx-auto border border-gray-600 rounded-lg overflow-hidden">
-                                  {(() => {
-                                    const thermalData = selectedSession.samples[playbackIndex].thermalData;
-                                    const upscaledGrid = [];
-                                    
-                                    // Upscale 8x8 to 32x32 (4x upscaling)
-                                    for (let y = 0; y < 32; y++) {
-                                      for (let x = 0; x < 32; x++) {
-                                        // Map 32x32 coordinates back to 8x8
-                                        const sourceY = Math.floor(y / 4);
-                                        const sourceX = Math.floor(x / 4);
-                                        const temp = thermalData[sourceY][sourceX];
-                                        
-                                        // Use the same temperature mapping as during recording
-                                        const minTemp = 18; // Same as in ThermalVisualization
-                                        const maxTemp = 40; // Same as in ThermalVisualization
-                                        const normalizedTemp = Math.max(0, Math.min(1, (temp - minTemp) / (maxTemp - minTemp)));
-                                        
-                                        // Create thermal color mapping (blue to red)
-                                        let r, g, b;
-                                        if (normalizedTemp < 0.5) {
-                                          // Blue to green
-                                          r = 0;
-                                          g = Math.floor(normalizedTemp * 2 * 255);
-                                          b = Math.floor((1 - normalizedTemp * 2) * 255);
-                                        } else {
-                                          // Green to red
-                                          r = Math.floor((normalizedTemp - 0.5) * 2 * 255);
-                                          g = Math.floor((1 - (normalizedTemp - 0.5) * 2) * 255);
-                                          b = 0;
-                                        }
-                                        
-                                        upscaledGrid.push(
-                                          <div
-                                            key={`${y}-${x}`}
-                                            className="aspect-square transition-all duration-300"
-                                            style={{
-                                              backgroundColor: `rgb(${r}, ${g}, ${b})`,
-                                            }}
-                                            title={`${temp.toFixed(1)}°C (${sourceX},${sourceY})`}
-                                          />
-                                        );
-                                      }
-                                    }
-                                    
-                                    return upscaledGrid;
-                                  })()}
+                                <div className="flex justify-center">
+                                  <canvas
+                                    ref={playbackCanvasRef}
+                                    className="rounded-lg border border-white/20 bg-gray-900"
+                                    style={{ imageRendering: 'pixelated' }}
+                                  />
                                 </div>
-                                <div className="flex justify-between text-xs text-gray-500 mt-3">
-                                  <span>🟦 Cool ({selectedSession.samples[playbackIndex].thermalData.flat().reduce((min, temp) => Math.min(min, temp), Infinity).toFixed(1)}°C)</span>
-                                  <span>🟥 Warm ({selectedSession.samples[playbackIndex].thermalData.flat().reduce((max, temp) => Math.max(max, temp), -Infinity).toFixed(1)}°C)</span>
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <span>🟦 Cool ({selectedSession.samples[playbackIndex].thermalData!.flat().reduce((min: number, temp: number) => Math.min(min, temp), Infinity).toFixed(1)}°C)</span>
+                                  <span>🟥 Warm ({selectedSession.samples[playbackIndex].thermalData!.flat().reduce((max: number, temp: number) => Math.max(max, temp), -Infinity).toFixed(1)}°C)</span>
                                 </div>
-                                <div className="text-center text-xs text-gray-400 mt-1">
-                                  Average: {(selectedSession.samples[playbackIndex].thermalData.flat().reduce((sum, temp) => sum + temp, 0) / 64).toFixed(1)}°C | Range: {(selectedSession.samples[playbackIndex].thermalData.flat().reduce((max, temp) => Math.max(max, temp), -Infinity) - selectedSession.samples[playbackIndex].thermalData.flat().reduce((min, temp) => Math.min(min, temp), Infinity)).toFixed(1)}°C
+                                <div className="text-center text-xs text-gray-400">
+                                  Average: {(selectedSession.samples[playbackIndex].thermalData!.flat().reduce((sum: number, temp: number) => sum + temp, 0) / 64).toFixed(1)}°C | Range: {(selectedSession.samples[playbackIndex].thermalData!.flat().reduce((max: number, temp: number) => Math.max(max, temp), -Infinity) - selectedSession.samples[playbackIndex].thermalData!.flat().reduce((min: number, temp: number) => Math.min(min, temp), Infinity)).toFixed(1)}°C
                                 </div>
                               </div>
                             ) : (
