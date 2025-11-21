@@ -7,6 +7,30 @@ import ThermalVisualization from "../components/ThermalVisualization";
 import { useAlertCenter } from "../components/AlertCenter";
 import { supabase } from "@/lib/supabaseClient";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 interface ThermalData {
   type: string;
@@ -83,6 +107,244 @@ const THERMAL_METRICS = [
   },
 ];
 
+// Component for live motion chart during recording
+interface LiveMotionChartProps {
+  samples: Array<{ sampleIndex: number; timestamp: number; heatmapVariance: number | null; patternStability: number | null; temperatureRange?: number | null; temperatureChange?: number | null; restlessness?: number | null }>;
+  sessionStart: number | null;
+}
+
+function LiveMotionChart({ samples, sessionStart }: LiveMotionChartProps) {
+  // Apply rolling window: keep only last 20 seconds of data
+  const ROLLING_WINDOW_SECONDS = 20;
+  const filteredSamples = (() => {
+    if (!samples || samples.length === 0) return [];
+    if (!sessionStart) return samples; // If no session start, show all data
+    
+    const now = Date.now();
+    const cutoffTime = now - (ROLLING_WINDOW_SECONDS * 1000);
+    
+    // Filter samples that are within the rolling window
+    const filtered = samples.filter(sample => sample.timestamp >= cutoffTime);
+    
+    // If filtering removes all data but we have samples, show all samples (might be early in recording)
+    return filtered.length > 0 ? filtered : samples;
+  })();
+
+  const getChartData = () => {
+    if (!filteredSamples || filteredSamples.length === 0) {
+      return null;
+    }
+    
+    // For rolling window chart, show time relative to sessionStart
+    // If no sessionStart, use the oldest sample in the window
+    let baseTime: number;
+    if (sessionStart) {
+      baseTime = sessionStart;
+    } else if (filteredSamples.length > 0) {
+      // Fallback: use oldest sample time
+      baseTime = Math.min(...filteredSamples.map(s => s.timestamp || Date.now()));
+    } else {
+      baseTime = Date.now();
+    }
+    
+    // Create labels array with numeric seconds values (formatted to 1 decimal)
+    const labels = filteredSamples.map((sample, index) => {
+      if (!sample.timestamp) {
+        // If no timestamp, use index as fallback (assuming ~100ms per sample)
+        return (index * 0.1).toFixed(1);
+      }
+      
+      const seconds = (sample.timestamp - baseTime) / 1000;
+      
+      // If seconds is 0 or negative for all samples, use index-based time
+      if (seconds <= 0 && index > 0) {
+        // Estimate time based on index (assuming samples come every ~100-200ms)
+        return (index * 0.15).toFixed(1);
+      }
+      
+      // Return formatted to 1 decimal place, ensuring positive value
+      const value = Math.max(0, seconds);
+      return isNaN(value) ? (index * 0.1).toFixed(1) : value.toFixed(1);
+    });
+
+    const datasets: any[] = [
+      {
+        label: 'Motion / Heatmap Variance',
+        data: filteredSamples.map(s => s.heatmapVariance ?? null),
+        borderColor: 'rgb(34, 211, 238)',
+        backgroundColor: 'rgba(34, 211, 238, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 1,
+        pointHoverRadius: 3,
+        yAxisID: 'y',
+      },
+    ];
+
+    if (filteredSamples.some(s => s.temperatureRange !== null && s.temperatureRange !== undefined)) {
+      datasets.push({
+        label: 'Temperature Range (°C)',
+        data: filteredSamples.map(s => s.temperatureRange ?? null),
+        borderColor: 'rgb(251, 146, 60)',
+        backgroundColor: 'rgba(251, 146, 60, 0.1)',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 2,
+        yAxisID: 'y1',
+      });
+    }
+
+    if (filteredSamples.some(s => s.temperatureChange !== null && s.temperatureChange !== undefined)) {
+      datasets.push({
+        label: 'Temperature Change (°C)',
+        data: filteredSamples.map(s => s.temperatureChange ?? null),
+        borderColor: 'rgb(168, 85, 247)',
+        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 2,
+        yAxisID: 'y1',
+      });
+    }
+
+    return { labels, datasets };
+  };
+
+  const chartData = getChartData();
+  const hasTemperatureData = filteredSamples.some(s => s.temperatureRange !== null || s.temperatureChange !== null);
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: 0, // Disable animation for real-time updates
+    },
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top' as const,
+        labels: {
+          color: 'rgb(156, 163, 175)',
+          font: {
+            size: 11,
+          },
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: 'white',
+        bodyColor: 'white',
+        borderColor: 'rgb(34, 211, 238)',
+        borderWidth: 1,
+        callbacks: {
+          label: function(context: any) {
+            const label = context.dataset.label || '';
+            const value = context.parsed.y;
+            if (label.includes('Temperature')) {
+              return `${label}: ${value !== null ? value.toFixed(1) + '°C' : 'N/A'}`;
+            }
+            if (label === 'Restlessness') {
+              return `${label}: ${value === 1 ? 'Yes' : value === 0 ? 'No' : 'N/A'}`;
+            }
+            return `${label}: ${value !== null ? value.toFixed(2) : 'N/A'}`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        display: true,
+        title: {
+          display: true,
+          text: 'Time (seconds from start)',
+          color: 'rgb(156, 163, 175)',
+        },
+        ticks: {
+          color: 'rgb(156, 163, 175)',
+          maxRotation: 45,
+          minRotation: 45,
+        },
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)',
+        },
+      },
+      y: {
+        type: 'linear' as const,
+        display: true,
+        position: 'left' as const,
+        title: {
+          display: true,
+          text: 'Motion / Variance',
+          color: 'rgb(34, 211, 238)',
+        },
+        ticks: {
+          color: 'rgb(34, 211, 238)',
+        },
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)',
+        },
+      },
+      y1: {
+        type: 'linear' as const,
+        display: hasTemperatureData,
+        position: 'right' as const,
+        title: {
+          display: true,
+          text: 'Temperature (°C)',
+          color: 'rgb(251, 146, 60)',
+        },
+        ticks: {
+          color: 'rgb(251, 146, 60)',
+        },
+        grid: {
+          drawOnChartArea: false,
+        },
+      },
+    },
+  };
+
+  if (!chartData) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-gray-400">
+          {samples.length === 0 
+            ? "Waiting for motion data..." 
+            : `Data available (${samples.length} samples) but chart cannot render`}
+        </p>
+      </div>
+    );
+  }
+
+  // Ensure chart data has valid values
+  const hasValidData = chartData.datasets.some(dataset => 
+    dataset.data.some((val: any) => val !== null && val !== undefined && !isNaN(val))
+  );
+
+  if (!hasValidData) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-gray-400">
+          Chart ready but no valid numeric data found ({samples.length} samples)
+        </p>
+        <p className="text-xs text-gray-500 mt-2">
+          Filtered: {filteredSamples.length} samples | Has variance: {filteredSamples.some(s => s.heatmapVariance !== null)}
+        </p>
+      </div>
+    );
+  }
+
+  return <Line data={chartData} options={chartOptions} />;
+}
+
 export default function SleepBehaviors() {
   const { addAlert } = useAlertCenter();
   const [isThermalActive, setIsThermalActive] = useState(false);
@@ -108,9 +370,12 @@ export default function SleepBehaviors() {
   const [thermalCalibrationTimestamp, setThermalCalibrationTimestamp] = useState<string | null>(null);
   const [isThermalBaselineCalibrating, setIsThermalBaselineCalibrating] = useState(false);
   const [baselineSampleCount, setBaselineSampleCount] = useState(0);
-  const [subjectIdentifier, setSubjectIdentifier] = useState("");
+  const [subjectIdentifier, setSubjectIdentifier] = useState("Test_Subject");
   const [userId, setUserId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [moveEventCount, setMoveEventCount] = useState(0);
+  const [moveButtonPressed, setMoveButtonPressed] = useState(false);
+  const [chartUpdateTrigger, setChartUpdateTrigger] = useState(0);
 
   const frameStatsRef = useRef<
     Array<{ timestamp: number; average: number; min: number; max: number; variance: number }>
@@ -130,7 +395,9 @@ export default function SleepBehaviors() {
   const sessionStartRef = useRef<number | null>(null);
   const baselineSamplesRef = useRef<number[][][]>([]);
   const BASELINE_SAMPLE_TARGET = 25;
-  const sessionSamplesRef = useRef<Array<{ sampleIndex: number; timestamp: number; heatmapVariance: number | null; patternStability: number | null }>>([]);
+  const sessionSamplesRef = useRef<Array<{ sampleIndex: number; timestamp: number; heatmapVariance: number | null; patternStability: number | null; temperatureRange?: number | null; temperatureChange?: number | null; restlessness?: number | null; averageTemperature?: number | null; thermalData?: number[][] | null }>>([]);
+  const moveEventsRef = useRef<Array<{ timestamp: number; secondsFromStart: number }>>([]);
+  const movementDetectedRef = useRef<Array<{ timestamp: number; secondsFromStart: number }>>([]);
 
   const formatTemperature = (value: number | null, suffix = "°C") =>
     value === null ? "—" : `${value.toFixed(1)}${suffix}`;
@@ -348,8 +615,22 @@ export default function SleepBehaviors() {
         variance > RESTLESS_VARIANCE_THRESHOLD ||
         Math.abs(tempDiff) > HIGH_TEMP_THRESHOLD;
 
+      // Calculate restlessness value: 1 if restless, 0 if not
+      const restlessnessValue = restlessFrame ? 1 : 0;
+
       if (restlessFrame) {
         restlessnessStreakRef.current += 1;
+        
+        // Track movement detection during recording
+        // Only record when we have a sustained detection (3+ frames)
+        // Record immediately when streak reaches exactly 3 (first detection of a movement period)
+        if (isRecording && sessionStartRef.current && restlessnessStreakRef.current === 3) {
+          const secondsFromStart = Math.floor((now - sessionStartRef.current) / 1000);
+          movementDetectedRef.current.push({
+            timestamp: now,
+            secondsFromStart: secondsFromStart,
+          });
+        }
       } else {
         restlessnessStreakRef.current = 0;
       }
@@ -432,13 +713,33 @@ export default function SleepBehaviors() {
 
     if (isRecording) {
       setSessionData((prev) => [...prev, data]);
+      // Calculate temperature change from baseline
+      const tempChange = baselineForFrame !== null ? avgTemp - baselineForFrame : null;
+      
+      // Calculate restlessness value: 1 if restless frame detected, 0 otherwise
+      // Use the same logic as the restlessFrame calculation above
+      const restlessnessFrame = baselineForFrame !== null && (
+        range > RESTLESS_RANGE_THRESHOLD ||
+        variance > RESTLESS_VARIANCE_THRESHOLD ||
+        Math.abs(tempChange ?? 0) > HIGH_TEMP_THRESHOLD
+      );
+      const restlessnessValue = restlessnessFrame ? 1 : 0;
+      
       // Store sample data for saving to database
       sessionSamplesRef.current.push({
         sampleIndex: sessionSamplesRef.current.length,
         timestamp: data.timestamp ?? now,
         heatmapVariance: variance,
         patternStability: finalStability,
+        temperatureRange: range,
+        temperatureChange: tempChange,
+        restlessness: restlessnessValue,
+        averageTemperature: avgTemp,
+        thermalData: data.thermal_data ? JSON.parse(JSON.stringify(data.thermal_data)) : null, // Deep copy the thermal grid
       });
+      
+      // Trigger chart update on every sample for real-time display
+      setChartUpdateTrigger(prev => prev + 1);
     }
   };
 
@@ -474,6 +775,33 @@ export default function SleepBehaviors() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleMoveButton = () => {
+    if (!isRecording || !sessionStartRef.current) {
+      return;
+    }
+
+    const now = Date.now();
+    const secondsFromStart = Math.floor((now - sessionStartRef.current) / 1000);
+    
+    moveEventsRef.current.push({
+      timestamp: now,
+      secondsFromStart: secondsFromStart,
+    });
+
+    // Update the move event count for UI display
+    setMoveEventCount(moveEventsRef.current.length);
+
+    // Visual feedback - button pressed animation
+    setMoveButtonPressed(true);
+    setTimeout(() => setMoveButtonPressed(false), 200);
+
+    addAlert({
+      message: `Move event recorded at ${formatTime(secondsFromStart)}`,
+      severity: "info",
+      source: "Thermal Sensor",
+    });
   };
 
   const toggleThermal = () => {
@@ -514,6 +842,9 @@ export default function SleepBehaviors() {
         recordingStableFramesRef.current = 0;
         setSessionData([]);
         sessionSamplesRef.current = [];
+        moveEventsRef.current = [];
+        movementDetectedRef.current = [];
+        setMoveEventCount(0);
         sessionStartRef.current = Date.now();
         setIsRecording(true);
       } else {
@@ -535,6 +866,9 @@ export default function SleepBehaviors() {
           // Reset session data since we can't save without subject identifier
           setSessionData([]);
           sessionSamplesRef.current = [];
+          moveEventsRef.current = [];
+          movementDetectedRef.current = [];
+          setMoveEventCount(0);
           return;
         }
 
@@ -547,6 +881,9 @@ export default function SleepBehaviors() {
           // Reset session data since we can't save without user ID
           setSessionData([]);
           sessionSamplesRef.current = [];
+          moveEventsRef.current = [];
+          movementDetectedRef.current = [];
+          setMoveEventCount(0);
           return;
         }
 
@@ -567,6 +904,20 @@ export default function SleepBehaviors() {
         setIsSaving(true);
         (async () => {
           try {
+            console.log('💾 Saving thermal session with data:', {
+              userId,
+              subjectIdentifier: subjectIdentifier.trim(),
+              startedAt: new Date(startedAt).toISOString(),
+              endedAt: new Date(endedAt).toISOString(),
+              durationSeconds,
+              averageSurfaceTemp,
+              averageTemperatureRange: averageTempRange,
+              thermalEventCount: eventCountRef.current,
+              samplesCount: sessionSamplesRef.current.length,
+              moveEventsCount: moveEventsRef.current.length,
+              movementDetectedCount: movementDetectedRef.current.length,
+            });
+
             const response = await fetch('/api/thermal-sessions', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -580,10 +931,17 @@ export default function SleepBehaviors() {
                 averageTemperatureRange: averageTempRange,
                 thermalEventCount: eventCountRef.current,
                 samples: sessionSamplesRef.current,
+                moveEvents: moveEventsRef.current,
+                movementDetected: movementDetectedRef.current,
               }),
             });
 
             const result = await response.json();
+            console.log('📊 Save session API response:', {
+              status: response.status,
+              ok: response.ok,
+              result: result
+            });
 
             if (!response.ok) {
               throw new Error(result.error || result.details || 'Failed to save session');
@@ -598,6 +956,9 @@ export default function SleepBehaviors() {
             // Clear session data after successful save
             setSessionData([]);
             sessionSamplesRef.current = [];
+            moveEventsRef.current = [];
+            movementDetectedRef.current = [];
+            setMoveEventCount(0);
           } catch (error) {
             console.error('Error saving session:', error);
             addAlert({
@@ -895,6 +1256,20 @@ export default function SleepBehaviors() {
                       {isSaving ? 'Saving...' : isRecording ? 'Stop Recording' : 'Start Recording'}
                     </button>
                   </div>
+                  {isRecording && (
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={handleMoveButton}
+                        className={`flex-1 py-3 px-4 rounded-lg border border-yellow-400/40 font-medium transition-all duration-200 ${
+                          moveButtonPressed
+                            ? 'bg-yellow-500/40 scale-95'
+                            : 'bg-yellow-500/10 text-yellow-100 hover:bg-yellow-500/20'
+                        }`}
+                      >
+                        📍 Mark Move Event {moveEventCount > 0 && `(${moveEventCount})`}
+                      </button>
+                    </div>
+                  )}
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={calibrateThermalBaseline}
@@ -948,12 +1323,40 @@ export default function SleepBehaviors() {
               <div className="text-2xl font-bold text-purple-400 mb-2">
                 {isRecording ? formatTime(sessionDuration) : '00:00'}
               </div>
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-gray-300 mb-2">
                 {isRecording ? 'Session Active' : 'Not Recording'}
               </p>
+              {isRecording && moveEventCount > 0 && (
+                <div className="mt-2 pt-2 border-t border-white/10">
+                  <p className="text-xs text-gray-400">Move Events</p>
+                  <p className="text-lg font-semibold text-yellow-400">{moveEventCount}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Live Motion Chart - Only during recording */}
+        {isRecording && sessionSamplesRef.current.length > 0 && (
+          <div className="mb-8">
+            <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-purple-500/10 via-fuchsia-500/5 to-pink-500/10 blur-xl" />
+              <div className="relative">
+                <h2 className="text-xl font-semibold mb-4">Live Motion Chart</h2>
+                <div className="text-xs text-gray-400 mb-2">
+                  Showing {sessionSamplesRef.current.length} sample(s) | Window: 20 seconds
+                </div>
+                <div className="h-80">
+                  <LiveMotionChart 
+                    key={`${chartUpdateTrigger}-${sessionSamplesRef.current.length}`} 
+                    samples={sessionSamplesRef.current} 
+                    sessionStart={sessionStartRef.current} 
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Session Data Display */}
         {isRecording && sessionData.length > 0 && (

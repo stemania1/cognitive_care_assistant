@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const limit = Number(searchParams.get('limit') || '50');
+    const debug = searchParams.get('debug') === 'true';
     
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -30,19 +31,57 @@ export async function GET(request: NextRequest) {
       }
     );
 
+    console.log('🔍 Fetching thermal sessions for userId:', userId, 'limit:', limit, 'debug:', debug);
+    
+    // If debug mode, also check total count and recent sessions
+    if (debug) {
+      const { count: totalCount } = await supabaseAdmin
+        .from('thermal_sessions')
+        .select('*', { count: 'exact', head: true });
+      
+      const { count: userCount } = await supabaseAdmin
+        .from('thermal_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+        
+      const { data: recentSessions } = await supabaseAdmin
+        .from('thermal_sessions')
+        .select('id, user_id, subject_identifier, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      console.log('🔍 Debug info:', {
+        totalSessionsInDB: totalCount,
+        sessionsForThisUser: userCount,
+        recentSessions: recentSessions
+      });
+    }
+    
     const { data, error } = await supabaseAdmin
       .from('thermal_sessions')
       .select('*')
       .eq('user_id', userId)
-      .order('session_number', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false })
       .limit(limit);
 
+    console.log('📊 Database query result:', {
+      error: error,
+      dataCount: data?.length || 0,
+      firstSession: data?.[0] ? {
+        id: data[0].id,
+        user_id: data[0].user_id,
+        subject_identifier: data[0].subject_identifier,
+        created_at: data[0].created_at
+      } : null
+    });
+
     if (error) {
-      console.error('Error fetching thermal sessions:', error);
+      console.error('❌ Error fetching thermal sessions:', error);
       return NextResponse.json({ error: 'Failed to fetch sessions', details: error.message }, { status: 500 });
     }
     
-    return NextResponse.json({ data });
+    console.log('✅ Returning', data?.length || 0, 'thermal sessions');
+    return NextResponse.json({ data, debug: debug ? { totalCount: data?.length || 0 } : undefined });
   } catch (e) {
     console.error('Unexpected error in GET:', e);
     return NextResponse.json({ 
@@ -64,7 +103,9 @@ export async function POST(request: NextRequest) {
       averageSurfaceTemp,
       averageTemperatureRange,
       thermalEventCount,
-      samples // Array of { sampleIndex, timestamp, heatmapVariance, patternStability }
+      samples, // Array of { sampleIndex, timestamp, heatmapVariance, patternStability }
+      moveEvents, // Array of { timestamp, secondsFromStart }
+      movementDetected // Array of { timestamp, secondsFromStart }
     } = body;
 
     if (!userId || !subjectIdentifier || !startedAt || !endedAt || typeof durationSeconds !== 'number') {
@@ -130,11 +171,22 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Update session with samples data (stored as JSONB)
-    if (samples && Array.isArray(samples) && samples.length > 0 && sessionData) {
+    // Update session with samples and move events data (stored as JSONB)
+    const updateData: { samples?: any; move_events?: any; movement_detected?: any } = {};
+    if (samples && Array.isArray(samples) && samples.length > 0) {
+      updateData.samples = samples;
+    }
+    if (moveEvents && Array.isArray(moveEvents) && moveEvents.length > 0) {
+      updateData.move_events = moveEvents;
+    }
+    if (movementDetected && Array.isArray(movementDetected) && movementDetected.length > 0) {
+      updateData.movement_detected = movementDetected;
+    }
+    
+    if (Object.keys(updateData).length > 0 && sessionData) {
       const { error: updateError } = await supabaseAdmin
         .from('thermal_sessions')
-        .update({ samples: samples })
+        .update(updateData)
         .eq('id', sessionData.id);
 
       if (updateError) {

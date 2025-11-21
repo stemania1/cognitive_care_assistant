@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
@@ -30,11 +30,195 @@ ChartJS.register(
   Filler
 );
 
+// Component wrapper to add move event lines to chart
+function MoveEventChart({ data, options, session }: { data: any; options: any; session: ThermalSession }) {
+  // Store session in a ref to ensure plugin has access
+  const sessionRef = React.useRef(session);
+  React.useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  // Helper function to draw vertical lines for events
+  const drawEventLines = (
+    chart: any,
+    events: MoveEvent[] | null | undefined,
+    color: string,
+    lineWidth: number = 2,
+    dashPattern: number[] = [5, 5]
+  ) => {
+    if (!events || !Array.isArray(events) || events.length === 0) {
+      return;
+    }
+
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+
+    if (!xScale || !yScale) {
+      return;
+    }
+
+    const labels = chart.data?.labels || [];
+    if (labels.length === 0) {
+      return;
+    }
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.setLineDash(dashPattern);
+
+    events.forEach((event: MoveEvent) => {
+      const targetLabel = `${event.secondsFromStart}s`;
+      let labelIndex = labels.findIndex((label: string) => label === targetLabel);
+
+      if (labelIndex === -1) {
+        let closestDiff = Infinity;
+        let closestIdx = -1;
+
+        labels.forEach((label: string, index: number) => {
+          const labelSeconds = parseInt(label.replace('s', ''), 10);
+          if (!isNaN(labelSeconds)) {
+            const diff = Math.abs(labelSeconds - event.secondsFromStart);
+            if (diff < closestDiff) {
+              closestDiff = diff;
+              closestIdx = index;
+            }
+          }
+        });
+
+        if (closestIdx !== -1 && closestDiff <= 5) {
+          labelIndex = closestIdx;
+        } else {
+          return;
+        }
+      }
+
+      if (labelIndex !== -1 && labelIndex >= 0 && labelIndex < labels.length) {
+        const xPos = xScale.getPixelForValue(labelIndex);
+
+        if (xPos !== null && !isNaN(xPos) && isFinite(xPos) && xPos >= xScale.left && xPos <= xScale.right) {
+          ctx.beginPath();
+          ctx.moveTo(xPos, yScale.top);
+          ctx.lineTo(xPos, yScale.bottom);
+          ctx.stroke();
+        }
+      }
+    });
+
+    ctx.restore();
+  };
+
+  // Custom plugin to draw move event lines and motion threshold
+  const moveEventPlugin = {
+    id: 'moveEventLines',
+    afterDraw: (chart: any) => {
+      const currentSession = sessionRef.current;
+      
+      const ctx = chart.ctx;
+      const yScale = chart.scales.y;
+      const xScale = chart.scales.x;
+      
+      if (!yScale || !xScale) {
+        return;
+      }
+      
+      // Draw motion detection threshold line (variance = 12.0)
+      // This shows when variance exceeds the threshold for motion detection
+      const MOTION_THRESHOLD = 12.0;
+      const thresholdY = yScale.getPixelForValue(MOTION_THRESHOLD);
+      
+      if (thresholdY !== null && !isNaN(thresholdY) && isFinite(thresholdY)) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(xScale.left, thresholdY);
+        ctx.lineTo(xScale.right, thresholdY);
+        ctx.stroke();
+        
+        // Add label for threshold
+        ctx.fillStyle = 'rgba(251, 146, 60, 0.9)';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('Motion Threshold (12.0)', xScale.right - 5, thresholdY - 5);
+        ctx.restore();
+      }
+      
+      // Draw temperature thresholds on right y-axis (y1)
+      const y1Scale = chart.scales.y1;
+      if (y1Scale) {
+        // Temperature Range threshold (2.5°C)
+        const RANGE_THRESHOLD = 2.5;
+        const rangeThresholdY = y1Scale.getPixelForValue(RANGE_THRESHOLD);
+        if (rangeThresholdY !== null && !isNaN(rangeThresholdY) && isFinite(rangeThresholdY)) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(251, 146, 60, 0.4)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([2, 2]);
+          ctx.beginPath();
+          ctx.moveTo(xScale.left, rangeThresholdY);
+          ctx.lineTo(xScale.right, rangeThresholdY);
+          ctx.stroke();
+          ctx.restore();
+        }
+        
+        // Temperature Change threshold lines (+2.0°C and -2.0°C)
+        const TEMP_CHANGE_THRESHOLD_POS = 2.0;
+        const TEMP_CHANGE_THRESHOLD_NEG = -2.0;
+        const posThresholdY = y1Scale.getPixelForValue(TEMP_CHANGE_THRESHOLD_POS);
+        const negThresholdY = y1Scale.getPixelForValue(TEMP_CHANGE_THRESHOLD_NEG);
+        
+        if (posThresholdY !== null && !isNaN(posThresholdY) && isFinite(posThresholdY)) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([2, 2]);
+          ctx.beginPath();
+          ctx.moveTo(xScale.left, posThresholdY);
+          ctx.lineTo(xScale.right, posThresholdY);
+          ctx.stroke();
+          ctx.restore();
+        }
+        
+        if (negThresholdY !== null && !isNaN(negThresholdY) && isFinite(negThresholdY)) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([2, 2]);
+          ctx.beginPath();
+          ctx.moveTo(xScale.left, negThresholdY);
+          ctx.lineTo(xScale.right, negThresholdY);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+      
+      // Draw manual move events (yellow, dashed)
+      drawEventLines(chart, currentSession?.move_events, 'rgb(250, 204, 21)', 2, [5, 5]);
+      
+      // Draw detected movement events (orange, solid)
+      drawEventLines(chart, currentSession?.movement_detected, 'rgb(251, 146, 60)', 2, []);
+    },
+  };
+
+  return <Line data={data} options={options} plugins={[moveEventPlugin]} />;
+}
+
 interface ThermalSample {
   sampleIndex: number;
   timestamp: number;
   heatmapVariance: number | null;
   patternStability: number | null;
+  temperatureRange?: number | null;
+  temperatureChange?: number | null;
+  restlessness?: number | null;
+}
+
+interface MoveEvent {
+  timestamp: number;
+  secondsFromStart: number;
 }
 
 interface ThermalSession {
@@ -49,6 +233,8 @@ interface ThermalSession {
   average_temperature_range: number | null;
   thermal_event_count: number;
   samples: ThermalSample[] | null;
+  move_events: MoveEvent[] | null;
+  movement_detected: MoveEvent[] | null;
   created_at: string;
 }
 
@@ -58,22 +244,38 @@ export default function ThermalHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ThermalSession | null>(null);
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [testResults, setTestResults] = useState<string | null>(null);
+  const [isTestingAPI, setIsTestingAPI] = useState(false);
+  const [isPlayingBack, setIsPlayingBack] = useState(false);
+  const [playbackIndex, setPlaybackIndex] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
   useEffect(() => {
     async function initializeUser() {
       try {
+        console.log('🔐 Initializing user for thermal history...');
         const guestStatus = await isGuestUser();
+        console.log('👤 Guest status:', guestStatus);
+        
         if (guestStatus) {
           const guestUserId = getGuestUserId();
+          console.log('🎭 Guest user ID:', guestUserId);
           setUserId(guestUserId);
         } else {
           const { data: { user } } = await supabase.auth.getUser();
+          console.log('🔑 Supabase user:', user);
           if (user?.id) {
+            console.log('✅ Setting user ID:', user.id);
             setUserId(user.id);
+          } else {
+            console.log('❌ No user ID found');
           }
         }
       } catch (error) {
-        console.error('Error getting user:', error);
+        console.error('💥 Error getting user:', error);
       } finally {
         setLoading(false);
       }
@@ -92,16 +294,24 @@ export default function ThermalHistoryPage() {
     
     try {
       setLoading(true);
+      console.log('🔍 Loading thermal sessions for userId:', userId);
       const response = await fetch(`/api/thermal-sessions?userId=${userId}&limit=100`);
       const result = await response.json();
 
+      console.log('📊 Thermal sessions API response:', {
+        status: response.status,
+        ok: response.ok,
+        result: result
+      });
+
       if (response.ok && result.data) {
+        console.log('✅ Successfully loaded sessions:', result.data.length, 'sessions');
         setSessions(result.data);
       } else {
-        console.error('Error loading sessions:', result.error);
+        console.error('❌ Error loading sessions:', result.error, result.details);
       }
     } catch (error) {
-      console.error('Error loading sessions:', error);
+      console.error('💥 Exception loading sessions:', error);
     } finally {
       setLoading(false);
     }
@@ -147,6 +357,83 @@ export default function ThermalHistoryPage() {
       alert('Failed to delete session');
     } finally {
       setDeletingSession(null);
+    }
+  };
+
+  const toggleSessionSelection = (sessionId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    const newSelected = new Set(selectedSessions);
+    if (newSelected.has(sessionId)) {
+      newSelected.delete(sessionId);
+    } else {
+      newSelected.add(sessionId);
+    }
+    setSelectedSessions(newSelected);
+  };
+
+  const selectAllSessions = () => {
+    const allSessionIds = new Set(sessions.map(s => s.id));
+    setSelectedSessions(allSessionIds);
+  };
+
+  const deselectAllSessions = () => {
+    setSelectedSessions(new Set());
+  };
+
+  const handleMassDelete = async () => {
+    if (!userId || selectedSessions.size === 0) return;
+    
+    const sessionCount = selectedSessions.size;
+    if (!confirm(`Are you sure you want to delete ${sessionCount} session${sessionCount > 1 ? 's' : ''}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const deletePromises = Array.from(selectedSessions).map(sessionId =>
+        fetch('/api/thermal-sessions', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, sessionId }),
+        })
+      );
+
+      const responses = await Promise.all(deletePromises);
+      const results = await Promise.all(responses.map(r => r.json()));
+
+      // Filter out successfully deleted sessions
+      const successfullyDeleted = Array.from(selectedSessions).filter((sessionId, index) => 
+        responses[index].ok
+      );
+
+      if (successfullyDeleted.length > 0) {
+        setSessions(sessions.filter(s => !successfullyDeleted.includes(s.id)));
+        if (selectedSession && successfullyDeleted.includes(selectedSession.id)) {
+          setSelectedSession(null);
+        }
+      }
+
+      // Handle any failures
+      const failedDeletions = results.filter((result, index) => !responses[index].ok);
+      if (failedDeletions.length > 0) {
+        alert(`Failed to delete ${failedDeletions.length} session(s). Please try again.`);
+      }
+
+      // Clear selection
+      setSelectedSessions(new Set());
+      
+    } catch (error) {
+      console.error('Error during mass delete:', error);
+      alert('Failed to delete sessions');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const toggleBulkSelectMode = () => {
+    setBulkSelectMode(!bulkSelectMode);
+    if (bulkSelectMode) {
+      setSelectedSessions(new Set());
     }
   };
 
@@ -236,22 +523,60 @@ export default function ThermalHistoryPage() {
         return `${seconds}s`;
       });
 
+    const datasets: any[] = [
+      {
+        label: 'Motion / Heatmap Variance',
+        data: samples.map(s => s.heatmapVariance ?? null),
+        borderColor: 'rgb(34, 211, 238)',
+        backgroundColor: 'rgba(34, 211, 238, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 2,
+        pointHoverRadius: 5,
+        yAxisID: 'y',
+      },
+      {
+        label: 'Average Temperature (°C)',
+        data: samples.map(s => s.averageTemperature ?? null),
+        borderColor: 'rgb(34, 197, 94)',
+        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        pointRadius: 1,
+        pointHoverRadius: 4,
+        yAxisID: 'y2',
+      },
+      {
+        label: 'Temperature Range (°C)',
+        data: samples.map(s => s.temperatureRange ?? null),
+        borderColor: 'rgb(251, 146, 60)',
+        backgroundColor: 'rgba(251, 146, 60, 0.1)',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        pointRadius: 1,
+        pointHoverRadius: 4,
+        yAxisID: 'y1',
+      },
+      {
+        label: 'Temperature Change from Baseline (°C)',
+        data: samples.map(s => s.temperatureChange ?? null),
+        borderColor: 'rgb(168, 85, 247)',
+        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        pointRadius: 1,
+        pointHoverRadius: 4,
+        yAxisID: 'y1',
+      },
+    ];
+
     return {
       labels,
-      datasets: [
-        {
-          label: 'Heatmap Variance',
-          data: samples.map(s => s.heatmapVariance ?? null),
-          borderColor: 'rgb(34, 211, 238)',
-          backgroundColor: 'rgba(34, 211, 238, 0.1)',
-          borderWidth: 2,
-          fill: true,
-          tension: 0.4,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          yAxisID: 'y',
-        },
-      ],
+      datasets,
     };
     } catch (error) {
       console.error('Error generating chart data:', error);
@@ -279,6 +604,19 @@ export default function ThermalHistoryPage() {
             second: '2-digit',
           });
 
+      // Build title with movement counts
+      let titleText = `Sleep Activity - Subject: ${session.subject_identifier} (Started: ${startTimeStr})`;
+      const movementCounts = [];
+      if (session.move_events && session.move_events.length > 0) {
+        movementCounts.push(`${session.move_events.length} manual`);
+      }
+      if (session.movement_detected && session.movement_detected.length > 0) {
+        movementCounts.push(`${session.movement_detected.length} detected`);
+      }
+      if (movementCounts.length > 0) {
+        titleText += ` [${movementCounts.join(', ')} movement events]`;
+      }
+
       return {
     responsive: true,
     maintainAspectRatio: false,
@@ -289,7 +627,7 @@ export default function ThermalHistoryPage() {
     plugins: {
       title: {
         display: true,
-        text: `Sleep Activity - Subject: ${session.subject_identifier} (Started: ${startTimeStr})`,
+        text: titleText,
         color: 'rgb(156, 163, 175)',
         font: {
           size: 16,
@@ -316,6 +654,17 @@ export default function ThermalHistoryPage() {
           label: function(context: any) {
             const label = context.dataset.label || '';
             const value = context.parsed.y;
+            if (label === 'Move Events') {
+              // Find the move event at this position
+              const moveEvent = session.move_events?.find((me: MoveEvent) => {
+                const xValue = context.parsed.x;
+                return xValue && typeof xValue === 'string' && xValue.includes(`${me.secondsFromStart}s`);
+              });
+              return `Move Event at ${moveEvent?.secondsFromStart ?? '?'}s`;
+            }
+            if (label.includes('Temperature')) {
+              return `${label}: ${value !== null ? value.toFixed(1) + '°C' : 'N/A'}`;
+            }
             return `${label}: ${value !== null ? value.toFixed(2) : 'N/A'}`;
           },
         },
@@ -342,7 +691,7 @@ export default function ThermalHistoryPage() {
         position: 'left' as const,
         title: {
           display: true,
-          text: 'Heatmap Variance',
+          text: 'Motion Level / Heatmap Variance',
           color: 'rgb(34, 211, 238)',
         },
         ticks: {
@@ -351,6 +700,29 @@ export default function ThermalHistoryPage() {
         grid: {
           color: 'rgba(255, 255, 255, 0.1)',
         },
+      },
+      y1: {
+        type: 'linear' as const,
+        display: true,
+        position: 'right' as const,
+        title: {
+          display: true,
+          text: 'Temperature Range/Change (°C)',
+          color: 'rgb(251, 146, 60)',
+        },
+        ticks: {
+          color: 'rgb(251, 146, 60)',
+        },
+        grid: {
+          drawOnChartArea: false,
+        },
+      },
+      y2: {
+        type: 'linear' as const,
+        display: false, // Hide this axis to avoid clutter, but use for scaling
+        position: 'right' as const,
+        min: 20, // Typical room temperature range
+        max: 40, // Typical body temperature range
       },
     },
     };
@@ -430,50 +802,390 @@ export default function ThermalHistoryPage() {
           </Link>
         </div>
 
+        {/* Debug Info - Show when no sessions or in development */}
+        {(sessions.length === 0 || process.env.NODE_ENV === 'development') && (
+          <div className="mb-6 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+            <h3 className="text-yellow-300 font-medium mb-2">🔧 Troubleshooting Panel</h3>
+            <div className="text-xs text-yellow-200 space-y-1">
+              <div>User ID: {userId || 'Not set'}</div>
+              <div>Loading: {loading ? 'Yes' : 'No'}</div>
+              <div>Sessions count: {sessions.length}</div>
+              <div>API URL: /api/thermal-sessions?userId={userId}&limit=100</div>
+              <div>Environment: {process.env.NODE_ENV || 'unknown'}</div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={loadSessions}
+                disabled={!userId || loading}
+                className="px-3 py-1 text-xs rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-all disabled:opacity-50"
+              >
+                🔄 Reload Sessions
+              </button>
+              <button
+                onClick={async () => {
+                  if (!userId) return;
+                  setIsTestingAPI(true);
+                  setTestResults(null);
+                  try {
+                    console.log('🧪 Testing API call with debug mode...');
+                    const response = await fetch(`/api/thermal-sessions?userId=${userId}&limit=100&debug=true`);
+                    const result = await response.json();
+                    console.log('🧪 Direct API test result:', {
+                      url: `/api/thermal-sessions?userId=${userId}&limit=100&debug=true`,
+                      status: response.status,
+                      statusText: response.statusText,
+                      ok: response.ok,
+                      headers: Object.fromEntries(response.headers.entries()),
+                      result: result
+                    });
+                    
+                    const testResult = `API Test Results:
+Status: ${response.status} ${response.statusText}
+Success: ${response.ok ? 'Yes' : 'No'}
+Data Count: ${result.data?.length || 0}
+Error: ${result.error || 'None'}
+Debug Info: ${result.debug ? JSON.stringify(result.debug, null, 2) : 'Not available'}
+
+${result.data?.length > 0 ? 'Sessions found! They should appear above.' : 'No sessions found in database for your user ID.'}`;
+                    
+                    setTestResults(testResult);
+                  } catch (error) {
+                    console.error('🧪 Direct API test error:', error);
+                    setTestResults(`API Test Error: ${error}\n\nThis usually means there's a network issue or the API server is not responding.`);
+                  } finally {
+                    setIsTestingAPI(false);
+                  }
+                }}
+                disabled={!userId || isTestingAPI}
+                className="px-3 py-1 text-xs rounded bg-green-500/20 text-green-300 hover:bg-green-500/30 transition-all disabled:opacity-50"
+              >
+                {isTestingAPI ? '⏳ Testing...' : '🧪 Test API'}
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(userId || '');
+                  alert('User ID copied to clipboard!');
+                }}
+                disabled={!userId}
+                className="px-3 py-1 text-xs rounded bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition-all disabled:opacity-50"
+              >
+                📋 Copy User ID
+              </button>
+              <button
+                onClick={async () => {
+                  if (!userId) return;
+                  setIsTestingAPI(true);
+                  setTestResults(null);
+                  try {
+                    // Check if we can reach the API at all
+                    const healthResponse = await fetch('/api/thermal-sessions?userId=test&limit=1');
+                    const healthResult = await healthResponse.json();
+                    
+                    const message = `Health Check Results:
+API Reachable: ${healthResponse.ok ? 'Yes' : 'No'}
+Status: ${healthResponse.status}
+Error: ${healthResult.error || 'None'}
+
+${healthResponse.ok ? 'API is working! Try recording a session in Sleep Behaviors.' : 'API has issues - check server logs.'}`;
+                    
+                    setTestResults(message);
+                    console.log('🏥 Health check result:', { healthResponse, healthResult });
+                  } catch (error) {
+                    setTestResults(`Health Check Failed: ${error}\n\nThis usually means the server is not running or there's a network issue.`);
+                    console.error('🏥 Health check error:', error);
+                  } finally {
+                    setIsTestingAPI(false);
+                  }
+                }}
+                disabled={isTestingAPI}
+                className="px-3 py-1 text-xs rounded bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-all disabled:opacity-50"
+              >
+                {isTestingAPI ? '⏳ Checking...' : '🏥 Health Check'}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!userId) return;
+                  setIsTestingAPI(true);
+                  setTestResults(null);
+                  try {
+                    console.log('🧪 Creating test session...');
+                    const now = new Date();
+                    const testSession = {
+                      userId,
+                      subjectIdentifier: 'TEST_SUBJECT',
+                      startedAt: new Date(now.getTime() - 30000).toISOString(), // 30 seconds ago
+                      endedAt: now.toISOString(),
+                      durationSeconds: 30,
+                      averageSurfaceTemp: 25.5,
+                      averageTemperatureRange: 2.1,
+                      thermalEventCount: 5,
+                      samples: [
+                        { sampleIndex: 0, timestamp: now.getTime() - 30000, heatmapVariance: 1.2, patternStability: 85 },
+                        { sampleIndex: 1, timestamp: now.getTime() - 15000, heatmapVariance: 1.5, patternStability: 82 },
+                        { sampleIndex: 2, timestamp: now.getTime(), heatmapVariance: 1.1, patternStability: 88 }
+                      ],
+                      moveEvents: [],
+                      movementDetected: []
+                    };
+
+                    const response = await fetch('/api/thermal-sessions', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(testSession),
+                    });
+
+                    const result = await response.json();
+                    console.log('🧪 Test session creation result:', { response, result });
+
+                    if (response.ok) {
+                      setTestResults(`✅ Test session created successfully!
+Session ID: ${result.data?.id || 'Unknown'}
+Subject: TEST_SUBJECT
+Duration: 30 seconds
+
+Now click "🔄 Reload Sessions" to see if it appears.`);
+                      
+                      // Auto-reload sessions after successful creation
+                      setTimeout(() => {
+                        loadSessions();
+                      }, 1000);
+                    } else {
+                      setTestResults(`❌ Failed to create test session:
+Status: ${response.status}
+Error: ${result.error || 'Unknown error'}
+Details: ${result.details || 'None'}
+
+This indicates a problem with the session saving process.`);
+                    }
+                  } catch (error) {
+                    console.error('🧪 Test session creation error:', error);
+                    setTestResults(`❌ Test session creation failed: ${error}`);
+                  } finally {
+                    setIsTestingAPI(false);
+                  }
+                }}
+                disabled={isTestingAPI}
+                className="px-3 py-1 text-xs rounded bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition-all disabled:opacity-50"
+              >
+                {isTestingAPI ? '⏳ Creating...' : '🧪 Create Test Session'}
+              </button>
+            </div>
+            <div className="mt-2 text-xs text-yellow-300">
+              💡 If no sessions appear after recording, click "🧪 Test API" to diagnose the issue.
+            </div>
+            {testResults && (
+              <div className="mt-3 p-3 rounded bg-gray-900/50 border border-gray-600">
+                <h4 className="text-xs font-medium text-white mb-2">Test Results:</h4>
+                <pre className="text-xs text-gray-300 whitespace-pre-wrap overflow-x-auto">
+                  {testResults}
+                </pre>
+                <button
+                  onClick={() => setTestResults(null)}
+                  className="mt-2 px-2 py-1 text-xs rounded bg-gray-600/50 text-gray-300 hover:bg-gray-600/70"
+                >
+                  Clear Results
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Sessions List */}
         {sessions.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-400 mb-4">No thermal sessions found.</p>
-            <Link
-              href="/sleepbehaviors"
-              className="inline-block px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-all"
-            >
-              Start a Recording
-            </Link>
+            <p className="text-gray-400 mb-4">
+              {loading ? 'Loading thermal sessions...' : 'No thermal sessions found.'}
+            </p>
+            {!loading && (
+              <>
+                <div className="mb-6 p-4 rounded-lg bg-orange-500/10 border border-orange-500/20 max-w-md mx-auto">
+                  <h3 className="text-orange-300 font-medium mb-2">⚠️ Important</h3>
+                  <p className="text-orange-200 text-sm">
+                    Sessions are only saved if you:
+                  </p>
+                  <ul className="text-orange-200 text-sm mt-2 space-y-1 text-left">
+                    <li>1. Fill in the <strong>"Subject"</strong> field</li>
+                    <li>2. Start the thermal sensor</li>
+                    <li>3. Record for at least a few seconds</li>
+                    <li>4. Stop recording</li>
+                  </ul>
+                  <p className="text-orange-300 text-xs mt-2">
+                    Without a subject identifier, recordings are discarded!
+                  </p>
+                </div>
+                <Link
+                  href="/sleepbehaviors"
+                  className="inline-block px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-all"
+                >
+                  Start a Recording
+                </Link>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Sessions List */}
             <div className="lg:col-span-1 space-y-4">
-              <h2 className="text-xl font-semibold mb-4">All Sessions ({sessions.length})</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">All Sessions ({sessions.length})</h2>
+                <button
+                  onClick={toggleBulkSelectMode}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-all ${
+                    bulkSelectMode
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
+                      : 'bg-white/5 text-gray-300 border border-white/20 hover:bg-white/10'
+                  }`}
+                >
+                  {bulkSelectMode ? 'Cancel' : 'Select'}
+                </button>
+              </div>
+              
+              {bulkSelectMode && (
+                <div className="flex flex-col gap-3 p-4 rounded-lg bg-white/5 border border-white/10 mb-4">
+                  <div className="text-xs text-gray-400 mb-1">
+                    💡 Click individual sessions or use quick select buttons below
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-300 font-medium">
+                      {selectedSessions.size} of {sessions.length} selected
+                    </span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => {
+                          const firstFive = new Set(sessions.slice(0, Math.min(5, sessions.length)).map(s => s.id));
+                          setSelectedSessions(firstFive);
+                        }}
+                        disabled={sessions.length === 0}
+                        className="px-2 py-1 text-xs rounded bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 transition-all disabled:opacity-50"
+                        title="Select first 5 sessions"
+                      >
+                        First 5
+                      </button>
+                      <button
+                        onClick={() => {
+                          const lastFive = new Set(sessions.slice(-Math.min(5, sessions.length)).map(s => s.id));
+                          setSelectedSessions(lastFive);
+                        }}
+                        disabled={sessions.length === 0}
+                        className="px-2 py-1 text-xs rounded bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 transition-all disabled:opacity-50"
+                        title="Select last 5 sessions"
+                      >
+                        Last 5
+                      </button>
+                      <button
+                        onClick={() => {
+                          const firstTen = new Set(sessions.slice(0, Math.min(10, sessions.length)).map(s => s.id));
+                          setSelectedSessions(firstTen);
+                        }}
+                        disabled={sessions.length < 6}
+                        className="px-2 py-1 text-xs rounded bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition-all disabled:opacity-50"
+                        title="Select first 10 sessions"
+                      >
+                        First 10
+                      </button>
+                      <button
+                        onClick={selectAllSessions}
+                        disabled={sessions.length === 0}
+                        className="px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-all disabled:opacity-50"
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={deselectAllSessions}
+                        disabled={selectedSessions.size === 0}
+                        className="px-2 py-1 text-xs rounded bg-gray-500/20 text-gray-300 hover:bg-gray-500/30 transition-all disabled:opacity-50"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {selectedSessions.size > 0 && (
+                    <div className="pt-2 border-t border-white/10">
+                      <button
+                        onClick={handleMassDelete}
+                        disabled={isDeleting}
+                        className="w-full py-2 px-3 rounded bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium border border-red-500/30"
+                      >
+                        {isDeleting ? (
+                          <>
+                            <span className="animate-spin mr-2">⟳</span>
+                            Deleting {selectedSessions.size} selected session{selectedSessions.size > 1 ? 's' : ''}...
+                          </>
+                        ) : (
+                          <>
+                            🗑️ Delete {selectedSessions.size} selected session{selectedSessions.size > 1 ? 's' : ''}
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
                 {sessions.map((session) => (
                   <div
                     key={session.id}
-                    onClick={() => handleSessionClick(session)}
-                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                      selectedSession?.id === session.id
-                        ? 'border-cyan-400 bg-cyan-500/20'
-                        : 'border-white/15 bg-white/5 hover:bg-white/10'
+                    onClick={() => bulkSelectMode ? null : handleSessionClick(session)}
+                    className={`p-4 rounded-lg border transition-all ${
+                      bulkSelectMode
+                        ? selectedSessions.has(session.id)
+                          ? 'border-cyan-400 bg-cyan-500/20 cursor-pointer ring-2 ring-cyan-400/30'
+                          : 'border-white/15 bg-white/5 hover:bg-white/10 cursor-pointer hover:border-white/25'
+                        : selectedSession?.id === session.id
+                        ? 'border-cyan-400 bg-cyan-500/20 cursor-pointer'
+                        : 'border-white/15 bg-white/5 hover:bg-white/10 cursor-pointer'
                     }`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          {session.session_number !== null && (
-                            <span className="text-xs font-medium text-gray-400">#{session.session_number}</span>
-                          )}
-                          <h3 className="font-medium text-cyan-200">Subject: {session.subject_identifier}</h3>
+                      <div className="flex items-start gap-3">
+                        {bulkSelectMode && (
+                          <div className="mt-1 flex flex-col items-center gap-1">
+                            <input
+                              type="checkbox"
+                              checked={selectedSessions.has(session.id)}
+                              onChange={(e) => toggleSessionSelection(session.id, e)}
+                              className="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500 focus:ring-2"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            {selectedSessions.has(session.id) && (
+                              <span className="text-xs text-red-400 font-medium" title="Marked for deletion">
+                                ⚠️
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            {session.session_number !== null && (
+                              <span className="text-xs font-medium text-gray-400">#{session.session_number}</span>
+                            )}
+                            <h3 className="font-medium text-cyan-200">Subject: {session.subject_identifier}</h3>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">{formatDateTime(session.started_at)}</p>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">{formatDateTime(session.started_at)}</p>
                       </div>
-                      <button
-                        onClick={(e) => handleDeleteSession(session.id, e)}
-                        disabled={deletingSession === session.id}
-                        className="text-red-400 hover:text-red-300 text-sm disabled:opacity-50"
-                      >
-                        {deletingSession === session.id ? '...' : '×'}
-                      </button>
+                      {!bulkSelectMode && (
+                        <button
+                          onClick={(e) => handleDeleteSession(session.id, e)}
+                          disabled={deletingSession === session.id}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-red-400 hover:text-red-300 hover:bg-red-500/10 text-xs font-medium transition-all disabled:opacity-50"
+                          title="Delete session"
+                        >
+                          {deletingSession === session.id ? (
+                            <>
+                              <span className="animate-spin">⟳</span>
+                              <span>Deleting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>🗑️</span>
+                              <span>Delete</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-gray-300 mt-2">
                       <div>
@@ -534,26 +1246,61 @@ export default function ThermalHistoryPage() {
                             : '—'}
                         </p>
                       </div>
+                      {selectedSession.move_events && selectedSession.move_events.length > 0 && (
+                        <div>
+                          <p className="text-sm text-gray-400">Move Events (Manual)</p>
+                          <p className="text-lg font-medium text-yellow-400">
+                            {selectedSession.move_events.length} event(s)
+                          </p>
+                        </div>
+                      )}
+                      {selectedSession.movement_detected && selectedSession.movement_detected.length > 0 && (
+                        <div>
+                          <p className="text-sm text-gray-400">Movement Detected (Auto)</p>
+                          <p className="text-lg font-medium text-orange-400">
+                            {selectedSession.movement_detected.length} event(s)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <p className="text-xs text-gray-400 mb-2">Motion Detection Logic:</p>
+                      <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside">
+                        <li>Motion is detected when variance &gt; 12.0, temperature range &gt; 2.5°C, or temperature change &gt; 2.0°C</li>
+                        <li>An event is recorded after 3 consecutive frames of motion (sustained movement)</li>
+                        <li>Minimum 5 seconds between recorded events to avoid duplicates</li>
+                      </ul>
                     </div>
                   </div>
 
                   {/* Chart */}
                   {selectedSession.samples && selectedSession.samples.length > 0 ? (
                     <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-xl font-semibold">
-                          Sleep Activity - Subject: {selectedSession.subject_identifier} ({selectedSession.samples.length} samples)
-                        </h3>
-                        <button
-                          onClick={() => exportToCSV(selectedSession)}
-                          className="px-4 py-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all text-sm text-cyan-200"
-                        >
-                          Export CSV
-                        </button>
+                      <div className="mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <h3 className="text-xl font-semibold">
+                            Motion Level Over Time - Subject: {selectedSession.subject_identifier} ({selectedSession.samples.length} samples)
+                          </h3>
+                          <button
+                            onClick={() => exportToCSV(selectedSession)}
+                            className="px-4 py-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all text-sm text-cyan-200"
+                          >
+                            Export CSV
+                          </button>
+                        </div>
+                          <div className="text-xs text-gray-400 space-y-1">
+                          <p><span className="text-orange-400">━━━</span> Orange line: Motion threshold (12.0) - values above indicate motion detected</p>
+                          <p><span className="text-yellow-400">━━ ━━</span> Yellow dashed: Manual move events | <span className="text-orange-400">━━━━</span> Orange solid: Auto-detected movement</p>
+                          <p>Lines: <span className="text-cyan-400">Cyan</span> = Motion/Variance | <span className="text-green-400">Green</span> = Avg Temperature | <span className="text-orange-400">Orange</span> = Temp Range | <span className="text-purple-400">Purple</span> = Temp Change</p>
+                        </div>
                       </div>
                       <div className="h-96">
                         {chartData && selectedSession ? (
-                          <Line data={chartData} options={getChartOptions(selectedSession)} />
+                          <MoveEventChart 
+                            data={chartData} 
+                            options={getChartOptions(selectedSession)}
+                            session={selectedSession}
+                          />
                         ) : (
                           <div className="flex items-center justify-center h-full">
                             <p className="text-gray-400">Unable to generate chart from sample data</p>
@@ -565,6 +1312,225 @@ export default function ThermalHistoryPage() {
                     <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
                       <h3 className="text-xl font-semibold mb-4">Sleep Activity - Subject: {selectedSession.subject_identifier}</h3>
                       <p className="text-gray-400 text-center py-8">No sample data available for this session.</p>
+                    </div>
+                  )}
+
+                  {/* Thermal Heatmap Playback */}
+                  {selectedSession.samples && selectedSession.samples.length > 0 && (
+                    <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-semibold">Thermal Heatmap Playback</h3>
+                        <div className="flex items-center gap-3">
+                          <select
+                            value={playbackSpeed}
+                            onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+                            className="px-2 py-1 rounded bg-gray-800 border border-gray-600 text-white text-sm"
+                          >
+                            <option value={0.5}>0.5x</option>
+                            <option value={1}>1x</option>
+                            <option value={2}>2x</option>
+                            <option value={4}>4x</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              if (isPlayingBack) {
+                                setIsPlayingBack(false);
+                              } else {
+                                setIsPlayingBack(true);
+                                // Auto-play through samples
+                                const interval = setInterval(() => {
+                                  setPlaybackIndex(prev => {
+                                    if (prev >= selectedSession.samples.length - 1) {
+                                      setIsPlayingBack(false);
+                                      clearInterval(interval);
+                                      return 0;
+                                    }
+                                    return prev + 1;
+                                  });
+                                }, 1000 / playbackSpeed);
+                              }
+                            }}
+                            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                              isPlayingBack
+                                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                            }`}
+                          >
+                            {isPlayingBack ? '⏸️ Pause' : '▶️ Play'}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-gray-400">
+                            Sample {playbackIndex + 1} of {selectedSession.samples.length}
+                          </span>
+                          <span className="text-sm text-gray-400">
+                            {selectedSession.samples[playbackIndex] ? 
+                              `${Math.floor((selectedSession.samples[playbackIndex].timestamp - selectedSession.samples[0].timestamp) / 1000)}s` 
+                              : '0s'}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={selectedSession.samples.length - 1}
+                          value={playbackIndex}
+                          onChange={(e) => setPlaybackIndex(Number(e.target.value))}
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Motion Data */}
+                        <div className="space-y-4">
+                          <h4 className="text-lg font-medium text-cyan-200">Motion Analysis</h4>
+                          {selectedSession.samples[playbackIndex] && (
+                            <div className="space-y-3">
+                              {/* Motion Level Indicator */}
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm text-gray-400">Motion Level:</span>
+                                  <span className="text-cyan-300 font-medium">
+                                    {selectedSession.samples[playbackIndex].heatmapVariance?.toFixed(2) ?? 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-700 rounded-full h-3">
+                                  <div 
+                                    className={`h-3 rounded-full transition-all duration-300 ${
+                                      (selectedSession.samples[playbackIndex].heatmapVariance ?? 0) > 12 
+                                        ? 'bg-red-500' 
+                                        : (selectedSession.samples[playbackIndex].heatmapVariance ?? 0) > 6
+                                        ? 'bg-yellow-500'
+                                        : 'bg-green-500'
+                                    }`}
+                                    style={{ 
+                                      width: `${Math.min(100, ((selectedSession.samples[playbackIndex].heatmapVariance ?? 0) / 20) * 100)}%` 
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <span>Still (0)</span>
+                                  <span>Motion Threshold (12)</span>
+                                  <span>High (20+)</span>
+                                </div>
+                              </div>
+
+                              {/* Pattern Stability */}
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm text-gray-400">Pattern Stability:</span>
+                                  <span className="text-purple-300 font-medium">
+                                    {selectedSession.samples[playbackIndex].patternStability?.toFixed(1) ?? 'N/A'}%
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-700 rounded-full h-3">
+                                  <div 
+                                    className="h-3 rounded-full bg-purple-500 transition-all duration-300"
+                                    style={{ 
+                                      width: `${selectedSession.samples[playbackIndex].patternStability ?? 0}%` 
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Restlessness Indicator */}
+                              <div className="flex justify-between items-center p-3 rounded-lg bg-gray-800/50 border border-gray-600">
+                                <span className="text-sm text-gray-400">Restlessness:</span>
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-3 h-3 rounded-full ${
+                                    selectedSession.samples[playbackIndex].restlessness === 1 
+                                      ? 'bg-red-500 animate-pulse' 
+                                      : 'bg-green-500'
+                                  }`} />
+                                  <span className={`text-sm font-medium ${
+                                    selectedSession.samples[playbackIndex].restlessness === 1 
+                                      ? 'text-red-300' 
+                                      : 'text-green-300'
+                                  }`}>
+                                    {selectedSession.samples[playbackIndex].restlessness === 1 ? 'Detected' : 'Calm'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Thermal Heatmap Visualization */}
+                        <div className="space-y-4">
+                          <h4 className="text-lg font-medium text-cyan-200">Thermal Heatmap</h4>
+                          <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+                            <div className="text-center text-gray-400 text-sm mb-4">
+                              Actual Recorded Thermal Data (8x8 sensor upscaled to 32x32 display)
+                            </div>
+                            {selectedSession.samples[playbackIndex]?.thermalData ? (
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-32 gap-0 max-w-96 mx-auto border border-gray-600 rounded-lg overflow-hidden">
+                                  {(() => {
+                                    const thermalData = selectedSession.samples[playbackIndex].thermalData;
+                                    const upscaledGrid = [];
+                                    
+                                    // Upscale 8x8 to 32x32 (4x upscaling)
+                                    for (let y = 0; y < 32; y++) {
+                                      for (let x = 0; x < 32; x++) {
+                                        // Map 32x32 coordinates back to 8x8
+                                        const sourceY = Math.floor(y / 4);
+                                        const sourceX = Math.floor(x / 4);
+                                        const temp = thermalData[sourceY][sourceX];
+                                        
+                                        // Use the same temperature mapping as during recording
+                                        const minTemp = 18; // Same as in ThermalVisualization
+                                        const maxTemp = 40; // Same as in ThermalVisualization
+                                        const normalizedTemp = Math.max(0, Math.min(1, (temp - minTemp) / (maxTemp - minTemp)));
+                                        
+                                        // Create thermal color mapping (blue to red)
+                                        let r, g, b;
+                                        if (normalizedTemp < 0.5) {
+                                          // Blue to green
+                                          r = 0;
+                                          g = Math.floor(normalizedTemp * 2 * 255);
+                                          b = Math.floor((1 - normalizedTemp * 2) * 255);
+                                        } else {
+                                          // Green to red
+                                          r = Math.floor((normalizedTemp - 0.5) * 2 * 255);
+                                          g = Math.floor((1 - (normalizedTemp - 0.5) * 2) * 255);
+                                          b = 0;
+                                        }
+                                        
+                                        upscaledGrid.push(
+                                          <div
+                                            key={`${y}-${x}`}
+                                            className="aspect-square transition-all duration-300"
+                                            style={{
+                                              backgroundColor: `rgb(${r}, ${g}, ${b})`,
+                                            }}
+                                            title={`${temp.toFixed(1)}°C (${sourceX},${sourceY})`}
+                                          />
+                                        );
+                                      }
+                                    }
+                                    
+                                    return upscaledGrid;
+                                  })()}
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-500 mt-3">
+                                  <span>🟦 Cool ({selectedSession.samples[playbackIndex].thermalData.flat().reduce((min, temp) => Math.min(min, temp), Infinity).toFixed(1)}°C)</span>
+                                  <span>🟥 Warm ({selectedSession.samples[playbackIndex].thermalData.flat().reduce((max, temp) => Math.max(max, temp), -Infinity).toFixed(1)}°C)</span>
+                                </div>
+                                <div className="text-center text-xs text-gray-400 mt-1">
+                                  Average: {(selectedSession.samples[playbackIndex].thermalData.flat().reduce((sum, temp) => sum + temp, 0) / 64).toFixed(1)}°C | Range: {(selectedSession.samples[playbackIndex].thermalData.flat().reduce((max, temp) => Math.max(max, temp), -Infinity) - selectedSession.samples[playbackIndex].thermalData.flat().reduce((min, temp) => Math.min(min, temp), Infinity)).toFixed(1)}°C
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center text-gray-500 py-8">
+                                <p className="mb-2">No thermal grid data available</p>
+                                <p className="text-xs">This session was recorded before thermal data saving was enabled</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
