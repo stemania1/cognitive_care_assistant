@@ -1,4 +1,4 @@
-import { GameSession, ChartDataPoint } from '@/types/memory-games';
+import type { GameSession } from '@/types/memory-games';
 
 interface GameStatsChartProps {
   sessions: GameSession[];

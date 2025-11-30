@@ -346,6 +346,9 @@ export default function ThermalHistoryPage() {
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
+  const [isRenaming, setIsRenaming] = useState(false);
 
   useEffect(() => {
     async function initializeUser() {
@@ -586,6 +589,73 @@ export default function ThermalHistoryPage() {
       alert('Failed to delete session');
     } finally {
       setDeletingSession(null);
+    }
+  };
+
+  const handleStartRename = (session: ThermalSession, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setEditingSessionId(session.id);
+    setEditingName(session.subject_identifier);
+  };
+
+  const handleCancelRename = (event?: React.MouseEvent) => {
+    if (event) event.stopPropagation();
+    setEditingSessionId(null);
+    setEditingName('');
+  };
+
+  const handleSaveRename = async (sessionId: string, event?: React.MouseEvent) => {
+    if (event) event.stopPropagation();
+    
+    if (!userId || !editingName.trim()) {
+      handleCancelRename();
+      return;
+    }
+
+    const trimmedName = editingName.trim();
+    if (trimmedName === sessions.find(s => s.id === sessionId)?.subject_identifier) {
+      // No change, just cancel
+      handleCancelRename();
+      return;
+    }
+
+    try {
+      setIsRenaming(true);
+      const response = await fetch('/api/thermal-sessions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          userId, 
+          sessionId, 
+          subjectIdentifier: trimmedName 
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.data) {
+        // Update the session in the list
+        setSessions(sessions.map(s => 
+          s.id === sessionId 
+            ? { ...s, subject_identifier: trimmedName }
+            : s
+        ));
+        
+        // Update selected session if it's the one being renamed
+        if (selectedSession?.id === sessionId) {
+          setSelectedSession({ ...selectedSession, subject_identifier: trimmedName });
+        }
+        
+        setEditingSessionId(null);
+        setEditingName('');
+      } else {
+        alert(`Failed to rename session: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error renaming session:', error);
+      alert('Failed to rename session');
+    } finally {
+      setIsRenaming(false);
     }
   };
 
@@ -1385,12 +1455,60 @@ This indicates a problem with the session saving process.`);
                             )}
                           </div>
                         )}
-                        <div>
+                        <div className="flex-1">
                           <div className="flex items-center gap-2">
                             {session.session_number !== null && (
                               <span className="text-xs font-medium text-gray-400">#{session.session_number}</span>
                             )}
-                            <h3 className="font-medium text-cyan-200">Subject: {session.subject_identifier}</h3>
+                            {editingSessionId === session.id ? (
+                              <div className="flex items-center gap-2 flex-1">
+                                <input
+                                  type="text"
+                                  value={editingName}
+                                  onChange={(e) => setEditingName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleSaveRename(session.id);
+                                    } else if (e.key === 'Escape') {
+                                      handleCancelRename();
+                                    }
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  disabled={isRenaming}
+                                  className="flex-1 px-2 py-1 rounded bg-gray-800 border border-cyan-400/50 text-cyan-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 disabled:opacity-50"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={(e) => handleSaveRename(session.id, e)}
+                                  disabled={isRenaming}
+                                  className="px-2 py-1 rounded bg-green-500/20 text-green-300 hover:bg-green-500/30 text-xs transition-all disabled:opacity-50"
+                                  title="Save"
+                                >
+                                  {isRenaming ? '⏳' : '✓'}
+                                </button>
+                                <button
+                                  onClick={(e) => handleCancelRename(e)}
+                                  disabled={isRenaming}
+                                  className="px-2 py-1 rounded bg-gray-500/20 text-gray-300 hover:bg-gray-500/30 text-xs transition-all disabled:opacity-50"
+                                  title="Cancel"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <h3 className="font-medium text-cyan-200">Subject: {session.subject_identifier}</h3>
+                                {!bulkSelectMode && (
+                                  <button
+                                    onClick={(e) => handleStartRename(session, e)}
+                                    className="ml-1 px-1.5 py-0.5 rounded text-gray-400 hover:text-cyan-300 hover:bg-cyan-500/10 text-xs transition-all"
+                                    title="Rename session"
+                                  >
+                                    ✏️
+                                  </button>
+                                )}
+                              </>
+                            )}
                           </div>
                           <p className="text-xs text-gray-400 mt-1">{formatDateTime(session.started_at)}</p>
                         </div>
@@ -1445,7 +1563,55 @@ This indicates a problem with the session saving process.`);
                       </div>
                       <div>
                         <p className="text-sm text-gray-400">Subject</p>
-                        <p className="text-lg font-medium text-cyan-200">{selectedSession.subject_identifier}</p>
+                        {editingSessionId === selectedSession.id ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleSaveRename(selectedSession.id);
+                                } else if (e.key === 'Escape') {
+                                  handleCancelRename();
+                                }
+                              }}
+                              disabled={isRenaming}
+                              className="flex-1 px-3 py-2 rounded bg-gray-800 border border-cyan-400/50 text-cyan-200 text-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 disabled:opacity-50"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleSaveRename(selectedSession.id)}
+                              disabled={isRenaming}
+                              className="px-3 py-2 rounded bg-green-500/20 text-green-300 hover:bg-green-500/30 transition-all disabled:opacity-50"
+                              title="Save"
+                            >
+                              {isRenaming ? '⏳' : '✓'}
+                            </button>
+                            <button
+                              onClick={() => handleCancelRename()}
+                              disabled={isRenaming}
+                              className="px-3 py-2 rounded bg-gray-500/20 text-gray-300 hover:bg-gray-500/30 transition-all disabled:opacity-50"
+                              title="Cancel"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <p className="text-lg font-medium text-cyan-200">{selectedSession.subject_identifier}</p>
+                            <button
+                              onClick={() => {
+                                setEditingSessionId(selectedSession.id);
+                                setEditingName(selectedSession.subject_identifier);
+                              }}
+                              className="px-2 py-1 rounded text-gray-400 hover:text-cyan-300 hover:bg-cyan-500/10 text-sm transition-all"
+                              title="Rename session"
+                            >
+                              ✏️
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p className="text-sm text-gray-400">Date/Time</p>
@@ -1533,21 +1699,6 @@ This indicates a problem with the session saving process.`);
                         ) : (
                           <div className="flex items-center justify-center h-full">
                             <p className="text-gray-400">Unable to generate chart from sample data</p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Debug info for movement events */}
-                      <div className="mt-4 p-3 bg-gray-800 rounded text-sm">
-                        <p className="text-yellow-400 font-semibold">Debug: Movement Events</p>
-                        <p>Manual move events: {selectedSession.move_events?.length || 0}</p>
-                        <p>Auto-detected events: {selectedSession.movement_detected?.length || 0}</p>
-                        {selectedSession.movement_detected && selectedSession.movement_detected.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-yellow-300">Auto-detected events data:</p>
-                            <pre className="text-xs text-gray-300 mt-1">
-                              {JSON.stringify(selectedSession.movement_detected, null, 2)}
-                            </pre>
                           </div>
                         )}
                       </div>

@@ -28,7 +28,38 @@ export async function POST(request: NextRequest) {
     
     const { type, data, timestamp, muscleActivity, muscleActivityProcessed, voltage, calibrated } = body;
     
-    console.log('📥 Received EMG data:', { type, data, timestamp, muscleActivity, muscleActivityProcessed });
+    console.log('📥 Received EMG data:', { 
+      type, 
+      data, 
+      timestamp, 
+      muscleActivity, 
+      muscleActivityProcessed,
+      voltage,
+      voltageCalculation: voltage !== undefined ? `ESP32 sent: ${voltage}V` : `Not provided, will calculate from muscleActivity`
+    });
+    
+    // Debug: Show voltage calculation details (only if valid data)
+    if (type === 'emg_data' && muscleActivity !== undefined && typeof muscleActivity === 'number') {
+      try {
+        const calculatedVoltage = (muscleActivity * 3.3) / 4095.0;
+        console.log('🔌 Voltage Analysis:', {
+          muscleActivityRaw: muscleActivity,
+          voltageFromESP32: voltage,
+          calculatedVoltage: calculatedVoltage.toFixed(3) + 'V',
+          difference: voltage !== undefined && typeof voltage === 'number' ? Math.abs(voltage - calculatedVoltage).toFixed(3) + 'V' : 'N/A',
+          isConstant: '⚠️ Check if muscleActivity is varying - constant values indicate sensor issue'
+        });
+        
+        // Track if values are constant (potential issue)
+        if (typeof muscleActivity === 'number') {
+          // This will help identify if the sensor is stuck at one value
+          console.log('📊 Data variation check - muscleActivity:', muscleActivity, 
+            '(If this number doesn\'t change, the ESP32 sensor is reading constant values)');
+        }
+      } catch (err) {
+        console.warn('Error in voltage analysis:', err);
+      }
+    }
     
     // Handle different message types from MyoWare client
     switch (type) {

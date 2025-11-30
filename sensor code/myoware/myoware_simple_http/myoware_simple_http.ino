@@ -19,8 +19,10 @@ const char* server_host = "192.168.254.204";  // Your computer's IP
 const int server_port = 3001;  // EMG server port
 const char* server_path = "/api/emg/ws";
 
-// MyoWare 2.0 sensor pin (ESP32 GPIO36 = A0)
-const int SENSOR_PIN = 36;
+// MyoWare 2.0 sensor pin 
+// Try GPIO36 (A0) or GPIO39 (A3) depending on your MyoWare Wireless Shield
+// GPIO39 (A3) is commonly used on MyoWare Wireless Shield
+const int SENSOR_PIN = 39; // Changed from 36 to 39 - GPIO39 (A3) is input-only, perfect for analog reading
 
 // Calibration data
 int sensorMin = 1023;
@@ -35,7 +37,7 @@ int sensorTotal = 0;
 
 // Timing
 unsigned long lastDataSend = 0;
-const unsigned long DATA_SEND_INTERVAL = 1000; // 1Hz for testing
+const unsigned long DATA_SEND_INTERVAL = 100; // 10Hz (100ms) - good for real-time EMG data
 
 // Connection status
 bool isConnected = false;
@@ -59,11 +61,37 @@ void setup() {
     sensorReadings[i] = 0;
   }
   
+  // ESP32 ADC Configuration
+  // GPIO39 (A3) is an input-only pin, perfect for analog reading
+  // Set ADC attenuation to 11dB for 0-3.3V range (default)
+  analogSetAttenuation(ADC_11db); // 0-3.3V range
+  analogSetWidth(12); // 12-bit resolution (0-4095)
+  
   Serial.println("MyoWare 2.0 Simple HTTP Client");
   Serial.println("=============================");
+  Serial.print("Reading from GPIO");
+  Serial.print(SENSOR_PIN);
+  Serial.print(" (A");
+  Serial.print(SENSOR_PIN == 36 ? "0" : "3");
+  Serial.println(")");
+  Serial.println("ADC configured: 12-bit, 0-3.3V range");
+  Serial.println("Watch Serial Monitor for RAW ADC values");
+  Serial.println("If values don't change, check sensor connection!");
   
   // Setup WiFi
   setupWiFi();
+  
+  // Automatically start transmission when WiFi is connected
+  // Wait a moment for WiFi to fully initialize
+  delay(1000);
+  if (WiFi.status() == WL_CONNECTED && isConnected) {
+    Serial.println("✅ Auto-starting transmission...");
+    isTransmitting = true;
+    lastDataSend = millis() - DATA_SEND_INTERVAL; // Start immediately
+    Serial.println("✅ Transmission started automatically!");
+  } else {
+    Serial.println("⚠️ WiFi not connected, transmission will start when WiFi connects");
+  }
   
   Serial.println("Setup complete!");
   Serial.println("Commands:");
@@ -81,13 +109,41 @@ void loop() {
     handleCommand(command);
   }
   
+  // Check WiFi connection status
+  if (WiFi.status() != WL_CONNECTED) {
+    if (isConnected) {
+      Serial.println("⚠️ WiFi disconnected! Reconnecting...");
+      isConnected = false;
+      isTransmitting = false;
+    }
+    // Try to reconnect every 10 seconds
+    static unsigned long lastReconnectAttempt = 0;
+    if (millis() - lastReconnectAttempt > 10000) {
+      setupWiFi();
+      lastReconnectAttempt = millis();
+    }
+  } else {
+    // WiFi is connected
+    if (!isConnected) {
+      // WiFi just connected
+      isConnected = true;
+      Serial.println("✅ WiFi connected!");
+    }
+    // Auto-start transmission if not already transmitting
+    if (!isTransmitting) {
+      Serial.println("✅ Auto-starting transmission...");
+      isTransmitting = true;
+      lastDataSend = millis() - DATA_SEND_INTERVAL; // Start immediately
+    }
+  }
+  
   // Send data if connected and transmitting
   if (isConnected && isTransmitting && millis() - lastDataSend >= DATA_SEND_INTERVAL) {
     sendEMGData();
     lastDataSend = millis();
   }
   
-  delay(100);
+  delay(10); // Reduced delay for faster loop (10ms = 100Hz loop rate)
 }
 
 void handleCommand(String command) {
@@ -129,6 +185,14 @@ void setupWiFi() {
 }
 
 void sendEMGData() {
+  // Check WiFi connection first
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("⚠️ WiFi not connected, skipping data send");
+    isConnected = false;
+    isTransmitting = false;
+    return;
+  }
+  
   // Read and smooth sensor data
   int smoothedValue = readSmoothedSensor();
   float activation = calculateMuscleActivation(smoothedValue);
@@ -147,17 +211,51 @@ void sendEMGData() {
   
   // Send HTTP POST request
   String url = "http://" + String(server_host) + ":" + String(server_port) + server_path;
+  
+  // Debug: Print URL and data being sent (only first time or on error)
+  static bool firstSend = true;
+  if (firstSend) {
+    Serial.print("📡 Sending to: ");
+    Serial.println(url);
+    firstSend = false;
+  }
+  
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
+  http.setTimeout(3000); // 3 second timeout
+  http.setReuse(true); // Reuse connection
   
   int httpResponseCode = http.POST(jsonString);
   
   if (httpResponseCode > 0) {
     String response = http.getString();
-    Serial.println("HTTP Response: " + String(httpResponseCode));
-    Serial.println("Data sent: " + String(smoothedValue) + " -> " + String(activation, 2) + "%");
+    static unsigned long lastSuccessPrint = 0;
+    if (millis() - lastSuccessPrint > 5000) { // Print success every 5 seconds
+      Serial.print("✅ HTTP ");
+      Serial.print(httpResponseCode);
+      Serial.print(" - Data: ");
+      Serial.print(smoothedValue);
+      Serial.print(" (");
+      Serial.print((smoothedValue * 3.3) / 4095.0, 3);
+      Serial.println("V)");
+      lastSuccessPrint = millis();
+    }
   } else {
-    Serial.println("HTTP Error: " + String(httpResponseCode));
+    // HTTP Error -1 means connection failed
+    Serial.print("❌ HTTP Error: ");
+    Serial.print(httpResponseCode);
+    if (httpResponseCode == -1) {
+      Serial.println(" - Connection failed!");
+      Serial.print("   Check: 1) emg-server.js running? 2) IP correct? (");
+      Serial.print(server_host);
+      Serial.print(") 3) Port correct? (");
+      Serial.print(server_port);
+      Serial.println(")");
+      Serial.println("   Try: ping " + String(server_host));
+    } else {
+      Serial.print(" - Failed to send to ");
+      Serial.println(url);
+    }
   }
   
   http.end();
@@ -267,6 +365,18 @@ void stopTransmission() {
 int readSmoothedSensor() {
   // Read raw value
   int rawValue = analogRead(SENSOR_PIN);
+  
+  // DEBUG: Print raw ADC value to Serial Monitor (less frequently to avoid spam)
+  // This helps diagnose if ESP32 is reading varying values
+  static unsigned long lastDebugPrint = 0;
+  if (millis() - lastDebugPrint > 2000) { // Print every 2 seconds (reduced frequency)
+    Serial.print("RAW ADC Value: ");
+    Serial.print(rawValue);
+    Serial.print(" (Voltage: ");
+    Serial.print((rawValue * 3.3) / 4095.0, 3);
+    Serial.println("V)");
+    lastDebugPrint = millis();
+  }
   
   // Add to smoothing array
   sensorTotal = sensorTotal - sensorReadings[readingIndex];

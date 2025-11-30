@@ -4,3 +4,5 @@
 ALTER TABLE thermal_sessions ADD COLUMN IF NOT EXISTS movement_detected JSONB;
 
 
+
+

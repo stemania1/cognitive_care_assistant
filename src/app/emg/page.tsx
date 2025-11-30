@@ -2,15 +2,18 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from "next/link";
+import { supabase } from '@/lib/supabaseClient';
+import { isGuestUser, getGuestUserId } from '@/lib/guestDataManager';
 import MyoWareClient from '../components/MyoWareClient';
 import EMGChart from '../components/EMGChart';
 import WorkoutVideo from '../components/WorkoutVideo';
 
 interface EMGData {
   timestamp: number;
-  // Single MyoWare 2.0 sensor data (0-1023 analog range, 0-5V)
-  muscleActivity: number;      // Raw analog value from MyoWare 2.0
+  // Single MyoWare 2.0 sensor data (ESP32: 0-4095 analog range, 0-3.3V)
+  muscleActivity: number;      // Raw analog value from MyoWare 2.0 (ESP32: 0-4095)
   muscleActivityProcessed: number; // Processed muscle activation (0-100%)
+  voltage?: number; // Voltage in volts (ESP32: 0-3.3V)
 }
 
 interface WorkoutExercise {
@@ -371,6 +374,19 @@ export default function EMGPage() {
   const consecutiveFailuresRef = useRef(0);
   const [showWorkoutList, setShowWorkoutList] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
+  
+  // Recording state
+  const [recordingName, setRecordingName] = useState('');
+  const [isRecordingSession, setIsRecordingSession] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+  const recordedSessionDataRef = useRef<EMGData[]>([]);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+
+  // LED movement detection state
+  const [movementDetected, setMovementDetected] = useState(false);
+  const [ledIntensity, setLedIntensity] = useState(0); // 0-100% intensity
+  const baselineVoltageRef = useRef<number | null>(null);
+  const voltageHistoryRef = useRef<number[]>([]);
 
   // MyoWare 2.0 data processing functions
   const processMyoWareData = (rawValue: number): number => {
@@ -392,9 +408,172 @@ export default function EMGPage() {
   const handleMyoWareData = (data: EMGData) => {
     setCurrentData(data);
     
+    // Calculate voltage for movement detection
+    const voltage = data.voltage !== undefined ? data.voltage : (data.muscleActivity * 3.3 / 4095);
+    
+    // Establish baseline (first few seconds) - no LEDs until baseline is set
+    if (baselineVoltageRef.current === null) {
+      voltageHistoryRef.current.push(voltage);
+      if (voltageHistoryRef.current.length >= 30) { // ~3 seconds at 10Hz for stable baseline
+        baselineVoltageRef.current = voltageHistoryRef.current.reduce((a, b) => a + b, 0) / voltageHistoryRef.current.length;
+        // Clear history after baseline is established
+        voltageHistoryRef.current = [];
+      } else {
+        // No LEDs until baseline is established
+        setMovementDetected(false);
+        setLedIntensity(0);
+        if (isRecording) {
+          setEmgData(prev => [...prev, data]);
+        }
+        return;
+      }
+    }
+    
+    // Calculate voltage change from baseline
+    const voltageChange = Math.abs(voltage - baselineVoltageRef.current);
+    
+    // Movement threshold: 0.08V change indicates movement
+    // This matches the physical shield behavior - LEDs only light on actual movement
+    const MOVEMENT_THRESHOLD = 0.08; // 0.08V = ~99 ADC counts on ESP32 (more conservative)
+    
+    // Only update baseline when very close to it (resting state)
+    // This prevents baseline from drifting during sustained movement
+    if (voltageChange < MOVEMENT_THRESHOLD * 0.3) {
+      // Only update baseline when very close to it (resting state)
+      // Very slow update to maintain stable baseline
+      baselineVoltageRef.current = baselineVoltageRef.current * 0.998 + voltage * 0.002;
+    }
+    
+    // Detect movement: voltage change from baseline
+    const isMoving = voltageChange > MOVEMENT_THRESHOLD;
+    
+    setMovementDetected(isMoving);
+    
+    // Calculate LED intensity based on voltage change (0-100%)
+    // Only show LEDs when movement is detected
+    if (isMoving) {
+      // Max intensity at 0.4V change or more
+      const maxChange = 0.4;
+      const intensity = Math.min(100, ((voltageChange - MOVEMENT_THRESHOLD) / (maxChange - MOVEMENT_THRESHOLD)) * 100);
+      setLedIntensity(Math.max(0, intensity)); // Ensure non-negative
+    } else {
+      // No LEDs when no movement detected - completely off
+      setLedIntensity(0);
+    }
+    
     if (isRecording) {
       setEmgData(prev => [...prev, data]);
     }
+    
+    // Record session data if active
+    if (isRecordingSession) {
+      recordedSessionDataRef.current.push(data);
+    }
+  };
+
+  const startRecording = () => {
+    if (!recordingName.trim()) {
+      alert('Please enter a recording name');
+      return;
+    }
+    setIsRecordingSession(true);
+    setSessionStartTime(Date.now());
+    recordedSessionDataRef.current = [];
+    setSaveStatus('idle');
+  };
+
+  const stopRecording = async () => {
+    setIsRecordingSession(false);
+    const endTime = Date.now();
+    const duration = sessionStartTime ? (endTime - sessionStartTime) / 1000 : 0;
+    
+    // Auto-save logic could go here, or manual save via UI
+    // For now, we just stop and let user decide to save or export
+  };
+
+  const saveRecordingToSupabase = async () => {
+    if (recordedSessionDataRef.current.length === 0) {
+      alert('No data to save');
+      return;
+    }
+
+    setSaveStatus('saving');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || (await isGuestUser() ? getGuestUserId() : 'guest');
+      
+      // Calculate stats
+      const readings = recordedSessionDataRef.current;
+      const voltages = readings.map(r => r.voltage || 0);
+      const avgVoltage = voltages.reduce((a, b) => a + b, 0) / voltages.length;
+      const maxVoltage = Math.max(...voltages);
+
+      const sessionData = {
+        userId,
+        sessionName: recordingName || `EMG Session ${new Date().toLocaleString()}`,
+        startedAt: sessionStartTime ? new Date(sessionStartTime).toISOString() : new Date().toISOString(),
+        endedAt: new Date().toISOString(),
+        durationSeconds: Math.round((Date.now() - (sessionStartTime || Date.now())) / 1000),
+        readings: readings, // Stores the full JSON array
+        averageVoltage: avgVoltage,
+        maxVoltage: maxVoltage
+      };
+
+      const response = await fetch('/api/emg-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionData)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || error.error || 'Failed to save');
+      }
+
+      const result = await response.json();
+      console.log('✅ Session saved successfully:', result.data);
+      
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+      
+      // Show success message
+      alert(`Recording saved successfully! Session ID: ${result.data?.id || 'unknown'}`);
+    } catch (error) {
+      console.error('Error saving recording:', error);
+      setSaveStatus('error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to save recording to database: ${errorMessage}`);
+    }
+  };
+
+  const exportToCSV = () => {
+    if (recordedSessionDataRef.current.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const headers = ['Timestamp', 'Date/Time', 'Voltage (V)', 'Muscle Activity (Raw)', 'Muscle Activity (%)'];
+    const rows = recordedSessionDataRef.current.map(d => [
+      d.timestamp,
+      new Date(d.timestamp).toISOString(),
+      d.voltage?.toFixed(4) || '0',
+      d.muscleActivity,
+      d.muscleActivityProcessed.toFixed(2)
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${recordingName || 'emg-recording'}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Fetch real-time data from API with retry mechanism
@@ -460,7 +639,7 @@ export default function EMGPage() {
       // Update connection status based on RECENT activity only (not historical data)
       // Check if we have recent heartbeat (device sends data every 1 second, so heartbeat should be recent)
       const hasRecentData = (data.data && Array.isArray(data.data) && data.data.length > 0);
-      const hasRecentHeartbeat = data.timeSinceLastHeartbeat !== undefined && data.timeSinceLastHeartbeat !== null && data.timeSinceLastHeartbeat < 10000; // 10 seconds - device sends data every 1 second
+      const hasRecentHeartbeat = data.timeSinceLastHeartbeat !== undefined && data.timeSinceLastHeartbeat !== null && data.timeSinceLastHeartbeat < 15000; // 15 seconds (increased for stability)
       const serverSaysConnected = data.isConnected === true; // Explicitly check for true (heartbeat within 30s)
       
       console.log('Connection check:', {
@@ -474,11 +653,11 @@ export default function EMGPage() {
         lastHeartbeat: data.lastHeartbeat
       });
       
-      // Consider connected ONLY if we have RECENT activity (within 10 seconds):
-      // Device sends data every 1 second, so if heartbeat is > 10 seconds old, device is disconnected
+      // Consider connected ONLY if we have RECENT activity (within 15 seconds):
+      // Device sends data every 100ms, but network glitches can happen. 15s is safe.
       // Note: We DON'T use serverSaysConnected (30s threshold) because it's too lenient
       // Note: We DON'T check dataCount > 0 alone because old data can remain in store after device disconnects
-      const shouldBeConnected = hasRecentHeartbeat; // Only recent heartbeat (10s), not server's 30s check
+      const shouldBeConnected = hasRecentHeartbeat; // Only recent heartbeat (15s), not server's 30s check
       
       console.log('Connection decision:', {
         shouldBeConnected,
@@ -496,21 +675,65 @@ export default function EMGPage() {
           dataLength: data.data?.length || 0
         });
         setIsMyoWareConnected(true);
+        // Reset failures on connection
+        consecutiveFailuresRef.current = 0;
       } else if (!shouldBeConnected && isMyoWareConnected) {
         // Disconnect if heartbeat is stale (no recent activity)
-        // Since device sends data every 1 second, if heartbeat is > 10 seconds old, device is disconnected
-        console.log('❌ MyoWare device DISCONNECTED - no recent heartbeat (last:', data.timeSinceLastHeartbeat, 'ms ago, threshold: 10000ms)');
+        console.log('❌ MyoWare device DISCONNECTED - no recent heartbeat (last:', data.timeSinceLastHeartbeat, 'ms ago, threshold: 15000ms)');
         setIsMyoWareConnected(false);
       }
       
       if (data.data && data.data.length > 0) {
         // Get the latest data point
         const latestData = data.data[data.data.length - 1];
+        
+        // Debug: Log raw values to understand voltage calculation
+        // Check if values are varying (important for detecting constant data issue)
+        try {
+          const calculatedVoltage = latestData.voltage !== undefined 
+            ? 'N/A (using ESP32 value)' 
+            : (typeof latestData.muscleActivity === 'number' 
+                ? ((latestData.muscleActivity * 3.3 / 4095).toFixed(3) + 'V')
+                : 'Invalid');
+          
+          // Check last few values to see if they're varying
+          const recentValues = data.data.slice(-5).map((d: any) => d.muscleActivity);
+          const isVarying = recentValues.length > 1 && 
+            Math.max(...recentValues) - Math.min(...recentValues) > 10; // At least 10 ADC units difference
+          
+          console.log('📊 Raw EMG Data from API:', {
+            muscleActivity: latestData.muscleActivity,
+            voltageFromESP32: latestData.voltage,
+            calculatedVoltage: calculatedVoltage,
+            muscleActivityProcessed: latestData.muscleActivityProcessed,
+            last5Values: recentValues,
+            isVarying: isVarying ? '✅ Values are varying' : '⚠️ WARNING: Values appear constant!',
+            variation: isVarying ? `${Math.max(...recentValues) - Math.min(...recentValues)} ADC units` : '0 (constant)'
+          });
+          
+          if (!isVarying && recentValues.length > 1) {
+            console.warn('⚠️ CONSTANT DATA DETECTED: muscleActivity values are not varying. This suggests:');
+            console.warn('   1. Sensor may not be properly connected');
+            console.warn('   2. Sensor may not be positioned on active muscle');
+            console.warn('   3. ESP32 may be sending constant values');
+            console.warn('   4. Smoothing algorithm may be too aggressive');
+          }
+        } catch (err) {
+          console.warn('Error logging raw EMG data:', err);
+        }
+        
         const emgData: EMGData = {
           timestamp: latestData.timestamp,
           muscleActivity: latestData.muscleActivity,
-          muscleActivityProcessed: latestData.muscleActivityProcessed
+          muscleActivityProcessed: latestData.muscleActivityProcessed,
+          voltage: latestData.voltage !== undefined ? latestData.voltage : (latestData.muscleActivity * 3.3 / 4095) // ESP32: 12-bit ADC (0-4095), 3.3V reference
         };
+        
+        // Additional debug: Show what voltage we're using
+        if (emgData.voltage !== undefined) {
+          console.log('🔌 Final voltage value:', emgData.voltage.toFixed(3) + 'V', 
+            latestData.voltage !== undefined ? '(from ESP32)' : '(calculated in app)');
+        }
         // Update calibration min/max while calibrating
         if (isCalibrating) {
           if (typeof emgData.muscleActivity === 'number') {
@@ -521,6 +744,9 @@ export default function EMGPage() {
         
         console.log('Setting current data:', emgData); // Debug log
         setCurrentData(emgData);
+        
+        // Trigger movement detection
+        handleMyoWareData(emgData);
         
         // Always update chart data for real-time visualization
         setChartData(prev => {
@@ -542,9 +768,12 @@ export default function EMGPage() {
       console.error('Failed to fetch real-time data:', error);
       
       // If too many consecutive failures, temporarily disable polling
-      if (consecutiveFailuresRef.current >= 5) {
-        console.log('Too many consecutive failures, temporarily disabling EMG polling');
+      // Increased threshold to 15 to account for network blips at higher sample rates
+      if (consecutiveFailuresRef.current >= 15) {
+        console.log('Too many consecutive failures (15+), temporarily disabling EMG polling');
         setIsMyoWareConnected(false);
+        // Reset failures so we can try again after a pause
+        setTimeout(() => { consecutiveFailuresRef.current = 0; }, 5000);
         return;
       }
       
@@ -954,7 +1183,15 @@ export default function EMGPage() {
         <div className="mb-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
             <div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-white mb-2">EMG Workout</h1>
+              <div className="flex items-center gap-4 mb-2">
+                <h1 className="text-3xl lg:text-4xl font-bold text-white">EMG Workout</h1>
+                <Link 
+                  href="/emg-history" 
+                  className="text-sm px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 rounded-lg text-cyan-300 hover:text-cyan-200 transition-all"
+                >
+                  View History
+                </Link>
+              </div>
               <p className="text-gray-300">Monitor muscle activation during exercises</p>
             </div>
             <div className="flex items-center gap-4">
@@ -1197,12 +1434,76 @@ export default function EMGPage() {
               />
               
               {/* Device Help */}
+              {/* Device Help */}
               <div className="mt-3 p-3 bg-gray-800 rounded-lg">
                 <h3 className="text-lg font-semibold text-white mb-2">Device Connection Help</h3>
-                <div className="text-xs text-gray-400 space-y-1">
+                <div className="text-xs text-gray-400 space-y-1 mb-3">
                   <p>• Power on the MyoWare device</p>
                   <p>• Ensure it is connected to the same WiFi network</p>
                   <p>• The device must POST to /api/emg/ws with type "heartbeat" and "emg_data"</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      // Test the endpoint
+                      const testResponse = await fetch('/api/emg/ws', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          type: 'test',
+                          message: 'Connection test from browser',
+                          timestamp: Date.now()
+                        })
+                      });
+                      
+                      const testResult = await testResponse.json();
+                      alert(`Connection Test:\nStatus: ${testResponse.ok ? '✅ Success' : '❌ Failed'}\nResponse: ${JSON.stringify(testResult, null, 2)}`);
+                    } catch (error) {
+                      alert(`Connection Test Failed:\n${error instanceof Error ? error.message : String(error)}`);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-blue-500/20 text-blue-200 rounded text-xs hover:bg-blue-500/30 transition-all"
+                >
+                  🔍 Test Connection
+                </button>
+                <div className="mt-3 text-xs text-gray-500 space-y-2">
+                  <div>
+                    <p><strong>Expected Device URL:</strong></p>
+                    <p className="font-mono break-all">http://{typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:{typeof window !== 'undefined' ? window.location.port || '3000' : '3000'}/api/emg/ws</p>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-700">
+                    <p><strong>💡 No Arduino Changes Needed!</strong></p>
+                    <p className="text-xs text-gray-400 mb-2">
+                      Use the standalone EMG server that runs on port 3001 (where your Arduino already sends data):
+                    </p>
+                    <div className="bg-gray-900 p-2 rounded text-[10px] font-mono text-green-300 mb-2">
+                      npm run emg-server
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      The server will forward data to Next.js automatically. See <code className="text-blue-300">MYOWARE_CONNECTION_SETUP.md</code> for details.
+                    </p>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-700">
+                    <p><strong>Troubleshooting Steps:</strong></p>
+                    <ol className="list-decimal list-inside space-y-1 mt-1">
+                      <li>Start the EMG server: <code className="text-blue-300">npm run emg-server</code></li>
+                      <li>Check device is powered on</li>
+                      <li>Verify WiFi SSID matches your network</li>
+                      <li>Check Serial Monitor for connection errors</li>
+                      <li>Ensure device sends "heartbeat" every 5 seconds</li>
+                    </ol>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-700">
+                    <p><strong>Required Data Format:</strong></p>
+                    <pre className="text-[10px] bg-gray-900 p-2 rounded mt-1 overflow-x-auto">
+{`{
+  "type": "emg_data",
+  "timestamp": 1234567890,
+  "muscleActivity": 512,
+  "muscleActivityProcessed": 50.0
+}`}
+                    </pre>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1215,6 +1516,65 @@ export default function EMGPage() {
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-xl font-semibold">EMG Data Visualization</h2>
+                  
+                  {/* Recording Controls */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col">
+                      <input
+                        type="text"
+                        placeholder="Recording Name"
+                        value={recordingName}
+                        onChange={(e) => setRecordingName(e.target.value)}
+                        className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
+                        disabled={isRecordingSession}
+                      />
+                    </div>
+                    
+                    {!isRecordingSession ? (
+                      <button
+                        onClick={startRecording}
+                        disabled={!recordingName.trim()}
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          !recordingName.trim() 
+                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                            : 'bg-red-500 hover:bg-red-600 text-white'
+                        }`}
+                      >
+                        ● Record
+                      </button>
+                    ) : (
+                      <button
+                        onClick={stopRecording}
+                        className="px-4 py-1.5 rounded-full text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white border border-red-500/50 animate-pulse"
+                      >
+                        ■ Stop ({recordedSessionDataRef.current.length} samples)
+                      </button>
+                    )}
+
+                    {/* Export/Save Controls (visible when data exists) */}
+                    {recordedSessionDataRef.current.length > 0 && !isRecordingSession && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveRecordingToSupabase}
+                          disabled={saveStatus === 'saving' || saveStatus === 'success'}
+                          className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                            saveStatus === 'success' 
+                              ? 'bg-green-500 text-white'
+                              : 'bg-blue-600 hover:bg-blue-500 text-white'
+                          }`}
+                        >
+                          {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved ✓' : 'Save to Cloud'}
+                        </button>
+                        <button
+                          onClick={exportToCSV}
+                          className="px-3 py-1.5 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+                        >
+                          Export CSV
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   {currentWorkout && (
                     <div className="text-right">
                       <div className="text-2xl font-bold text-white">
@@ -1284,7 +1644,10 @@ export default function EMGPage() {
                           />
                         </div>
                         <div className="text-xs text-gray-500 mt-2">
-                          Voltage: {(currentData.muscleActivity * 5 / 1023).toFixed(2)}V
+                          Voltage: {currentData.voltage !== undefined 
+                            ? currentData.voltage.toFixed(2) 
+                            : (currentData.muscleActivity * 3.3 / 4095).toFixed(2) // ESP32: 12-bit ADC (0-4095), 3.3V reference
+                          }V
                         </div>
                       </div>
                       
@@ -1305,6 +1668,82 @@ export default function EMGPage() {
                           Range: {calibrationData.muscleActivity?.min || 400}-{calibrationData.muscleActivity?.max || 600}
                         </div>
                       </div>
+                    </div>
+
+                    {/* MyoWare Shield LED Replication */}
+                    <div className="mt-4 p-4 rounded-lg bg-gray-900/50 border border-gray-700">
+                      <div className="text-lg font-medium text-white mb-3">Movement Detection (Shield LED Replication)</div>
+                      <div className="flex items-center justify-center gap-4 mb-4">
+                        {/* LED Array - Replicates shield LEDs */}
+                        <div className="flex gap-2">
+                          {[0, 1, 2, 3, 4].map((index) => {
+                            // Each LED lights up based on intensity threshold
+                            // Only light up if movement is detected AND intensity is above threshold
+                            const threshold = (index + 1) * 20; // 20%, 40%, 60%, 80%, 100%
+                            const isLit = movementDetected && ledIntensity >= threshold;
+                            
+                            return (
+                              <div
+                                key={index}
+                                className={`w-12 h-12 rounded-full border-2 transition-all duration-100 ${
+                                  isLit 
+                                    ? 'bg-yellow-400 border-yellow-300 shadow-lg shadow-yellow-400/50' 
+                                    : 'bg-gray-800 border-gray-700'
+                                }`}
+                                style={{
+                                  opacity: isLit ? 1 : 0.2,
+                                  boxShadow: isLit ? `0 0 ${ledIntensity / 3}px rgba(250, 204, 21, 0.8)` : 'none'
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center gap-3">
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                          movementDetected 
+                            ? 'bg-yellow-500/20 border border-yellow-400/50' 
+                            : 'bg-gray-700/50 border border-gray-600'
+                        }`}>
+                          <div className={`w-3 h-3 rounded-full ${
+                            movementDetected 
+                              ? 'bg-yellow-400 animate-pulse' 
+                              : 'bg-gray-500'
+                          }`} />
+                          <span className={`text-sm font-medium ${
+                            movementDetected ? 'text-yellow-200' : 'text-gray-400'
+                          }`}>
+                            {movementDetected ? 'Movement Detected' : 'No Movement'}
+                          </span>
+                        </div>
+                        {baselineVoltageRef.current !== null && (
+                          <div className="text-xs text-gray-400">
+                            Baseline: {baselineVoltageRef.current.toFixed(2)}V
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 flex items-center justify-center gap-3">
+                        <div className="text-xs text-gray-500">
+                          LEDs only light when movement detected (voltage change &gt; 0.05V from baseline)
+                        </div>
+                        <button
+                          onClick={() => {
+                            baselineVoltageRef.current = null;
+                            voltageHistoryRef.current = [];
+                            setMovementDetected(false);
+                            setLedIntensity(0);
+                          }}
+                          className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+                          title="Reset baseline"
+                        >
+                          Reset Baseline
+                        </button>
+                      </div>
+                      {baselineVoltageRef.current === null && (
+                        <div className="mt-2 text-xs text-yellow-400 text-center">
+                          Establishing baseline... ({voltageHistoryRef.current.length}/30 samples) - Keep arm still
+                        </div>
+                      )}
                     </div>
 
                   {/* Live Metrics Summary */}
@@ -1382,7 +1821,11 @@ export default function EMGPage() {
                 <div className="mb-4">
                   <EMGChart 
                     data={isMyoWareConnected ? chartData : []} 
-                    isConnected={isMyoWareConnected} 
+                    isConnected={isMyoWareConnected}
+                    onReset={() => {
+                      // Clear the chart data when reset is clicked
+                      setChartData([]);
+                    }}
                   />
                 </div>
 

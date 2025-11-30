@@ -3,3 +3,5 @@
 ALTER TABLE thermal_sessions ADD COLUMN IF NOT EXISTS move_events JSONB;
 
 
+
+

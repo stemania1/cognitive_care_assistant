@@ -368,6 +368,18 @@ function Jigsaw3x3() {
     setStartTime(null);
   }
 
+  function handleManualCompletion() {
+    if (solved) return;
+    
+    // Ensure start time is set if user clicks immediately
+    if (!startTime) {
+      setStartTime(Date.now());
+    }
+    
+    // Auto-solve the puzzle by setting pieces in correct order [0, 1, ..., 8]
+    setOrder(Array.from({ length: 9 }, (_, i) => i));
+  }
+
   return (
     <div className="relative">
       <ConfettiBurst show={burst} />
@@ -403,6 +415,16 @@ function Jigsaw3x3() {
             />
           );
         })}
+      </div>
+
+      <div className="mt-4 flex justify-center">
+        <button
+          type="button"
+          onClick={handleManualCompletion}
+          className="rounded-md border border-emerald-500/50 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+        >
+          Mark as Completed
+        </button>
       </div>
 
       {solved && <p aria-live="polite" className="sr-only">Congratulations! You solved the puzzle.</p>}
@@ -476,14 +498,18 @@ export default function MemoryGamesPage() {
 
           {/* Performance Charts */}
           <div className="space-y-6">
-            <GameStatsChart 
-              sessions={memorySessions} 
-              gameType="memory" 
-            />
-            <GameStatsChart 
-              sessions={jigsawSessions} 
-              gameType="jigsaw" 
-            />
+            {tab === "memory" && (
+              <GameStatsChart 
+                sessions={memorySessions} 
+                gameType="memory" 
+              />
+            )}
+            {tab === "jigsaw" && (
+              <GameStatsChart 
+                sessions={jigsawSessions} 
+                gameType="jigsaw" 
+              />
+            )}
           </div>
         </div>
       </main>
