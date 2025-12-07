@@ -25,7 +25,7 @@ const char* server_path = "/api/emg/ws";
 const int SENSOR_PIN = 39; // Changed from 36 to 39 - GPIO39 (A3) is input-only, perfect for analog reading
 
 // Calibration data
-int sensorMin = 1023;
+int sensorMin = 4095; // ESP32: 12-bit ADC max value (0-4095)
 int sensorMax = 0;
 bool isCalibrated = false;
 
@@ -50,7 +50,7 @@ void setup() {
   Serial.begin(115200);
   
   // Initialize sensor data
-  sensorMin = 1023;
+  sensorMin = 4095; // ESP32: 12-bit ADC max value (0-4095)
   sensorMax = 0;
   isCalibrated = false;
   readingIndex = 0;

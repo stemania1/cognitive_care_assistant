@@ -336,6 +336,8 @@ export default function ThermalHistoryPage() {
   const [sessions, setSessions] = useState<ThermalSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ThermalSession | null>(null);
+  const [selectedSessionsForOverlap, setSelectedSessionsForOverlap] = useState<ThermalSession[]>([]);
+  const [overlapMode, setOverlapMode] = useState(false);
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -550,10 +552,28 @@ export default function ThermalHistoryPage() {
   };
 
   const handleSessionClick = (session: ThermalSession) => {
-    if (selectedSession?.id === session.id) {
-      setSelectedSession(null);
+    if (bulkSelectMode) {
+      // Handle bulk select mode (existing functionality)
+      return;
+    }
+    
+    if (overlapMode) {
+      // Toggle session in selectedSessionsForOverlap array
+      setSelectedSessionsForOverlap(prev => {
+        const isSelected = prev.some(s => s.id === session.id);
+        if (isSelected) {
+          return prev.filter(s => s.id !== session.id);
+        } else {
+          return [...prev, session];
+        }
+      });
     } else {
-      setSelectedSession(session);
+      if (selectedSession?.id === session.id) {
+        setSelectedSession(null);
+      } else {
+        setSelectedSession(session);
+      }
+      setSelectedSessionsForOverlap([]);
     }
   };
 
@@ -742,18 +762,103 @@ export default function ThermalHistoryPage() {
       return;
     }
 
-    const headers = ['Sample Index', 'Timestamp', 'Heatmap Variance', 'Pattern Stability (%)'];
-    const rows = session.samples.map(sample => [
-      sample.sampleIndex,
-      new Date(sample.timestamp).toISOString(),
-      sample.heatmapVariance !== null ? sample.heatmapVariance.toFixed(2) : '',
-      sample.patternStability !== null ? sample.patternStability.toFixed(1) : '',
-    ]);
+    // Get move events and movement detected
+    const moveEvents = session.move_events || [];
+    const movementDetected = session.movement_detected || [];
 
-    const csvContent = [
+    // Calculate session start time for matching events to samples
+    const sessionStartTime = new Date(session.started_at).getTime();
+
+    // Create maps to quickly check if a sample has a move event or detected movement
+    // Match by timestamp (within 1 second tolerance) or by secondsFromStart
+    const moveRequestMap = new Map<number, MoveEvent>();
+    const movementDetectedMap = new Map<number, MoveEvent>();
+
+    moveEvents.forEach(event => {
+      // Use timestamp if available, otherwise calculate from secondsFromStart
+      const eventTime = event.timestamp || (sessionStartTime + event.secondsFromStart * 1000);
+      moveRequestMap.set(eventTime, event);
+    });
+
+    movementDetected.forEach(event => {
+      // Use timestamp if available, otherwise calculate from secondsFromStart
+      const eventTime = event.timestamp || (sessionStartTime + event.secondsFromStart * 1000);
+      movementDetectedMap.set(eventTime, event);
+    });
+
+    const headers = ['Sample Index', 'Timestamp', 'Date/Time', 'Heatmap Variance', 'Pattern Stability (%)', 'Move Request', 'Movement Detected'];
+    const rows = session.samples.map(sample => {
+      const sampleTime = typeof sample.timestamp === 'number' ? sample.timestamp : new Date(sample.timestamp as any).getTime();
+      
+      // Check if this sample has a move request (within 1 second tolerance)
+      let moveRequest = '';
+      for (const [eventTime, event] of moveRequestMap.entries()) {
+        if (Math.abs(sampleTime - eventTime) < 1000) {
+          moveRequest = 'Yes';
+          break;
+        }
+      }
+
+      // Check if this sample has detected movement (within 1 second tolerance)
+      let movementDetected = '';
+      for (const [eventTime, event] of movementDetectedMap.entries()) {
+        if (Math.abs(sampleTime - eventTime) < 1000) {
+          movementDetected = 'Yes';
+          break;
+        }
+      }
+
+      return [
+        sample.sampleIndex,
+        sampleTime,
+        new Date(sampleTime).toISOString(),
+        sample.heatmapVariance !== null ? sample.heatmapVariance.toFixed(2) : '',
+        sample.patternStability !== null ? sample.patternStability.toFixed(1) : '',
+        moveRequest,
+        movementDetected,
+      ];
+    });
+
+    // Build CSV content
+    const csvLines: string[] = [
       headers.join(','),
       ...rows.map(row => row.join(','))
-    ].join('\n');
+    ];
+
+    // Add move events summary section at the end
+    if (moveEvents.length > 0 || movementDetected.length > 0) {
+      csvLines.push(''); // Empty line separator
+      csvLines.push('Move Events Summary');
+      
+      if (moveEvents.length > 0) {
+        csvLines.push('Move Requests:');
+        csvLines.push('Timestamp,Date/Time,Seconds From Start');
+        moveEvents.forEach(event => {
+          const eventTime = event.timestamp || (sessionStartTime + event.secondsFromStart * 1000);
+          csvLines.push([
+            eventTime,
+            new Date(eventTime).toISOString(),
+            event.secondsFromStart
+          ].join(','));
+        });
+      }
+
+      if (movementDetected.length > 0) {
+        csvLines.push(''); // Empty line between sections
+        csvLines.push('Detected Movements:');
+        csvLines.push('Timestamp,Date/Time,Seconds From Start');
+        movementDetected.forEach(event => {
+          const eventTime = event.timestamp || (sessionStartTime + event.secondsFromStart * 1000);
+          csvLines.push([
+            eventTime,
+            new Date(eventTime).toISOString(),
+            event.secondsFromStart
+          ].join(','));
+        });
+      }
+    }
+
+    const csvContent = csvLines.join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -792,99 +897,130 @@ export default function ThermalHistoryPage() {
     }
   };
 
-  const getChartData = (session: ThermalSession) => {
-    if (!session || !session.samples || session.samples.length === 0) {
+  const getChartData = (sessionsToDisplay: ThermalSession[]) => {
+    if (sessionsToDisplay.length === 0) {
+      return null;
+    }
+
+    // Filter out sessions without samples
+    const validSessions = sessionsToDisplay.filter(s => s.samples && s.samples.length > 0);
+    if (validSessions.length === 0) {
       return null;
     }
 
     try {
-      // Ensure timestamps are numbers (they might come as strings from JSONB)
-      const samples = session.samples.map(sample => {
-        let timestamp: number;
-        if (typeof sample.timestamp === 'number') {
-          timestamp = sample.timestamp;
-        } else if (typeof sample.timestamp === 'string') {
-          const parsed = new Date(sample.timestamp).getTime();
-          timestamp = isNaN(parsed) ? Date.now() : parsed;
-        } else {
-          timestamp = Date.now();
-        }
+      // Color palette for multiple sessions
+      const colors = [
+        { primary: 'rgb(34, 211, 238)', secondary: 'rgba(34, 211, 238, 0.1)' }, // Cyan
+        { primary: 'rgb(34, 197, 94)', secondary: 'rgba(34, 197, 94, 0.1)' }, // Green
+        { primary: 'rgb(251, 146, 60)', secondary: 'rgba(251, 146, 60, 0.1)' }, // Orange
+        { primary: 'rgb(168, 85, 247)', secondary: 'rgba(168, 85, 247, 0.1)' }, // Purple
+        { primary: 'rgb(239, 68, 68)', secondary: 'rgba(239, 68, 68, 0.1)' }, // Red
+        { primary: 'rgb(250, 204, 21)', secondary: 'rgba(250, 204, 21, 0.1)' }, // Yellow
+        { primary: 'rgb(59, 130, 246)', secondary: 'rgba(59, 130, 246, 0.1)' }, // Blue
+        { primary: 'rgb(236, 72, 153)', secondary: 'rgba(236, 72, 153, 0.1)' }, // Pink
+      ];
 
-        return {
-          ...sample,
-          timestamp,
-        };
+      const allDatasets: any[] = [];
+
+      validSessions.forEach((session, sessionIndex) => {
+        // Ensure timestamps are numbers
+        const samples = session.samples!.map(sample => {
+          let timestamp: number;
+          if (typeof sample.timestamp === 'number') {
+            timestamp = sample.timestamp;
+          } else if (typeof sample.timestamp === 'string') {
+            const parsed = new Date(sample.timestamp).getTime();
+            timestamp = isNaN(parsed) ? Date.now() : parsed;
+          } else {
+            timestamp = Date.now();
+          }
+
+          return {
+            ...sample,
+            timestamp,
+          };
+        });
+
+        // Find this session's start time (first sample timestamp)
+        const sessionStartTime = samples[0]?.timestamp ?? new Date(session.started_at).getTime();
+
+        const color = colors[sessionIndex % colors.length];
+        const sessionName = session.subject_identifier || `Session ${sessionIndex + 1}`;
+
+        // Calculate seconds from this session's own start time (so all sessions start at x=0)
+        const dataPoints = samples.map((sample) => {
+          const seconds = (sample.timestamp - sessionStartTime) / 1000;
+          return { seconds, sample };
+        });
+
+        // Create datasets for each metric
+        allDatasets.push(
+          {
+            label: `${sessionName} - Motion/Variance`,
+            data: dataPoints.map(p => ({ x: p.seconds, y: p.sample.heatmapVariance ?? null })),
+            borderColor: color.primary,
+            backgroundColor: color.secondary,
+            borderWidth: 2,
+            fill: false,
+            tension: 0.4,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            yAxisID: 'y',
+          },
+          {
+            label: `${sessionName} - Avg Temp`,
+            data: dataPoints.map(p => ({ x: p.seconds, y: p.sample.averageTemperature ?? null })),
+            borderColor: color.primary,
+            backgroundColor: color.secondary,
+            borderWidth: 1.5,
+            fill: false,
+            tension: 0.4,
+            pointRadius: 1,
+            pointHoverRadius: 4,
+            yAxisID: 'y2',
+            borderDash: [5, 5], // Dashed line for temperature
+          },
+          {
+            label: `${sessionName} - Temp Range`,
+            data: dataPoints.map(p => ({ x: p.seconds, y: p.sample.temperatureRange ?? null })),
+            borderColor: color.primary,
+            backgroundColor: color.secondary,
+            borderWidth: 1.5,
+            fill: false,
+            tension: 0.4,
+            pointRadius: 1,
+            pointHoverRadius: 4,
+            yAxisID: 'y1',
+            borderDash: [3, 3], // Different dash pattern
+          },
+          {
+            label: `${sessionName} - Temp Change`,
+            data: dataPoints.map(p => ({ x: p.seconds, y: p.sample.temperatureChange ?? null })),
+            borderColor: color.primary,
+            backgroundColor: color.secondary,
+            borderWidth: 1.5,
+            fill: false,
+            tension: 0.4,
+            pointRadius: 1,
+            pointHoverRadius: 4,
+            yAxisID: 'y1',
+            borderDash: [2, 2], // Different dash pattern
+          }
+        );
       });
 
-      const baseTime = samples[0]?.timestamp ?? 0;
-      const labels = samples.map((sample) => {
-        const seconds = Math.floor((sample.timestamp - baseTime) / 1000);
-        return `${seconds}s`;
-      });
-
-    const datasets: any[] = [
-      {
-        label: 'Motion / Heatmap Variance',
-        data: samples.map(s => s.heatmapVariance ?? null),
-        borderColor: 'rgb(34, 211, 238)',
-        backgroundColor: 'rgba(34, 211, 238, 0.1)',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        yAxisID: 'y',
-      },
-      {
-        label: 'Average Temperature (°C)',
-        data: samples.map(s => s.averageTemperature ?? null),
-        borderColor: 'rgb(34, 197, 94)',
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-        borderWidth: 2,
-        fill: false,
-        tension: 0.4,
-        pointRadius: 1,
-        pointHoverRadius: 4,
-        yAxisID: 'y2',
-      },
-      {
-        label: 'Temperature Range (°C)',
-        data: samples.map(s => s.temperatureRange ?? null),
-        borderColor: 'rgb(251, 146, 60)',
-        backgroundColor: 'rgba(251, 146, 60, 0.1)',
-        borderWidth: 2,
-        fill: false,
-        tension: 0.4,
-        pointRadius: 1,
-        pointHoverRadius: 4,
-        yAxisID: 'y1',
-      },
-      {
-        label: 'Temperature Change from Baseline (°C)',
-        data: samples.map(s => s.temperatureChange ?? null),
-        borderColor: 'rgb(168, 85, 247)',
-        backgroundColor: 'rgba(168, 85, 247, 0.1)',
-        borderWidth: 2,
-        fill: false,
-        tension: 0.4,
-        pointRadius: 1,
-        pointHoverRadius: 4,
-        yAxisID: 'y1',
-      },
-    ];
-
-    return {
-      labels,
-      datasets,
-    };
+      return {
+        datasets: allDatasets,
+      };
     } catch (error) {
       console.error('Error generating chart data:', error);
       return null;
     }
   };
 
-  const getChartOptions = (session: ThermalSession) => {
-    if (!session || !session.started_at) {
+  const getChartOptions = (sessionsToDisplay: ThermalSession[]) => {
+    if (sessionsToDisplay.length === 0) {
       return {
         responsive: true,
         maintainAspectRatio: false,
@@ -892,28 +1028,34 @@ export default function ThermalHistoryPage() {
     }
 
     try {
-      const startTime = new Date(session.started_at);
-      const startTimeStr = isNaN(startTime.getTime()) 
-        ? 'Unknown' 
-        : startTime.toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          });
+      // Build title
+      let titleText: string;
+      if (sessionsToDisplay.length === 1) {
+        const startTime = new Date(sessionsToDisplay[0].started_at);
+        const startTimeStr = isNaN(startTime.getTime()) 
+          ? 'Unknown' 
+          : startTime.toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            });
 
-      // Build title with movement counts
-      let titleText = `Sleep Activity - Subject: ${session.subject_identifier} (Started: ${startTimeStr})`;
-      const movementCounts = [];
-      if (session.move_events && session.move_events.length > 0) {
-        movementCounts.push(`${session.move_events.length} manual`);
-      }
-      if (session.movement_detected && session.movement_detected.length > 0) {
-        movementCounts.push(`${session.movement_detected.length} detected`);
-      }
-      if (movementCounts.length > 0) {
-        titleText += ` [${movementCounts.join(', ')} movement events]`;
+        // Build title with movement counts
+        titleText = `Sleep Activity - Subject: ${sessionsToDisplay[0].subject_identifier} (Started: ${startTimeStr})`;
+        const movementCounts = [];
+        if (sessionsToDisplay[0].move_events && sessionsToDisplay[0].move_events.length > 0) {
+          movementCounts.push(`${sessionsToDisplay[0].move_events.length} manual`);
+        }
+        if (sessionsToDisplay[0].movement_detected && sessionsToDisplay[0].movement_detected.length > 0) {
+          movementCounts.push(`${sessionsToDisplay[0].movement_detected.length} detected`);
+        }
+        if (movementCounts.length > 0) {
+          titleText += ` [${movementCounts.join(', ')} movement events]`;
+        }
+      } else {
+        titleText = `Thermal Sessions Overlap: ${sessionsToDisplay.length} sessions`;
       }
 
       return {
@@ -954,11 +1096,15 @@ export default function ThermalHistoryPage() {
             const label = context.dataset.label || '';
             const value = context.parsed.y;
             if (label === 'Move Events') {
-              // Find the move event at this position
-              const moveEvent = session.move_events?.find((me: MoveEvent) => {
-                const xValue = context.parsed.x;
-                return xValue && typeof xValue === 'string' && xValue.includes(`${me.secondsFromStart}s`);
-              });
+              // Find the move event at this position across all sessions
+              let moveEvent: MoveEvent | undefined;
+              for (const session of sessionsToDisplay) {
+                moveEvent = session.move_events?.find((me: MoveEvent) => {
+                  const xValue = context.parsed.x;
+                  return xValue && typeof xValue === 'string' && xValue.includes(`${me.secondsFromStart}s`);
+                });
+                if (moveEvent) break;
+              }
               return `Move Event at ${moveEvent?.secondsFromStart ?? '?'}s`;
             }
             if (label.includes('Temperature')) {
@@ -971,6 +1117,7 @@ export default function ThermalHistoryPage() {
     },
     scales: {
       x: {
+        type: 'linear' as const,
         display: true,
         title: {
           display: true,
@@ -1027,13 +1174,14 @@ export default function ThermalHistoryPage() {
     };
     } catch (error) {
       console.error('Error generating chart options:', error);
+      const firstSession = sessionsToDisplay.length > 0 ? sessionsToDisplay[0] : null;
       return {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
           title: {
             display: true,
-            text: session ? `Sleep Activity - Subject: ${session.subject_identifier}` : 'Sleep Activity',
+            text: firstSession ? `Sleep Activity - Subject: ${firstSession.subject_identifier}` : 'Sleep Activity',
             color: 'rgb(156, 163, 175)',
           },
         },
@@ -1052,7 +1200,8 @@ export default function ThermalHistoryPage() {
     );
   }
 
-  const chartData = selectedSession ? getChartData(selectedSession) : null;
+  const sessionsToDisplayForChart = overlapMode ? selectedSessionsForOverlap : (selectedSession ? [selectedSession] : []);
+  const chartData = sessionsToDisplayForChart.length > 0 ? getChartData(sessionsToDisplayForChart) : null;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
@@ -1327,18 +1476,45 @@ This indicates a problem with the session saving process.`);
             <div className="lg:col-span-1 space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold">All Sessions ({sessions.length})</h2>
-                <button
-                  onClick={toggleBulkSelectMode}
-                  className={`px-3 py-1 rounded text-sm font-medium transition-all ${
-                    bulkSelectMode
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
-                      : 'bg-white/5 text-gray-300 border border-white/20 hover:bg-white/10'
-                  }`}
-                >
-                  {bulkSelectMode ? 'Cancel' : 'Select'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setOverlapMode(!overlapMode);
+                      if (overlapMode) {
+                        setSelectedSessionsForOverlap([]);
+                      }
+                      if (!overlapMode) {
+                        setBulkSelectMode(false);
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      overlapMode
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
+                        : 'bg-white/5 text-gray-300 border border-white/20 hover:bg-white/10'
+                    }`}
+                  >
+                    {overlapMode ? '✓ Overlap Mode' : '📊 Overlap Graphs'}
+                  </button>
+                  <button
+                    onClick={toggleBulkSelectMode}
+                    className={`px-3 py-1 rounded text-sm font-medium transition-all ${
+                      bulkSelectMode
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
+                        : 'bg-white/5 text-gray-300 border border-white/20 hover:bg-white/10'
+                    }`}
+                  >
+                    {bulkSelectMode ? 'Cancel' : 'Select'}
+                  </button>
+                </div>
               </div>
               
+              {overlapMode && selectedSessionsForOverlap.length > 0 && (
+                <div className="mb-4 p-3 rounded-lg bg-cyan-500/10 border border-cyan-400/30">
+                  <p className="text-sm text-cyan-200">
+                    {selectedSessionsForOverlap.length} session{selectedSessionsForOverlap.length > 1 ? 's' : ''} selected for overlap
+                  </p>
+                </div>
+              )}
               {bulkSelectMode && (
                 <div className="flex flex-col gap-3 p-4 rounded-lg bg-white/5 border border-white/10 mb-4">
                   <div className="text-xs text-gray-400 mb-1">
@@ -1426,12 +1602,19 @@ This indicates a problem with the session saving process.`);
                 {sessions.map((session) => (
                   <div
                     key={session.id}
-                    onClick={() => bulkSelectMode ? null : handleSessionClick(session)}
+                    onClick={() => {
+                      if (bulkSelectMode) return;
+                      handleSessionClick(session);
+                    }}
                     className={`p-4 rounded-lg border transition-all ${
                       bulkSelectMode
                         ? selectedSessions.has(session.id)
                           ? 'border-cyan-400 bg-cyan-500/20 cursor-pointer ring-2 ring-cyan-400/30'
                           : 'border-white/15 bg-white/5 hover:bg-white/10 cursor-pointer hover:border-white/25'
+                        : overlapMode
+                        ? selectedSessionsForOverlap.some(s => s.id === session.id)
+                          ? 'border-cyan-400 bg-cyan-500/20 cursor-pointer'
+                          : 'border-white/15 bg-white/5 hover:bg-white/10 cursor-pointer'
                         : selectedSession?.id === session.id
                         ? 'border-cyan-400 bg-cyan-500/20 cursor-pointer'
                         : 'border-white/15 bg-white/5 hover:bg-white/10 cursor-pointer'
@@ -1439,16 +1622,22 @@ This indicates a problem with the session saving process.`);
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-start gap-3">
-                        {bulkSelectMode && (
+                        {(bulkSelectMode || overlapMode) && (
                           <div className="mt-1 flex flex-col items-center gap-1">
                             <input
                               type="checkbox"
-                              checked={selectedSessions.has(session.id)}
-                              onChange={(e) => toggleSessionSelection(session.id, e as any)}
+                              checked={bulkSelectMode ? selectedSessions.has(session.id) : selectedSessionsForOverlap.some(s => s.id === session.id)}
+                              onChange={(e) => {
+                                if (bulkSelectMode) {
+                                  toggleSessionSelection(session.id, e as any);
+                                } else {
+                                  handleSessionClick(session);
+                                }
+                              }}
                               className="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500 focus:ring-2"
                               onClick={(e) => e.stopPropagation()}
                             />
-                            {selectedSessions.has(session.id) && (
+                            {bulkSelectMode && selectedSessions.has(session.id) && (
                               <span className="text-xs text-red-400 font-medium" title="Marked for deletion">
                                 ⚠️
                               </span>
@@ -1549,9 +1738,10 @@ This indicates a problem with the session saving process.`);
 
             {/* Session Details */}
             <div className="lg:col-span-2">
-              {selectedSession ? (
+              {(overlapMode ? selectedSessionsForOverlap.length > 0 : selectedSession) ? (
                 <div className="space-y-6">
                   {/* Session Summary */}
+                  {!overlapMode && selectedSession && (
                   <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
                     <h2 className="text-2xl font-semibold mb-4">Session Details</h2>
                     <div className="grid grid-cols-2 gap-4 mb-4">
@@ -1599,11 +1789,13 @@ This indicates a problem with the session saving process.`);
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <p className="text-lg font-medium text-cyan-200">{selectedSession.subject_identifier}</p>
+                            <p className="text-lg font-medium text-cyan-200">{selectedSession?.subject_identifier ?? 'Unknown'}</p>
                             <button
                               onClick={() => {
-                                setEditingSessionId(selectedSession.id);
-                                setEditingName(selectedSession.subject_identifier);
+                                if (selectedSession) {
+                                  setEditingSessionId(selectedSession.id);
+                                  setEditingName(selectedSession.subject_identifier);
+                                }
                               }}
                               className="px-2 py-1 rounded text-gray-400 hover:text-cyan-300 hover:bg-cyan-500/10 text-sm transition-all"
                               title="Rename session"
@@ -1667,51 +1859,85 @@ This indicates a problem with the session saving process.`);
                       </ul>
                     </div>
                   </div>
-
-                  {/* Chart */}
-                  {selectedSession.samples && selectedSession.samples.length > 0 ? (
-                    <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
-                      <div className="mb-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <h3 className="text-xl font-semibold">
-                            Motion Level Over Time - Subject: {selectedSession.subject_identifier} ({selectedSession.samples.length} samples)
-                          </h3>
-                          <button
-                            onClick={() => exportToCSV(selectedSession)}
-                            className="px-4 py-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all text-sm text-cyan-200"
-                          >
-                            Export CSV
-                          </button>
-                        </div>
-                          <div className="text-xs text-gray-400 space-y-1">
-                          <p><span className="text-orange-400">━━━</span> Orange line: Motion threshold (12.0) - values above indicate motion detected</p>
-                          <p><span className="text-yellow-400">━━ ━━</span> Yellow dashed: Manual move events | <span className="text-yellow-400">▼</span> Yellow triangles: Auto-detected movement</p>
-                          <p>Lines: <span className="text-cyan-400">Cyan</span> = Motion/Variance | <span className="text-green-400">Green</span> = Avg Temperature | <span className="text-orange-400">Orange</span> = Temp Range | <span className="text-purple-400">Purple</span> = Temp Change</p>
-                        </div>
-                      </div>
-                      <div className="h-96">
-                        {chartData && selectedSession ? (
-                          <MoveEventChart 
-                            data={chartData} 
-                            options={getChartOptions(selectedSession)}
-                            session={selectedSession}
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-full">
-                            <p className="text-gray-400">Unable to generate chart from sample data</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
-                      <h3 className="text-xl font-semibold mb-4">Sleep Activity - Subject: {selectedSession.subject_identifier}</h3>
-                      <p className="text-gray-400 text-center py-8">No sample data available for this session.</p>
-                    </div>
                   )}
 
+                  {/* Chart */}
+                  {(() => {
+                    const sessionsToDisplay = overlapMode ? selectedSessionsForOverlap : (selectedSession ? [selectedSession] : []);
+                    if (sessionsToDisplay.length === 0) return null;
+                    
+                    const hasSamples = sessionsToDisplay.some(s => s.samples && s.samples.length > 0);
+                    
+                    if (!hasSamples) {
+                      return (
+                        <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+                          <h3 className="text-xl font-semibold mb-4">
+                            {overlapMode ? `Overlapping ${sessionsToDisplay.length} Sessions` : `Sleep Activity - Subject: ${sessionsToDisplay[0]?.subject_identifier ?? 'Unknown'}`}
+                          </h3>
+                          <p className="text-gray-400 text-center py-8">No sample data available for these sessions.</p>
+                        </div>
+                      );
+                    }
+                    
+                    const chartData = getChartData(sessionsToDisplay);
+                    if (!chartData) {
+                      return (
+                        <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+                          <p className="text-gray-400 text-center py-8">Unable to generate chart from sample data</p>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
+                        <div className="mb-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-xl font-semibold">
+                              {overlapMode 
+                                ? `Motion Level Over Time - ${sessionsToDisplay.length} Sessions Overlapping`
+                                : `Motion Level Over Time - Subject: ${sessionsToDisplay[0]?.subject_identifier ?? 'Unknown'} (${sessionsToDisplay[0]?.samples?.length ?? 0} samples)`
+                              }
+                            </h3>
+                            {!overlapMode && sessionsToDisplay[0] && (
+                              <button
+                                onClick={() => {
+                                  if (sessionsToDisplay[0]) {
+                                    exportToCSV(sessionsToDisplay[0]);
+                                  }
+                                }}
+                                className="px-4 py-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all text-sm text-cyan-200"
+                              >
+                                Export CSV
+                              </button>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 space-y-1">
+                            <p><span className="text-orange-400">━━━</span> Orange line: Motion threshold (12.0) - values above indicate motion detected</p>
+                            <p><span className="text-yellow-400">━━ ━━</span> Yellow dashed: Manual move events | <span className="text-yellow-400">▼</span> Yellow triangles: Auto-detected movement</p>
+                            <p>Lines: <span className="text-cyan-400">Cyan</span> = Motion/Variance | <span className="text-green-400">Green</span> = Avg Temperature | <span className="text-orange-400">Orange</span> = Temp Range | <span className="text-purple-400">Purple</span> = Temp Change</p>
+                            {overlapMode && <p className="text-cyan-300 mt-2">💡 Each session uses a different color. Check legend to identify sessions.</p>}
+                          </div>
+                        </div>
+                        <div className="h-96">
+                          {sessionsToDisplay.length === 1 ? (
+                            <MoveEventChart 
+                              data={chartData} 
+                              options={getChartOptions(sessionsToDisplay)}
+                              session={sessionsToDisplay[0]}
+                            />
+                          ) : (
+                            <Line 
+                              data={chartData} 
+                              options={getChartOptions(sessionsToDisplay)}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Thermal Heatmap Playback */}
-                  {selectedSession.samples && selectedSession.samples.length > 0 && (
+                  {!overlapMode && selectedSession && selectedSession.samples && selectedSession.samples.length > 0 && (
                     <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xl font-semibold">Thermal Heatmap Playback</h3>

@@ -110,3 +110,5 @@ NEXTJS_API_URL=http://localhost:3000/api/emg/ws
 
 The EMG server acts as a bridge between your Arduino (port 3001) and Next.js (port 3000).
 
+
+

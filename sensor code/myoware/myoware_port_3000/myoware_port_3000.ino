@@ -23,7 +23,7 @@ const char* server_path = "/api/emg/ws";
 const int SENSOR_PIN = 36;
 
 // Calibration data
-int sensorMin = 1023;
+int sensorMin = 4095; // ESP32: 12-bit ADC max value (0-4095)
 int sensorMax = 0;
 bool isCalibrated = false;
 
@@ -48,7 +48,7 @@ void setup() {
   Serial.begin(115200);
   
   // Initialize sensor data
-  sensorMin = 1023;
+  sensorMin = 4095; // ESP32: 12-bit ADC max value (0-4095)
   sensorMax = 0;
   isCalibrated = false;
   readingIndex = 0;

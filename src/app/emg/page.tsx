@@ -14,6 +14,12 @@ interface EMGData {
   muscleActivity: number;      // Raw analog value from MyoWare 2.0 (ESP32: 0-4095)
   muscleActivityProcessed: number; // Processed muscle activation (0-100%)
   voltage?: number; // Voltage in volts (ESP32: 0-3.3V)
+  moveMarker?: 'request' | 'sensed' | 'end'; // Optional move marker type
+}
+
+interface MoveMarker {
+  timestamp: number;
+  type: 'request' | 'sensed' | 'end'; // 'request' = user clicked Move button, 'sensed' = detected from EMG data, 'end' = user clicked End Move button
 }
 
 interface WorkoutExercise {
@@ -359,6 +365,8 @@ export default function EMGPage() {
   const [workoutTime, setWorkoutTime] = useState(0);
   const [emgData, setEmgData] = useState<EMGData[]>([]);
   const [chartData, setChartData] = useState<EMGData[]>([]); // Data for chart visualization
+  const [isChartPaused, setIsChartPaused] = useState(false); // Track if chart is paused
+  const isChartPausedRef = useRef(false); // Ref for SSE handler to access current pause state
   const [currentData, setCurrentData] = useState<EMGData | null>(null);
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
   const [calibrationData, setCalibrationData] = useState<{ [key: string]: { min: number; max: number } }>({});
@@ -378,15 +386,20 @@ export default function EMGPage() {
   // Recording state
   const [recordingName, setRecordingName] = useState('');
   const [isRecordingSession, setIsRecordingSession] = useState(false);
+  const isRecordingSessionRef = useRef(false); // Ref to track recording state for callbacks
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+  const [recordingElapsedTime, setRecordingElapsedTime] = useState(0); // Timer in seconds
   const recordedSessionDataRef = useRef<EMGData[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [verifying, setVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<any>(null);
+  
+  // Move markers for chart visualization
+  const [moveMarkers, setMoveMarkers] = useState<MoveMarker[]>([]);
+  const moveMarkersRef = useRef<MoveMarker[]>([]); // Ref for callbacks
+  const lastVoltageRef = useRef<number | null>(null); // Track last voltage for move detection
+  const moveDetectionThreshold = 0.15; // Voltage change threshold to detect a move (V)
 
-  // LED movement detection state
-  const [movementDetected, setMovementDetected] = useState(false);
-  const [ledIntensity, setLedIntensity] = useState(0); // 0-100% intensity
-  const baselineVoltageRef = useRef<number | null>(null);
-  const voltageHistoryRef = useRef<number[]>([]);
 
   // MyoWare 2.0 data processing functions
   const processMyoWareData = (rawValue: number): number => {
@@ -408,66 +421,197 @@ export default function EMGPage() {
   const handleMyoWareData = (data: EMGData) => {
     setCurrentData(data);
     
-    // Calculate voltage for movement detection
-    const voltage = data.voltage !== undefined ? data.voltage : (data.muscleActivity * 3.3 / 4095);
-    
-    // Establish baseline (first few seconds) - no LEDs until baseline is set
-    if (baselineVoltageRef.current === null) {
-      voltageHistoryRef.current.push(voltage);
-      if (voltageHistoryRef.current.length >= 30) { // ~3 seconds at 10Hz for stable baseline
-        baselineVoltageRef.current = voltageHistoryRef.current.reduce((a, b) => a + b, 0) / voltageHistoryRef.current.length;
-        // Clear history after baseline is established
-        voltageHistoryRef.current = [];
-      } else {
-        // No LEDs until baseline is established
-        setMovementDetected(false);
-        setLedIntensity(0);
-        if (isRecording) {
-          setEmgData(prev => [...prev, data]);
+    // Detect moves based on voltage changes (only when recording)
+    if (isRecordingSessionRef.current && data.voltage !== undefined && data.voltage !== null) {
+      const currentVoltage = data.voltage;
+      
+      if (lastVoltageRef.current !== null) {
+        const voltageChange = Math.abs(currentVoltage - lastVoltageRef.current);
+        
+        // If voltage change exceeds threshold, detect a move
+        if (voltageChange >= moveDetectionThreshold) {
+          const sensedMove: MoveMarker = {
+            timestamp: data.timestamp,
+            type: 'sensed'
+          };
+          
+          // Add to markers
+          moveMarkersRef.current = [...moveMarkersRef.current, sensedMove];
+          setMoveMarkers([...moveMarkersRef.current]);
+          
+          // Mark the data point with the move marker
+          data.moveMarker = 'sensed';
+          
+          console.log('🎯 Sensed move detected:', {
+            timestamp: data.timestamp,
+            voltageChange: voltageChange.toFixed(3) + 'V',
+            currentVoltage: currentVoltage.toFixed(3) + 'V',
+            previousVoltage: lastVoltageRef.current.toFixed(3) + 'V'
+          });
         }
-        return;
       }
-    }
-    
-    // Calculate voltage change from baseline
-    const voltageChange = Math.abs(voltage - baselineVoltageRef.current);
-    
-    // Movement threshold: 0.08V change indicates movement
-    // This matches the physical shield behavior - LEDs only light on actual movement
-    const MOVEMENT_THRESHOLD = 0.08; // 0.08V = ~99 ADC counts on ESP32 (more conservative)
-    
-    // Only update baseline when very close to it (resting state)
-    // This prevents baseline from drifting during sustained movement
-    if (voltageChange < MOVEMENT_THRESHOLD * 0.3) {
-      // Only update baseline when very close to it (resting state)
-      // Very slow update to maintain stable baseline
-      baselineVoltageRef.current = baselineVoltageRef.current * 0.998 + voltage * 0.002;
-    }
-    
-    // Detect movement: voltage change from baseline
-    const isMoving = voltageChange > MOVEMENT_THRESHOLD;
-    
-    setMovementDetected(isMoving);
-    
-    // Calculate LED intensity based on voltage change (0-100%)
-    // Only show LEDs when movement is detected
-    if (isMoving) {
-      // Max intensity at 0.4V change or more
-      const maxChange = 0.4;
-      const intensity = Math.min(100, ((voltageChange - MOVEMENT_THRESHOLD) / (maxChange - MOVEMENT_THRESHOLD)) * 100);
-      setLedIntensity(Math.max(0, intensity)); // Ensure non-negative
-    } else {
-      // No LEDs when no movement detected - completely off
-      setLedIntensity(0);
+      
+      lastVoltageRef.current = currentVoltage;
     }
     
     if (isRecording) {
       setEmgData(prev => [...prev, data]);
     }
     
-    // Record session data if active
-    if (isRecordingSession) {
+    // Record session data if active (use ref to ensure we have current state)
+    if (isRecordingSessionRef.current) {
+      const beforeCount = recordedSessionDataRef.current.length;
       recordedSessionDataRef.current.push(data);
+      const afterCount = recordedSessionDataRef.current.length;
+      
+      // Also update chart data during recording so user can see the data being recorded
+      if (!isChartPausedRef.current) {
+        setChartData(prev => {
+          const newData = [...prev, data];
+          // Keep only last 100 data points for chart performance
+          return newData.slice(-100);
+        });
+      }
+      
+      // Log first few samples and then every 50 to avoid spam
+      if (afterCount <= 5 || afterCount % 50 === 0) {
+        console.log('📊 Recording data:', {
+          samples: afterCount,
+          latestVoltage: data.voltage,
+          latestMuscleActivity: data.muscleActivity,
+          timestamp: data.timestamp,
+          hasMoveMarker: data.moveMarker !== undefined,
+          chartDataLength: chartData.length
+        });
+      }
+    } else {
+      // When not recording, still update chart data if not paused
+      if (!isChartPausedRef.current) {
+        setChartData(prev => {
+          const newData = [...prev, data];
+          const updated = newData.slice(-100);
+          // Log occasionally to track chart updates when not recording
+          if (updated.length % 20 === 0 || updated.length <= 5) {
+            console.log('📈 Chart data updated (not recording):', {
+              chartDataLength: updated.length,
+              latestVoltage: data.voltage,
+              isPaused: isChartPausedRef.current
+            });
+          }
+          return updated;
+        });
+      }
+      
+      // Debug: Log when we receive data but aren't recording
+      if (recordedSessionDataRef.current.length === 0) {
+        // Only log occasionally to avoid spam
+        const shouldLog = Math.random() < 0.1; // 10% chance
+        if (shouldLog) {
+          console.log('⚠️ Data received but not recording:', {
+            isRecordingSessionRef: isRecordingSessionRef.current,
+            isRecordingSession: isRecordingSession,
+            voltage: data.voltage,
+            chartDataLength: chartData.length
+          });
+        }
+      }
+    }
+  };
+  
+  // Handle Move button click
+  const handleMoveRequest = () => {
+    if (!isRecordingSessionRef.current) {
+      alert('Please start recording first');
+      return;
+    }
+    
+    const now = Date.now();
+    const moveRequest: MoveMarker = {
+      timestamp: now,
+      type: 'request'
+    };
+    
+    // Add to markers
+    const newMarkers = [...moveMarkersRef.current, moveRequest];
+    moveMarkersRef.current = newMarkers;
+    setMoveMarkers(newMarkers);
+    
+    console.log('👆 Move request button clicked:', {
+      timestamp: now,
+      timestampISO: new Date(now).toISOString(),
+      currentMarkersCount: moveMarkersRef.current.length,
+      newMarkersCount: newMarkers.length,
+      hasCurrentData: currentData !== null,
+      sessionStartTime: sessionStartTime
+    });
+    
+    // Add a data point with the move marker
+    // Use current data if available, otherwise create a minimal data point
+    const markedData: EMGData = {
+      timestamp: now,
+      muscleActivity: currentData?.muscleActivity || 0,
+      muscleActivityProcessed: currentData?.muscleActivityProcessed || 0,
+      voltage: currentData?.voltage,
+      moveMarker: 'request'
+    };
+    
+    // Add to recorded data
+    if (isRecordingSessionRef.current) {
+      recordedSessionDataRef.current.push(markedData);
+      console.log('👆 Move request recorded with data:', {
+        timestamp: now,
+        voltage: currentData?.voltage,
+        hasCurrentData: currentData !== null,
+        recordedDataCount: recordedSessionDataRef.current.length
+      });
+    }
+  };
+
+  const handleMoveEnd = () => {
+    if (!isRecordingSessionRef.current) {
+      alert('Please start recording first');
+      return;
+    }
+    
+    const now = Date.now();
+    const moveEnd: MoveMarker = {
+      timestamp: now,
+      type: 'end'
+    };
+    
+    // Add to markers
+    const newMarkers = [...moveMarkersRef.current, moveEnd];
+    moveMarkersRef.current = newMarkers;
+    setMoveMarkers(newMarkers);
+    
+    console.log('🛑 End move event button clicked:', {
+      timestamp: now,
+      timestampISO: new Date(now).toISOString(),
+      currentMarkersCount: moveMarkersRef.current.length,
+      newMarkersCount: newMarkers.length,
+      hasCurrentData: currentData !== null,
+      sessionStartTime: sessionStartTime
+    });
+    
+    // Add a data point with the move marker
+    // Use current data if available, otherwise create a minimal data point
+    const markedData: EMGData = {
+      timestamp: now,
+      muscleActivity: currentData?.muscleActivity || 0,
+      muscleActivityProcessed: currentData?.muscleActivityProcessed || 0,
+      voltage: currentData?.voltage,
+      moveMarker: 'end'
+    };
+    
+    // Add to recorded data
+    if (isRecordingSessionRef.current) {
+      recordedSessionDataRef.current.push(markedData);
+      console.log('🛑 End move event recorded with data:', {
+        timestamp: now,
+        voltage: currentData?.voltage,
+        hasCurrentData: currentData !== null,
+        recordedDataCount: recordedSessionDataRef.current.length
+      });
     }
   };
 
@@ -476,19 +620,143 @@ export default function EMGPage() {
       alert('Please enter a recording name');
       return;
     }
+    
+    if (!isMyoWareConnected || !isConnected) {
+      alert('Please connect the MyoWare device first. Click "Start Recording" at the top to connect.');
+      return;
+    }
+    
+    console.log('🎬 Starting recording session:', {
+      recordingName,
+      isMyoWareConnected,
+      isConnected,
+      currentData: currentData ? 'available' : 'none',
+      currentDataVoltage: currentData?.voltage
+    });
+    
+    // Clear previous data and start recording
+    recordedSessionDataRef.current = [];
+    moveMarkersRef.current = [];
+    setMoveMarkers([]);
+    lastVoltageRef.current = null;
+    isRecordingSessionRef.current = true; // Update ref FIRST, before state
     setIsRecordingSession(true);
     setSessionStartTime(Date.now());
-    recordedSessionDataRef.current = [];
     setSaveStatus('idle');
+    
+    console.log('✅ Recording started, waiting for data...', {
+      isRecordingSessionRef: isRecordingSessionRef.current,
+      refSet: true
+    });
+    
+    // If we have current data, immediately add it to the recording
+    if (currentData) {
+      console.log('📥 Adding initial current data to recording');
+      recordedSessionDataRef.current.push(currentData);
+      console.log('📊 Initial sample count:', recordedSessionDataRef.current.length);
+    }
+  };
+
+  // Timer effect - updates every second when recording
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (isRecordingSession && sessionStartTime) {
+      // Update timer immediately
+      setRecordingElapsedTime(Math.floor((Date.now() - sessionStartTime) / 1000));
+      
+      // Then update every second
+      interval = setInterval(() => {
+        setRecordingElapsedTime(Math.floor((Date.now() - sessionStartTime) / 1000));
+      }, 1000);
+    } else {
+      // Reset timer when not recording
+      setRecordingElapsedTime(0);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isRecordingSession, sessionStartTime]);
+
+  // Format time as MM:SS
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const stopRecording = async () => {
+    // Stop recording first
+    isRecordingSessionRef.current = false; // Update ref immediately
     setIsRecordingSession(false);
+    
+    const sampleCount = recordedSessionDataRef.current.length;
     const endTime = Date.now();
     const duration = sessionStartTime ? (endTime - sessionStartTime) / 1000 : 0;
     
-    // Auto-save logic could go here, or manual save via UI
-    // For now, we just stop and let user decide to save or export
+    console.log('⏹️ Stopping recording:', {
+      samples: sampleCount,
+      duration: duration,
+      sessionName: recordingName,
+      isMyoWareConnected,
+      isConnected,
+      hasCurrentData: currentData !== null
+    });
+    
+    // Automatically save to Supabase when recording stops
+    if (sampleCount > 0) {
+      console.log('🔄 Auto-saving recording after stop...', {
+        samples: sampleCount,
+        duration: duration,
+        sessionName: recordingName
+      });
+      
+      // Save in the background (don't await to avoid blocking UI)
+      saveRecordingToSupabase().catch(error => {
+        console.error('Failed to auto-save recording:', error);
+        // Error is already handled in saveRecordingToSupabase with alert
+      });
+    } else {
+      // Try to capture current data if available
+      if (currentData) {
+        console.log('⚠️ No data recorded, but current data available - adding it now');
+        recordedSessionDataRef.current.push(currentData);
+        const newCount = recordedSessionDataRef.current.length;
+        
+        if (newCount > 0) {
+          console.log('✅ Added current data, now have', newCount, 'samples - saving...');
+          saveRecordingToSupabase().catch(error => {
+            console.error('Failed to auto-save recording:', error);
+          });
+          return; // Exit early since we're now saving
+        }
+      }
+      
+      console.error('⚠️ No data recorded!', {
+        sampleCount,
+        isMyoWareConnected,
+        isConnected,
+        hasCurrentData: currentData !== null,
+        currentDataVoltage: currentData?.voltage,
+        wasRecording: isRecordingSessionRef.current,
+        duration: duration
+      });
+      
+      const errorDetails = {
+        sampleCount,
+        duration: `${duration.toFixed(1)}s`,
+        isMyoWareConnected,
+        isConnected,
+        hasCurrentData: currentData !== null
+      };
+      
+      console.error('Error details:', errorDetails);
+      
+      alert(`No data was recorded (${sampleCount} samples in ${duration.toFixed(1)}s).\n\nPossible causes:\n1. Recording stopped too quickly (wait at least 3-5 seconds)\n2. Device disconnected during recording\n3. No data received from device\n\nPlease:\n- Make sure device shows green "Connected" indicator\n- Record for at least 5 seconds\n- Check browser console (F12) for details`);
+    }
   };
 
   const saveRecordingToSupabase = async () => {
@@ -502,11 +770,44 @@ export default function EMGPage() {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || (await isGuestUser() ? getGuestUserId() : 'guest');
       
-      // Calculate stats
-      const readings = recordedSessionDataRef.current;
-      const voltages = readings.map(r => r.voltage || 0);
+      // Calculate stats and ensure voltage is included in readings
+      const readings = recordedSessionDataRef.current.map(r => {
+        // Ensure voltage is always present in saved data
+        if (r.voltage === undefined || r.voltage === null) {
+          // Calculate from muscleActivity (ESP32: 12-bit ADC, 3.3V reference)
+          return {
+            ...r,
+            voltage: (r.muscleActivity * 3.3) / 4095.0
+          };
+        }
+        return r;
+      });
+      
+      const voltages = readings.map(r => r.voltage!).filter(v => !isNaN(v) && isFinite(v));
+      
+      console.log('💾 Prepared readings for save:', {
+        totalReadings: readings.length,
+        voltagesCount: voltages.length,
+        firstReading: readings[0],
+        lastReading: readings[readings.length - 1],
+        voltageRange: voltages.length > 0 ? `${Math.min(...voltages).toFixed(3)}V - ${Math.max(...voltages).toFixed(3)}V` : 'N/A'
+      });
+      
+      if (voltages.length === 0) {
+        throw new Error('No valid voltage readings to save');
+      }
+      
       const avgVoltage = voltages.reduce((a, b) => a + b, 0) / voltages.length;
       const maxVoltage = Math.max(...voltages);
+      
+      console.log('💾 Saving recording:', {
+        readingsCount: readings.length,
+        voltagesCount: voltages.length,
+        avgVoltage,
+        maxVoltage,
+        sessionName: recordingName,
+        userId
+      });
 
       const sessionData = {
         userId,
@@ -514,10 +815,20 @@ export default function EMGPage() {
         startedAt: sessionStartTime ? new Date(sessionStartTime).toISOString() : new Date().toISOString(),
         endedAt: new Date().toISOString(),
         durationSeconds: Math.round((Date.now() - (sessionStartTime || Date.now())) / 1000),
-        readings: readings, // Stores the full JSON array
+        readings: readings, // Stores the full JSON array (includes moveMarker property on individual readings)
+        moveMarkers: moveMarkersRef.current, // Also store move markers as separate array for easy querying
         averageVoltage: avgVoltage,
         maxVoltage: maxVoltage
       };
+
+      console.log('📤 Sending session data to API:', {
+        url: '/api/emg-sessions',
+        method: 'POST',
+        dataSize: JSON.stringify(sessionData).length,
+        readingsCount: sessionData.readings.length,
+        moveMarkersCount: sessionData.moveMarkers.length,
+        moveMarkers: sessionData.moveMarkers
+      });
 
       const response = await fetch('/api/emg-sessions', {
         method: 'POST',
@@ -525,13 +836,49 @@ export default function EMGPage() {
         body: JSON.stringify(sessionData)
       });
 
+      console.log('📥 API Response:', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      const responseText = await response.text();
+      console.log('📥 API Response body (raw):', responseText);
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.details || error.error || 'Failed to save');
+        let error;
+        try {
+          error = JSON.parse(responseText);
+        } catch {
+          error = { error: responseText || 'Unknown error', status: response.status };
+        }
+        
+        console.error('❌ API Error Response:', {
+          status: response.status,
+          error: error.error,
+          details: error.details,
+          code: error.code,
+          hint: error.hint,
+          fullError: error
+        });
+        
+        throw new Error(error.details || error.error || `Failed to save (HTTP ${response.status})`);
       }
 
-      const result = await response.json();
-      console.log('✅ Session saved successfully:', result.data);
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${responseText}`);
+      }
+
+      console.log('✅ Session saved successfully:', {
+        sessionId: result.data?.id,
+        sessionName: result.data?.session_name,
+        userId: result.data?.user_id,
+        fullData: result.data
+      });
       
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);
@@ -539,10 +886,38 @@ export default function EMGPage() {
       // Show success message
       alert(`Recording saved successfully! Session ID: ${result.data?.id || 'unknown'}`);
     } catch (error) {
-      console.error('Error saving recording:', error);
+      console.error('💥 Error saving recording:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined
+      });
       setSaveStatus('error');
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       alert(`Failed to save recording to database: ${errorMessage}`);
+    }
+  };
+
+  const verifySupabaseSetup = async () => {
+    setVerifying(true);
+    setVerificationResult(null);
+    try {
+      const response = await fetch('/api/emg-sessions/verify');
+      const result = await response.json();
+      setVerificationResult(result);
+      console.log('🔍 Verification result:', result);
+      
+      if (result.status === 'PASS') {
+        alert('✅ All checks passed! EMG sessions table is properly configured.');
+      } else {
+        alert(`❌ Some checks failed. See console for details. Status: ${result.status}`);
+      }
+    } catch (error) {
+      console.error('Error verifying setup:', error);
+      setVerificationResult({ error: error instanceof Error ? error.message : 'Unknown error' });
+      alert('Failed to verify setup. See console for details.');
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -636,41 +1011,81 @@ export default function EMGPage() {
         timeSinceLastHeartbeatValue: data.timeSinceLastHeartbeat
       });
       
-      // Update connection status based on RECENT activity only (not historical data)
-      // Check if we have recent heartbeat (device sends data every 1 second, so heartbeat should be recent)
-      const hasRecentData = (data.data && Array.isArray(data.data) && data.data.length > 0);
-      const hasRecentHeartbeat = data.timeSinceLastHeartbeat !== undefined && data.timeSinceLastHeartbeat !== null && data.timeSinceLastHeartbeat < 15000; // 15 seconds (increased for stability)
-      const serverSaysConnected = data.isConnected === true; // Explicitly check for true (heartbeat within 30s)
+      // Update connection status based on HEARTBEAT data (primary) and recent data (secondary)
+      // Heartbeat is updated when EMG data is received or when explicit heartbeat message is sent
+      const heartbeatBasedConnection = data.isConnected === true;
+      const timeSinceLastHeartbeat = data.timeSinceLastHeartbeat || Infinity;
+      const lastHeartbeat = data.lastHeartbeat || null;
       
-      console.log('Connection check:', {
-        serverSaysConnected,
+      // Secondary check: verify we have recent data points (within last 60 seconds)
+      const hasData = (data.data && Array.isArray(data.data) && data.data.length > 0);
+      const dataCount = data.dataCount || 0;
+      
+      let hasRecentDataPoint = false;
+      let latestDataAge = null;
+      if (hasData && data.data.length > 0) {
+        const latestDataPoint = data.data[data.data.length - 1];
+        if (latestDataPoint.timestamp) {
+          latestDataAge = Date.now() - latestDataPoint.timestamp;
+          hasRecentDataPoint = latestDataAge < 60000; // Data from last 60 seconds
+        }
+      }
+      
+      // Primary: Use heartbeat-based connection status
+      // Secondary: Also check for recent data points as a fallback
+      // Device is connected if:
+      // 1. Heartbeat is active (within 30 seconds), OR
+      // 2. We have recent data (within 60 seconds) - this is the key indicator, OR
+      // 3. We have any data at all AND data count > 0 (data is flowing)
+      const hasActiveDataFlow = hasData && dataCount > 0;
+      const shouldBeConnected = heartbeatBasedConnection 
+        || hasRecentDataPoint  // If we have recent data, device is connected
+        || (hasActiveDataFlow && timeSinceLastHeartbeat < 180000); // Allow connection if data is flowing and heartbeat is within 3 minutes
+      
+      console.log('🔍 Connection check (using heartbeat as primary):', {
+        heartbeatBasedConnection,
+        timeSinceLastHeartbeat: timeSinceLastHeartbeat < Infinity ? (timeSinceLastHeartbeat / 1000).toFixed(1) + 's' : 'N/A',
+        lastHeartbeat: lastHeartbeat ? new Date(lastHeartbeat).toISOString() : 'never',
         isConnected: data.isConnected,
-        dataCount: data.dataCount || 0,
+        dataCount: dataCount,
         recentDataCount: data.data?.length || 0,
-        hasRecentData,
-        hasRecentHeartbeat,
-        timeSinceLastHeartbeat: data.timeSinceLastHeartbeat,
-        lastHeartbeat: data.lastHeartbeat
+        hasData,
+        hasRecentDataPoint,
+        latestDataAge: latestDataAge ? (latestDataAge / 1000).toFixed(1) + 's' : 'N/A',
+        latestDataTimestamp: hasData && data.data.length > 0 ? new Date(data.data[data.data.length - 1].timestamp).toISOString() : null,
+        willConnect: shouldBeConnected ? 'YES' : 'NO',
+        reason: shouldBeConnected 
+          ? (heartbeatBasedConnection 
+              ? 'heartbeat active' 
+              : hasRecentDataPoint 
+                ? 'recent data point' 
+                : hasActiveDataFlow 
+                  ? 'active data flow' 
+                  : 'unknown')
+          : 'no indicators'
       });
       
-      // Consider connected ONLY if we have RECENT activity (within 15 seconds):
-      // Device sends data every 100ms, but network glitches can happen. 15s is safe.
-      // Note: We DON'T use serverSaysConnected (30s threshold) because it's too lenient
-      // Note: We DON'T check dataCount > 0 alone because old data can remain in store after device disconnects
-      const shouldBeConnected = hasRecentHeartbeat; // Only recent heartbeat (15s), not server's 30s check
-      
-      console.log('Connection decision:', {
+      console.log('🔍 Connection decision:', {
         shouldBeConnected,
         currentState: isMyoWareConnected,
         willUpdate: shouldBeConnected !== isMyoWareConnected,
-        detectionMethod: hasRecentHeartbeat ? 'heartbeat' : 'none'
+        primaryMethod: heartbeatBasedConnection ? 'heartbeat' : 'none',
+        secondaryMethod: hasRecentDataPoint ? 'recent data' : 'none',
+        reason: shouldBeConnected 
+          ? (heartbeatBasedConnection 
+              ? `Heartbeat active (${(timeSinceLastHeartbeat / 1000).toFixed(1)}s ago)` 
+              : `Recent data point (${latestDataAge ? (latestDataAge / 1000).toFixed(1) : 'N/A'}s ago)`)
+          : `No heartbeat (${timeSinceLastHeartbeat < Infinity ? (timeSinceLastHeartbeat / 1000).toFixed(1) : 'N/A'}s since last) and no recent data`
       });
       
       // Update connection state immediately when we detect connection
       if (shouldBeConnected && !isMyoWareConnected) {
-        console.log('✅ MyoWare device CONNECTED - recent heartbeat detected:', {
-          hasRecentHeartbeat,
-          timeSinceLastHeartbeat: data.timeSinceLastHeartbeat,
+        console.log('✅ MyoWare device CONNECTED - heartbeat active:', {
+          heartbeatBasedConnection,
+          timeSinceLastHeartbeat: timeSinceLastHeartbeat < Infinity ? (timeSinceLastHeartbeat / 1000).toFixed(1) + 's' : 'N/A',
+          lastHeartbeat: lastHeartbeat ? new Date(lastHeartbeat).toISOString() : 'never',
+          hasRecentDataPoint,
+          latestDataAge: latestDataAge ? (latestDataAge / 1000).toFixed(1) + 's' : 'N/A',
           dataCount: data.dataCount || 0,
           dataLength: data.data?.length || 0
         });
@@ -678,8 +1093,14 @@ export default function EMGPage() {
         // Reset failures on connection
         consecutiveFailuresRef.current = 0;
       } else if (!shouldBeConnected && isMyoWareConnected) {
-        // Disconnect if heartbeat is stale (no recent activity)
-        console.log('❌ MyoWare device DISCONNECTED - no recent heartbeat (last:', data.timeSinceLastHeartbeat, 'ms ago, threshold: 15000ms)');
+        // Disconnect if heartbeat is stale
+        console.log('❌ MyoWare device DISCONNECTED - heartbeat stale:', {
+          timeSinceLastHeartbeat: timeSinceLastHeartbeat < Infinity ? (timeSinceLastHeartbeat / 1000).toFixed(1) + 's' : 'N/A',
+          lastHeartbeat: lastHeartbeat ? new Date(lastHeartbeat).toISOString() : 'never',
+          hasRecentDataPoint,
+          latestDataAge: latestDataAge ? (latestDataAge / 1000).toFixed(1) + 's' : 'N/A',
+          threshold: '30s (heartbeat timeout)'
+        });
         setIsMyoWareConnected(false);
       }
       
@@ -722,17 +1143,45 @@ export default function EMGPage() {
           console.warn('Error logging raw EMG data:', err);
         }
         
+        // Calculate voltage - ensure it's not capped
+        let calculatedVoltage: number;
+        if (latestData.voltage !== undefined && latestData.voltage !== null) {
+          calculatedVoltage = latestData.voltage;
+        } else {
+          // ESP32: 12-bit ADC (0-4095), 3.3V reference
+          calculatedVoltage = (latestData.muscleActivity * 3.3) / 4095.0;
+        }
+        
+        // Warn if voltage is suspiciously high (sensor might be disconnected)
+        if (calculatedVoltage > 2.9) {
+          console.warn('⚠️ HIGH VOLTAGE WARNING:', {
+            voltage: calculatedVoltage.toFixed(3) + 'V',
+            muscleActivity: latestData.muscleActivity,
+            diagnosis: latestData.muscleActivity >= 4000 
+              ? 'Sensor likely DISCONNECTED (floating input reads max ~4095)'
+              : 'Voltage unusually high - check sensor connection',
+            troubleshooting: [
+              '1. Check wireless shield connection to MyoWare sensor',
+              '2. Ensure sensor is properly attached to muscle with good contact',
+              '3. Verify sensor wires (red=power, black=ground, white=signal) are secure',
+              '4. For wireless shield: check Bluetooth/WiFi connection',
+              '5. Try power cycling the wireless shield'
+            ]
+          });
+        }
+        
         const emgData: EMGData = {
           timestamp: latestData.timestamp,
           muscleActivity: latestData.muscleActivity,
           muscleActivityProcessed: latestData.muscleActivityProcessed,
-          voltage: latestData.voltage !== undefined ? latestData.voltage : (latestData.muscleActivity * 3.3 / 4095) // ESP32: 12-bit ADC (0-4095), 3.3V reference
+          voltage: calculatedVoltage
         };
         
         // Additional debug: Show what voltage we're using
         if (emgData.voltage !== undefined) {
           console.log('🔌 Final voltage value:', emgData.voltage.toFixed(3) + 'V', 
-            latestData.voltage !== undefined ? '(from ESP32)' : '(calculated in app)');
+            latestData.voltage !== undefined ? '(from ESP32)' : '(calculated in app)',
+            '| muscleActivity:', latestData.muscleActivity);
         }
         // Update calibration min/max while calibrating
         if (isCalibrating) {
@@ -745,15 +1194,46 @@ export default function EMGPage() {
         console.log('Setting current data:', emgData); // Debug log
         setCurrentData(emgData);
         
-        // Trigger movement detection
+        // Trigger movement detection and recording
         handleMyoWareData(emgData);
         
-        // Always update chart data for real-time visualization
-        setChartData(prev => {
-          const newData = [...prev, emgData];
-          // Keep only last 100 data points for chart performance
-          return newData.slice(-100);
-        });
+        // Debug: Check recording state after handling data (log first few and then occasionally)
+        if (isRecordingSessionRef.current) {
+          const count = recordedSessionDataRef.current.length;
+          if (count <= 5 || count % 20 === 0) {
+            console.log('✅ Recording active - sample count:', count);
+          }
+        }
+        
+        // Update chart data for real-time visualization (only if not paused and not already updated by recording)
+        // During recording, chartData is updated in handleMyoWareData, so skip here to avoid duplicates
+        if (!isChartPausedRef.current && !isRecordingSessionRef.current) {
+          setChartData(prev => {
+            const newData = [...prev, emgData];
+            // Keep only last 100 data points for chart performance
+            const updated = newData.slice(-100);
+            // Log occasionally to track chart data updates
+            if (updated.length % 10 === 0 || updated.length <= 5) {
+              console.log('📈 Chart data updated:', {
+                newLength: updated.length,
+                latestVoltage: emgData.voltage,
+                isPaused: isChartPausedRef.current,
+                isRecording: isRecordingSessionRef.current
+              });
+            }
+            return updated;
+          });
+        } else {
+          // Log why chart data isn't being updated
+          if (Math.random() < 0.1) {
+            console.log('⚠️ Chart data NOT updated:', {
+              reason: isChartPausedRef.current ? 'chart is paused' : 'recording session active',
+              isPaused: isChartPausedRef.current,
+              isRecording: isRecordingSessionRef.current,
+              hasData: !!emgData
+            });
+          }
+        }
         
         if (isRecording) {
           setEmgData(prev => [...prev, emgData]);
@@ -789,7 +1269,11 @@ export default function EMGPage() {
         if (error.name === 'AbortError') {
           console.log('Request timed out, will retry on next interval');
         } else if (error.message.includes('Failed to fetch')) {
-          console.log('Network error, will retry on next interval');
+          console.error('❌ Failed to fetch - Next.js server may not be running!', {
+            error: error.message,
+            suggestion: 'Check if Next.js dev server is running on port 3000',
+            command: 'Run: npm run dev'
+          });
         } else if (error.message.includes('HTTP error')) {
           console.log('HTTP error, will retry on next interval');
         }
@@ -807,16 +1291,515 @@ export default function EMGPage() {
     }
   };
 
-  // Poll for real-time data
+  // Connect to real-time data stream using Server-Sent Events
   useEffect(() => {
-    // Poll immediately on mount and then every 3 seconds
-    fetchRealTimeData(); // Initial poll
+    console.log('🔄 Setting up SSE connection to /api/emg/stream');
     
-    // Always poll for data to detect device connection/disconnection
-    const interval = setInterval(fetchRealTimeData, 3000); // Poll every 3 seconds for device detection
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let pollingInterval: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    const reconnectDelay = 2000; // 2 seconds
     
-    return () => clearInterval(interval);
-  }, []); // Run once on mount - fetchRealTimeData is stable and doesn't need to be in deps
+    const startPollingFallback = () => {
+      console.log('🔄 Starting polling fallback mode');
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+      
+      // Poll immediately, then every second
+      const pollOnce = async () => {
+        try {
+          const pollStartTime = Date.now();
+          let response: Response;
+          try {
+            response = await fetch('/api/emg/data', {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+              cache: 'no-cache',
+              signal: AbortSignal.timeout(5000)
+            });
+          } catch (fetchError: any) {
+            // Handle network errors (Next.js not running, CORS, etc.)
+            if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError') {
+              console.warn('⏱️ Request timeout - Next.js may be slow to respond');
+              throw fetchError;
+            } else if (fetchError.message?.includes('Failed to fetch')) {
+              console.error('❌ CRITICAL: Failed to fetch from Next.js API!', {
+                error: fetchError.message,
+                possibleCauses: [
+                  'Next.js dev server is not running',
+                  'Next.js server crashed',
+                  'Port 3000 is blocked or in use',
+                  'Network/CORS issue'
+                ],
+                action: 'Check Next.js terminal - is the server running?',
+                command: 'Run: npm run dev in a new terminal'
+              });
+              throw fetchError;
+            } else {
+              throw fetchError;
+            }
+          }
+          
+          const pollDuration = Date.now() - pollStartTime;
+          
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Log every polling response for debugging
+            const latestData = data.data && data.data.length > 0 ? data.data[data.data.length - 1] : null;
+            const latestDataAge = latestData ? ((Date.now() - latestData.timestamp) / 1000).toFixed(1) + 's' : 'N/A';
+            const isDataFresh = latestData && (Date.now() - latestData.timestamp) < 5000; // Less than 5 seconds old
+            
+            console.log('📊 Polling response:', {
+              status: response.status,
+              pollDuration: pollDuration + 'ms',
+              isConnected: data.isConnected,
+              dataCount: data.dataCount,
+              hasData: data.data && Array.isArray(data.data) && data.data.length > 0,
+              dataArrayLength: data.data?.length || 0,
+              timeSinceLastHeartbeat: data.timeSinceLastHeartbeat < Infinity ? (data.timeSinceLastHeartbeat / 1000).toFixed(1) + 's' : 'N/A',
+              lastHeartbeat: data.lastHeartbeat ? new Date(data.lastHeartbeat).toISOString() : 'never',
+              latestDataTimestamp: latestData ? new Date(latestData.timestamp).toISOString() : 'no data',
+              latestDataAge: latestDataAge,
+              isDataFresh: isDataFresh ? '✅ Fresh' : '⚠️ Stale',
+              latestVoltage: latestData?.voltage?.toFixed(3) + 'V' || 'N/A',
+              latestMuscleActivity: latestData?.muscleActivity || 'N/A'
+            });
+            
+            if (!isDataFresh && latestData) {
+              console.warn('⚠️ WARNING: Latest data is stale!', {
+                age: latestDataAge,
+                timestamp: new Date(latestData.timestamp).toISOString(),
+                now: new Date().toISOString(),
+                issue: 'ESP32 may have stopped sending data or EMG server stopped forwarding'
+              });
+            }
+            
+            // Parse connection status - handle both boolean and string values
+            const heartbeatBasedConnection = data.isConnected === true || data.isConnected === 'true';
+            const hasData = (data.data && Array.isArray(data.data) && data.data.length > 0);
+            const dataCount = data.dataCount || 0;
+            const timeSinceLastHeartbeat = data.timeSinceLastHeartbeat || Infinity;
+            
+            // Connection detection: require actual data or active heartbeat
+            // Device is connected if:
+            // 1. Heartbeat is active (within 30s) - PRIMARY METHOD, OR
+            // 2. We have actual data points in the response (even if heartbeat is stale), OR  
+            // 3. We have data count > 0 AND heartbeat was recent (within 2 minutes)
+            // Also check if latest data is fresh (within last 10 seconds) as additional indicator
+            // Note: latestData and latestDataAge are already defined above
+            const latestDataAgeMs = latestData ? (Date.now() - latestData.timestamp) : Infinity;
+            const hasFreshData = latestDataAgeMs < 10000; // Data less than 10 seconds old
+            
+            // Prioritize heartbeat-based connection, but also accept fresh data as connection indicator
+            const shouldBeConnected = heartbeatBasedConnection || hasData || (dataCount > 0 && (timeSinceLastHeartbeat < 120000 || hasFreshData));
+            
+            console.log('🔍 Connection decision (polling):', {
+              shouldBeConnected,
+              currentState: isMyoWareConnected,
+              heartbeatBasedConnection,
+              hasData,
+              hasFreshData: hasFreshData ? '✅ Fresh' : '❌ Stale',
+              latestDataAge: latestDataAgeMs < Infinity ? (latestDataAgeMs / 1000).toFixed(1) + 's' : 'N/A',
+              dataCount,
+              dataArrayLength: data.data?.length || 0,
+              timeSinceLastHeartbeat: timeSinceLastHeartbeat < Infinity ? (timeSinceLastHeartbeat / 1000).toFixed(1) + 's' : 'N/A',
+              willUpdate: shouldBeConnected !== isMyoWareConnected,
+              reason: shouldBeConnected 
+                ? (heartbeatBasedConnection 
+                    ? 'heartbeat active' 
+                    : hasFreshData
+                      ? 'fresh data received'
+                      : hasData 
+                        ? 'has data array' 
+                        : 'data count > 0')
+                : 'no heartbeat and no data'
+            });
+            
+            if (shouldBeConnected) {
+              if (!isMyoWareConnected) {
+                const reason = heartbeatBasedConnection 
+                  ? 'heartbeat active' 
+                  : (hasData && data.data.length > 0) 
+                    ? `has ${data.data.length} data points` 
+                    : (dataCount > 0 && timeSinceLastHeartbeat < 120000)
+                      ? `data count ${dataCount} within ${(timeSinceLastHeartbeat / 1000).toFixed(0)}s`
+                      : 'unknown';
+                console.log('✅ MyoWare device CONNECTED via polling:', {
+                  heartbeatBasedConnection,
+                  hasData,
+                  dataCount,
+                  timeSinceLastHeartbeat: timeSinceLastHeartbeat < Infinity ? (timeSinceLastHeartbeat / 1000).toFixed(1) + 's' : 'N/A',
+                  reason
+                });
+              }
+              setIsMyoWareConnected(true);
+              
+              if (hasData && data.data.length > 0) {
+                const latestData = data.data[data.data.length - 1];
+                const emgData: EMGData = {
+                  timestamp: latestData.timestamp,
+                  muscleActivity: latestData.muscleActivity,
+                  muscleActivityProcessed: latestData.muscleActivityProcessed,
+                  voltage: latestData.voltage,
+                };
+                
+                setCurrentData(emgData);
+                handleMyoWareData(emgData);
+                
+                // Update chart data if not paused
+                if (!isChartPausedRef.current) {
+                  setChartData(prev => {
+                    // Avoid duplicates by checking timestamp
+                    const isDuplicate = prev.some(d => d.timestamp === emgData.timestamp);
+                    if (isDuplicate) {
+                      console.log('⚠️ Duplicate data detected, skipping:', {
+                        timestamp: new Date(emgData.timestamp).toISOString()
+                      });
+                      return prev;
+                    }
+                    const newData = [...prev, emgData];
+                    const trimmed = newData.slice(-100);
+                    console.log('📈 Updating chart data:', {
+                      previousCount: prev.length,
+                      newCount: trimmed.length,
+                      timestamp: new Date(emgData.timestamp).toISOString(),
+                      voltage: emgData.voltage?.toFixed(3) + 'V',
+                      isPaused: isChartPausedRef.current,
+                      wasDuplicate: isDuplicate
+                    });
+                    return trimmed;
+                  });
+                } else {
+                  console.log('⏸️ Chart is paused, skipping data update');
+                }
+              }
+            } else {
+              if (isMyoWareConnected) {
+                console.log('❌ MyoWare device DISCONNECTED via polling:', {
+                  heartbeatBasedConnection,
+                  hasData,
+                  dataCount,
+                  timeSinceLastHeartbeat: data.timeSinceLastHeartbeat
+                });
+              }
+              setIsMyoWareConnected(false);
+            }
+          } else {
+            console.warn('⚠️ Polling response not OK:', {
+              status: response.status,
+              statusText: response.statusText,
+              pollDuration: pollDuration + 'ms'
+            });
+            setIsMyoWareConnected(false);
+          }
+        } catch (pollError) {
+          console.error('❌ Polling error:', {
+            error: pollError,
+            message: pollError instanceof Error ? pollError.message : String(pollError),
+            name: pollError instanceof Error ? pollError.name : 'Unknown'
+          });
+          setIsMyoWareConnected(false);
+        }
+      };
+      
+      // Poll immediately
+      pollOnce();
+      
+      // Then poll every second
+      pollingInterval = setInterval(pollOnce, 1000);
+      console.log('✅ Polling interval set - will poll every 1 second');
+    };
+    
+    const connectSSE = () => {
+      try {
+        console.log('🔄 Creating EventSource connection to /api/emg/stream');
+        eventSource = new EventSource('/api/emg/stream');
+        
+        eventSource.onopen = () => {
+          console.log('✅ SSE connection opened successfully');
+          reconnectAttempts = 0;
+          consecutiveFailuresRef.current = 0;
+        };
+        
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'initial' || data.type === 'update' || data.type === 'heartbeat') {
+              // Update connection status
+              const heartbeatBasedConnection = data.isConnected === true;
+              const timeSinceLastHeartbeat = data.timeSinceLastHeartbeat || Infinity;
+              const lastHeartbeat = data.lastHeartbeat || null;
+              const hasData = (data.data && Array.isArray(data.data) && data.data.length > 0);
+              const dataCount = data.dataCount || 0;
+              
+              // More lenient connection detection: heartbeat OR has data OR has data count
+              const shouldBeConnected = heartbeatBasedConnection || hasData || dataCount > 0;
+              
+              if (shouldBeConnected && !isMyoWareConnected) {
+                console.log('✅ MyoWare device CONNECTED via SSE:', {
+                  heartbeatBasedConnection,
+                  hasData,
+                  dataCount,
+                  timeSinceLastHeartbeat: timeSinceLastHeartbeat < Infinity ? (timeSinceLastHeartbeat / 1000).toFixed(1) + 's' : 'N/A'
+                });
+                setIsMyoWareConnected(true);
+                consecutiveFailuresRef.current = 0;
+              } else if (!shouldBeConnected && isMyoWareConnected) {
+                console.log('❌ MyoWare device DISCONNECTED via SSE');
+                setIsMyoWareConnected(false);
+              }
+              
+              // Process new data if available
+              if (data.type === 'update' && data.newData) {
+                const emgData: EMGData = {
+                  timestamp: data.newData.timestamp,
+                  muscleActivity: data.newData.muscleActivity,
+                  muscleActivityProcessed: data.newData.muscleActivityProcessed,
+                  voltage: data.newData.voltage,
+                };
+                
+                setCurrentData(emgData);
+                handleMyoWareData(emgData);
+                
+                // Only update chart if not paused (use ref to get current value)
+                if (!isChartPausedRef.current) {
+                  setChartData(prev => {
+                    const newData = [...prev, emgData];
+                    return newData.slice(-100);
+                  });
+                }
+                
+                if (isRecording) {
+                  setEmgData(prev => [...prev, emgData]);
+                }
+              } else if (data.type === 'initial' && hasData && data.data.length > 0 && !isChartPausedRef.current) {
+                const latestData = data.data[data.data.length - 1];
+                const emgData: EMGData = {
+                  timestamp: latestData.timestamp,
+                  muscleActivity: latestData.muscleActivity,
+                  muscleActivityProcessed: latestData.muscleActivityProcessed,
+                  voltage: latestData.voltage,
+                };
+                
+                setCurrentData(emgData);
+                setChartData([emgData]);
+              }
+            }
+          } catch (error) {
+            console.error('Error parsing SSE message:', error);
+          }
+        };
+        
+        eventSource.onerror = (error) => {
+          const readyState = eventSource?.readyState;
+          const stateNames = ['CONNECTING', 'OPEN', 'CLOSED'];
+          const stateName = readyState !== undefined ? stateNames[readyState] : 'UNKNOWN';
+          
+          console.error('❌ SSE connection error:', {
+            error,
+            readyState,
+            stateName,
+            url: eventSource?.url,
+            reconnectAttempts,
+            withCredentials: eventSource?.withCredentials
+          });
+          
+          // Check readyState to determine error type
+          if (eventSource) {
+            if (readyState === EventSource.CLOSED) {
+              console.log('SSE connection closed - will attempt reconnect');
+              eventSource.close();
+              
+              if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                console.log(`🔄 Attempting to reconnect SSE (attempt ${reconnectAttempts}/${maxReconnectAttempts})...`);
+                reconnectTimeout = setTimeout(() => {
+                  connectSSE();
+                }, reconnectDelay);
+              } else {
+                console.error('❌ Max reconnect attempts reached, falling back to polling');
+                setIsMyoWareConnected(false);
+                // Fall back to polling
+                startPollingFallback();
+              }
+            } else if (readyState === EventSource.CONNECTING) {
+              console.log('SSE connection is connecting... (this is normal on first connect)');
+            }
+          }
+        };
+      } catch (error) {
+        console.error('Failed to create SSE connection:', error);
+        console.log('⚠️ SSE not supported or failed, falling back to polling mode');
+        setIsMyoWareConnected(false);
+        startPollingFallback();
+      }
+    };
+    
+    // Start polling immediately as primary method
+    // SSE is disabled for now due to compatibility issues
+    console.log('🚀 Initializing EMG data connection (polling mode)...');
+    startPollingFallback();
+    
+    // SSE disabled - using polling only for now
+    // Uncomment below to enable SSE (may cause errors in some environments)
+    // connectSSE();
+    
+    // Test API endpoint and EMG server forwarding status
+    const runDiagnostics = async () => {
+      try {
+        // Test Next.js API
+        let apiResponse: Response;
+        try {
+          apiResponse = await fetch('/api/emg/data', {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            },
+          });
+        } catch (fetchError: any) {
+          console.warn('⚠️ Cannot reach Next.js API /api/emg/data:', fetchError.message);
+          return; // Exit early if we can't reach the API
+        }
+        
+        if (!apiResponse.ok) {
+          console.warn(`⚠️ Next.js API returned error: ${apiResponse.status} ${apiResponse.statusText}`);
+          return;
+        }
+        
+        const apiData = await apiResponse.json();
+        console.log('🧪 Next.js API status:', {
+          dataCount: apiData.dataCount,
+          isConnected: apiData.isConnected,
+          hasData: apiData.data && Array.isArray(apiData.data) && apiData.data.length > 0,
+          timeSinceLastHeartbeat: apiData.timeSinceLastHeartbeat,
+          lastHeartbeat: apiData.lastHeartbeat ? new Date(apiData.lastHeartbeat).toISOString() : 'never'
+        });
+        
+        // Test EMG server forwarding status
+        try {
+          const emgServerResponse = await fetch('http://localhost:3001/api/emg/ws', {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            },
+          }).catch((fetchError) => {
+            // Handle network errors gracefully
+            throw new Error(`Network error: ${fetchError.message}`);
+          });
+          
+          if (!emgServerResponse.ok) {
+            throw new Error(`HTTP ${emgServerResponse.status}: ${emgServerResponse.statusText}`);
+          }
+          
+          const emgServerData = await emgServerResponse.json();
+          console.log('🧪 EMG Server status:', {
+            status: emgServerData.status,
+            connectedDevices: emgServerData.connectedDevices,
+            forwardingStats: emgServerData.forwardingStats
+          });
+          
+          if (emgServerData.forwardingStats) {
+            const stats = emgServerData.forwardingStats;
+            console.log('📊 Forwarding Statistics:', {
+              success: stats.success,
+              failures: stats.failures,
+              lastError: stats.lastError,
+              lastSuccess: stats.lastSuccess,
+              nextjsUrl: stats.nextjsUrl
+            });
+            
+            // Check if lastSuccess is recent (within last 5 seconds)
+            if (stats.lastSuccess) {
+              const lastSuccessTime = new Date(stats.lastSuccess).getTime();
+              const timeSinceLastSuccess = Date.now() - lastSuccessTime;
+              const isRecentSuccess = timeSinceLastSuccess < 5000; // 5 seconds
+              
+              console.log('⏱️ Last successful forward:', {
+                time: stats.lastSuccess,
+                age: (timeSinceLastSuccess / 1000).toFixed(1) + 's',
+                isRecent: isRecentSuccess ? '✅ YES' : '❌ NO - stale'
+              });
+              
+              if (!isRecentSuccess && stats.success > 0) {
+                console.warn('⚠️ WARNING: EMG server shows successful forwards, but last success was ' + 
+                  (timeSinceLastSuccess / 1000).toFixed(1) + ' seconds ago');
+                console.warn('   ⚠️ CRITICAL: POST requests may have STOPPED reaching Next.js!');
+                console.warn('   🔍 ACTION REQUIRED: Check Next.js server console (terminal running "npm run dev")');
+                console.warn('   Look for: "🔔 POST /api/emg/ws - Request received" messages');
+                console.warn('   If you don\'t see these messages, POST requests are NOT reaching Next.js');
+                console.warn('   Possible causes:');
+                console.warn('   1. Next.js server restarted and EMG server is forwarding to old instance');
+                console.warn('   2. Network/firewall blocking localhost:3000');
+                console.warn('   3. Next.js API route not responding');
+              }
+            }
+            
+            if (stats.failures > 0 && stats.success === 0) {
+              // Use console.warn instead of console.error to avoid React error boundary
+              console.warn('⚠️ WARNING: EMG server is NOT forwarding data to Next.js!');
+              console.warn('   This may be normal if:');
+              console.warn('   1. No data has been sent from the MyoWare sensor yet');
+              console.warn('   2. Next.js server was just restarted');
+              console.warn('   3. EMG server is still starting up');
+              console.warn('   Check that Next.js is running on port 3000');
+              console.warn('   Check that the URL is correct:', stats.nextjsUrl);
+              if (stats.lastError) {
+                console.warn('   Last error:', stats.lastError);
+              }
+            } else if (stats.success > 0) {
+              console.log('✅ EMG server IS forwarding data successfully');
+              console.log('   ⚠️ IMPORTANT: Check Next.js server console (terminal running "npm run dev")');
+              console.log('   Look for: "🔔 POST /api/emg/ws - Request received" messages');
+              console.log('   If you don\'t see these, POST requests aren\'t reaching Next.js!');
+            }
+          }
+        } catch (emgError: any) {
+          // Silently handle EMG server connection errors - it's optional for diagnostics
+          console.warn('⚠️ Cannot reach EMG server at http://localhost:3001 (this is OK if EMG server is not running)');
+          if (emgError.message) {
+            console.warn('   Error:', emgError.message);
+          }
+        }
+      } catch (error) {
+        console.error('🧪 Diagnostic test failed:', error);
+      }
+    };
+    
+    // Run diagnostics after a short delay (to ensure page is ready) and then every 10 seconds
+    // Wrap in try-catch to prevent unhandled promise rejections
+    setTimeout(() => {
+      runDiagnostics().catch((err) => {
+        // Silently handle - errors are already logged inside runDiagnostics
+        console.debug('Diagnostic run completed with errors (this is normal)');
+      });
+    }, 1000);
+    
+    const diagnosticInterval = setInterval(() => {
+      runDiagnostics().catch((err) => {
+        // Silently handle - errors are already logged inside runDiagnostics
+        console.debug('Diagnostic run completed with errors (this is normal)');
+      });
+    }, 10000);
+    
+    return () => {
+      console.log('🛑 Cleaning up SSE connection and polling');
+      clearInterval(diagnosticInterval);
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, []); // Run once on mount
 
   // Auto-connect to MyoWare when page loads
   useEffect(() => {
@@ -830,50 +1813,96 @@ export default function EMGPage() {
         console.log('Auto-connecting to MyoWare...');
         
         // First check if the EMG server is running
-        const wsResponse = await fetch('/api/emg/ws', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-cache'
-        });
+        // Add timeout and error handling for when Next.js isn't ready
+        let wsResponse: Response;
+        try {
+          wsResponse = await fetch('/api/emg/ws', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            cache: 'no-cache',
+            signal: AbortSignal.timeout(3000) // 3 second timeout
+          });
+        } catch (fetchError: any) {
+          if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError' || fetchError.message?.includes('Failed to fetch')) {
+            console.log('Next.js API not ready yet (this is normal if Next.js is starting up). Will retry in polling.');
+            setIsMyoWareConnected(false);
+            setUseRealData(false);
+            return; // Exit early, polling will retry later
+          }
+          throw fetchError; // Re-throw unexpected errors
+        }
         
         if (wsResponse.ok) {
           const wsData = await wsResponse.json();
           console.log('EMG WebSocket server status:', wsData);
           
           // Then check if there's actual EMG data available
-          const dataResponse = await fetch('/api/emg/data', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            cache: 'no-cache'
-          });
+          let dataResponse: Response;
+          try {
+            dataResponse = await fetch('/api/emg/data', {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              cache: 'no-cache',
+              signal: AbortSignal.timeout(3000) // 3 second timeout
+            });
+          } catch (fetchError: any) {
+            if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError' || fetchError.message?.includes('Failed to fetch')) {
+              console.log('Next.js API not ready yet (this is normal if Next.js is starting up). Will retry in polling.');
+              setIsMyoWareConnected(false);
+              setUseRealData(false);
+              return; // Exit early, polling will retry later
+            }
+            throw fetchError; // Re-throw unexpected errors
+          }
           
           if (dataResponse.ok) {
             const dataData = await dataResponse.json();
             console.log('EMG data status:', dataData);
             
-            // Use the same connection detection logic as polling - only check RECENT activity (10 seconds)
-            const hasRecentHeartbeat = dataData.timeSinceLastHeartbeat !== undefined && dataData.timeSinceLastHeartbeat !== null && dataData.timeSinceLastHeartbeat < 10000; // 10 seconds
+            // Use heartbeat-based connection detection (primary) with recent data as fallback
+            const heartbeatBasedConnection = dataData.isConnected === true;
+            const timeSinceLastHeartbeat = dataData.timeSinceLastHeartbeat || Infinity;
+            const lastHeartbeat = dataData.lastHeartbeat || null;
             
-            const shouldBeConnected = hasRecentHeartbeat; // Only recent heartbeat, not server's 30s check
+            // Secondary check: verify we have recent data points (within last 60 seconds)
+            let hasRecentDataPoint = false;
+            let latestDataAge = null;
+            if (dataData.data && Array.isArray(dataData.data) && dataData.data.length > 0) {
+              const latestDataPoint = dataData.data[dataData.data.length - 1];
+              if (latestDataPoint.timestamp) {
+                latestDataAge = Date.now() - latestDataPoint.timestamp;
+                hasRecentDataPoint = latestDataAge < 60000; // Data from last 60 seconds
+              }
+            }
+            
+            // Primary: Use heartbeat-based connection status
+            // Secondary: Also check for recent data points as a fallback
+            const shouldBeConnected = heartbeatBasedConnection || (hasRecentDataPoint && timeSinceLastHeartbeat < 90000); // 90s fallback
             
             if (shouldBeConnected) {
               setIsMyoWareConnected(true);
               setUseRealData(true);
-              console.log('Auto-connected to MyoWare device - recent heartbeat detected:', {
-                hasRecentHeartbeat,
-                timeSinceLastHeartbeat: dataData.timeSinceLastHeartbeat,
+              console.log('Auto-connected to MyoWare device - heartbeat active:', {
+                heartbeatBasedConnection,
+                timeSinceLastHeartbeat: timeSinceLastHeartbeat < Infinity ? (timeSinceLastHeartbeat / 1000).toFixed(1) + 's' : 'N/A',
+                lastHeartbeat: lastHeartbeat ? new Date(lastHeartbeat).toISOString() : 'never',
+                hasRecentDataPoint,
+                latestDataAge: latestDataAge ? (latestDataAge / 1000).toFixed(1) + 's' : 'N/A',
                 dataCount: dataData.dataCount || 0
               });
             } else {
               console.log('EMG server running but no device connected yet:', {
+                heartbeatBasedConnection,
+                timeSinceLastHeartbeat: timeSinceLastHeartbeat < Infinity ? (timeSinceLastHeartbeat / 1000).toFixed(1) + 's' : 'N/A',
+                lastHeartbeat: lastHeartbeat ? new Date(lastHeartbeat).toISOString() : 'never',
                 isConnected: dataData.isConnected,
                 dataCount: dataData.dataCount || 0,
                 dataLength: dataData.data?.length || 0,
-                timeSinceHeartbeat: dataData.timeSinceLastHeartbeat
+                hasRecentDataPoint
               });
               setIsMyoWareConnected(false);
               setUseRealData(false);
@@ -889,17 +1918,20 @@ export default function EMGPage() {
           setUseRealData(false);
         }
       } catch (error) {
-        console.log('MyoWare server not available for auto-connect:', error);
-        
-        // Handle error with proper typing
-        if (error instanceof Error) {
-          console.error('Auto-connect error details:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-          });
+        // Don't log as error if it's just Next.js not being ready yet
+        if (error instanceof Error && (error.message?.includes('Failed to fetch') || error.name === 'AbortError' || error.name === 'TimeoutError')) {
+          console.log('Next.js API not ready yet (this is normal if Next.js is starting up). Will retry in polling.');
         } else {
-          console.error('Unknown auto-connect error type:', error);
+          console.log('MyoWare server not available for auto-connect:', error);
+          
+          // Handle error with proper typing
+          if (error instanceof Error) {
+            console.error('Auto-connect error details:', {
+              name: error.name,
+              message: error.message,
+              stack: error.stack
+            });
+          }
         }
         
         setIsMyoWareConnected(false);
@@ -1015,18 +2047,53 @@ export default function EMGPage() {
     }
   };
 
-  // Connect to EMG sensors
+  // Connect to EMG sensors and start recording
   const connectEMG = () => {
     // Only allow connection if we have a real MyoWare device
     if (isMyoWareConnected) {
       setIsConnected(true);
+      
+      // Use provided recording name or auto-generate one
+      const finalRecordingName = recordingName.trim() || `EMG Session ${new Date().toLocaleString()}`;
+      if (!recordingName.trim()) {
+        setRecordingName(finalRecordingName);
+      }
+      
+      // Clear previous data and start recording
+      recordedSessionDataRef.current = [];
+      moveMarkersRef.current = [];
+      setMoveMarkers([]);
+      lastVoltageRef.current = null;
+      isRecordingSessionRef.current = true; // Update ref FIRST, before state
+      setIsRecordingSession(true);
+      setSessionStartTime(Date.now());
+      setSaveStatus('idle');
+      
+      console.log('🎬 Auto-started recording session:', {
+        recordingName: finalRecordingName,
+        isMyoWareConnected,
+        isConnected: true,
+        currentData: currentData ? 'available' : 'none'
+      });
+      
+      // If we have current data, immediately add it to the recording
+      if (currentData) {
+        console.log('📥 Adding initial current data to recording');
+        recordedSessionDataRef.current.push(currentData);
+        console.log('📊 Initial sample count:', recordedSessionDataRef.current.length);
+      }
     } else {
       console.log('Cannot connect: No MyoWare device detected');
     }
   };
 
-  // Disconnect from EMG sensors
-  const disconnectEMG = () => {
+  // Disconnect from EMG sensors and stop recording
+  const disconnectEMG = async () => {
+    // Stop recording first if active
+    if (isRecordingSessionRef.current) {
+      await stopRecording();
+    }
+    
     setIsConnected(false);
     setCurrentData(null);
   };
@@ -1117,13 +2184,6 @@ export default function EMGPage() {
     return sum / emgData.length;
   };
 
-  // Format time
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
   // Workout timer
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -1191,6 +2251,14 @@ export default function EMGPage() {
                 >
                   View History
                 </Link>
+                <button
+                  onClick={verifySupabaseSetup}
+                  disabled={verifying}
+                  className="text-sm px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg text-purple-300 hover:text-purple-200 transition-all disabled:opacity-50"
+                  title="Verify Supabase migration and configuration"
+                >
+                  {verifying ? 'Verifying...' : 'Verify Setup'}
+                </button>
               </div>
               <p className="text-gray-300">Monitor muscle activation during exercises</p>
             </div>
@@ -1388,37 +2456,128 @@ export default function EMGPage() {
           </div>
           
           {/* Connection Controls */}
-          <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
-            {!isMyoWareConnected ? (
-              <div className="px-6 py-3 bg-gray-600 text-gray-300 rounded-lg font-medium">
-                Waiting for MyoWare Device...
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3 justify-center lg:justify-start items-center">
+              {!isMyoWareConnected ? (
+                <div className="px-6 py-3 bg-gray-600 text-gray-300 rounded-lg font-medium">
+                  Waiting for MyoWare Device...
+                </div>
+              ) : !isConnected ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      placeholder="Recording Name (optional)"
+                      value={recordingName}
+                      onChange={(e) => setRecordingName(e.target.value)}
+                      className="bg-gray-900 border border-gray-700 rounded px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500 min-w-[200px]"
+                    />
+                    <button
+                      onClick={connectEMG}
+                      className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-600 transition-all duration-200"
+                    >
+                      Start Recording
+                    </button>
+                  </div>
+                  {!isRecordingSession && (
+                    <button
+                      onClick={isCalibrating ? stopCalibration : startCalibration}
+                      className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                        isCalibrating 
+                          ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600' 
+                          : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'
+                      }`}
+                    >
+                      {isCalibrating ? 'Finish Calibration' : 'Calibrate (5s)'}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={disconnectEMG}
+                    className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200"
+                  >
+                    Stop Recording
+                  </button>
+                  {isRecordingSession && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 rounded-lg">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                      <span className="text-sm text-gray-300">
+                        Recording: {formatTime(recordingElapsedTime)} ({recordedSessionDataRef.current.length} samples)
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Real-time EMG Data Graph - moved here */}
+            {isMyoWareConnected && (
+              <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-4">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-sky-500/5 to-blue-500/10 blur-xl" />
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xl font-semibold">Real-time EMG Data</h2>
+                    <button
+                      onClick={() => {
+                        if (isChartPaused) {
+                          // Restart: clear chart and resume
+                          setChartData([]);
+                          moveMarkersRef.current = [];
+                          setMoveMarkers([]);
+                          lastVoltageRef.current = null;
+                          setIsChartPaused(false);
+                          isChartPausedRef.current = false;
+                        } else {
+                          // Pause: stop updating chart
+                          setIsChartPaused(true);
+                          isChartPausedRef.current = true;
+                        }
+                      }}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                        isChartPaused
+                          ? 'bg-green-500 hover:bg-green-600 text-white'
+                          : 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                      }`}
+                    >
+                      {isChartPaused ? 'Restart' : 'Pause'}
+                    </button>
+                  </div>
+                  <EMGChart 
+                    data={chartData} 
+                    isConnected={isMyoWareConnected}
+                    moveMarkers={moveMarkers}
+                    sessionStartTime={sessionStartTime}
+                    onReset={() => {
+                      // Clear the chart data when reset is clicked
+                      setChartData([]);
+                      moveMarkersRef.current = [];
+                      setMoveMarkers([]);
+                      lastVoltageRef.current = null;
+                      setIsChartPaused(false); // Also resume if paused
+                      isChartPausedRef.current = false;
+                    }}
+                  />
+                  {/* Mark Move Event and End Move Event buttons - only show when recording */}
+                  {isRecordingSession && (
+                    <div className="mt-3 flex justify-center gap-3">
+                      <button
+                        onClick={handleMoveRequest}
+                        className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-cyan-600 transition-all duration-200 shadow-lg"
+                      >
+                        Mark Move Event
+                      </button>
+                      <button
+                        onClick={handleMoveEnd}
+                        className="px-6 py-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200 shadow-lg"
+                      >
+                        End Move Event
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : !isConnected ? (
-              <button
-                onClick={connectEMG}
-                className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-600 transition-all duration-200"
-              >
-                Start Recording
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={disconnectEMG}
-                  className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-all duration-200"
-                >
-                  Stop Recording
-                </button>
-                <button
-                  onClick={isCalibrating ? stopCalibration : startCalibration}
-                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                    isCalibrating 
-                      ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600' 
-                      : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'
-                  }`}
-                >
-                  {isCalibrating ? 'Finish Calibration' : 'Calibrate (5s)'}
-                </button>
-              </>
             )}
           </div>
         </div>
@@ -1517,63 +2676,43 @@ export default function EMGPage() {
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-xl font-semibold">EMG Data Visualization</h2>
                   
-                  {/* Recording Controls */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex flex-col">
-                      <input
-                        type="text"
-                        placeholder="Recording Name"
-                        value={recordingName}
-                        onChange={(e) => setRecordingName(e.target.value)}
-                        className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
-                        disabled={isRecordingSession}
-                      />
+                  {/* Recording Status */}
+                  {isRecordingSession && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        <span className="text-sm text-gray-300">
+                          Recording: {formatTime(recordingElapsedTime)} ({recordedSessionDataRef.current.length} samples)
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {recordingName}
+                      </span>
                     </div>
-                    
-                    {!isRecordingSession ? (
+                  )}
+
+                  {/* Export/Save Controls (visible when data exists and not recording) */}
+                  {recordedSessionDataRef.current.length > 0 && !isRecordingSession && (
+                    <div className="flex gap-2">
                       <button
-                        onClick={startRecording}
-                        disabled={!recordingName.trim()}
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                          !recordingName.trim() 
-                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                            : 'bg-red-500 hover:bg-red-600 text-white'
+                        onClick={saveRecordingToSupabase}
+                        disabled={saveStatus === 'saving' || saveStatus === 'success'}
+                        className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                          saveStatus === 'success' 
+                            ? 'bg-green-500 text-white'
+                            : 'bg-blue-600 hover:bg-blue-500 text-white'
                         }`}
                       >
-                        ● Record
+                        {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved ✓' : 'Save to Cloud'}
                       </button>
-                    ) : (
                       <button
-                        onClick={stopRecording}
-                        className="px-4 py-1.5 rounded-full text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white border border-red-500/50 animate-pulse"
+                        onClick={exportToCSV}
+                        className="px-3 py-1.5 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
                       >
-                        ■ Stop ({recordedSessionDataRef.current.length} samples)
+                        Export CSV
                       </button>
-                    )}
-
-                    {/* Export/Save Controls (visible when data exists) */}
-                    {recordedSessionDataRef.current.length > 0 && !isRecordingSession && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveRecordingToSupabase}
-                          disabled={saveStatus === 'saving' || saveStatus === 'success'}
-                          className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                            saveStatus === 'success' 
-                              ? 'bg-green-500 text-white'
-                              : 'bg-blue-600 hover:bg-blue-500 text-white'
-                          }`}
-                        >
-                          {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved ✓' : 'Save to Cloud'}
-                        </button>
-                        <button
-                          onClick={exportToCSV}
-                          className="px-3 py-1.5 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
-                        >
-                          Export CSV
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {currentWorkout && (
                     <div className="text-right">
@@ -1594,10 +2733,19 @@ export default function EMGPage() {
                       <p className="text-sm text-gray-400 mb-4">
                         Connect your MyoWare 2.0 device to start monitoring muscle activity
                       </p>
-                      <div className="text-xs text-gray-500">
-                        <p>• Make sure your device is powered on</p>
-                        <p>• Check that it's connected to WiFi</p>
-                        <p>• Verify the device is sending data to the server</p>
+                      <div className="text-left text-xs text-gray-400 space-y-2 mb-4 p-4 bg-gray-900/50 rounded-lg">
+                        <p className="font-semibold text-yellow-400 mb-2">⚠️ Troubleshooting Steps:</p>
+                        <p>1. <strong>Start the EMG Server:</strong> Open a new terminal and run:</p>
+                        <code className="block bg-gray-800 p-2 rounded mt-1 text-cyan-300">npm run emg-server</code>
+                        <p className="mt-2">2. <strong>Or start both servers together:</strong></p>
+                        <code className="block bg-gray-800 p-2 rounded mt-1 text-cyan-300">npm run dev:all</code>
+                        <p className="mt-2">3. Make sure your MyoWare device is:</p>
+                        <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                          <li>Powered on</li>
+                          <li>Connected to WiFi</li>
+                          <li>Configured to send data to <code className="text-cyan-300">http://localhost:3001/api/emg/ws</code></li>
+                        </ul>
+                        <p className="mt-2">4. Check the browser console (F12) for connection status messages</p>
                       </div>
                     </div>
                   </div>
@@ -1648,7 +2796,15 @@ export default function EMGPage() {
                             ? currentData.voltage.toFixed(2) 
                             : (currentData.muscleActivity * 3.3 / 4095).toFixed(2) // ESP32: 12-bit ADC (0-4095), 3.3V reference
                           }V
+                          {currentData.voltage !== undefined && currentData.voltage > 2.9 && (
+                            <span className="ml-2 text-yellow-400 text-xs">⚠️ High - Check sensor</span>
+                          )}
                         </div>
+                        {currentData.muscleActivity >= 4000 && (
+                          <div className="mt-2 p-2 bg-red-500/20 border border-red-500/30 rounded text-xs text-red-200">
+                            ⚠️ Sensor reading max value ({currentData.muscleActivity}) - Wireless shield sensor may be disconnected!
+                          </div>
+                        )}
                       </div>
                       
                       {/* Processed Percentage */}
@@ -1668,82 +2824,6 @@ export default function EMGPage() {
                           Range: {calibrationData.muscleActivity?.min || 400}-{calibrationData.muscleActivity?.max || 600}
                         </div>
                       </div>
-                    </div>
-
-                    {/* MyoWare Shield LED Replication */}
-                    <div className="mt-4 p-4 rounded-lg bg-gray-900/50 border border-gray-700">
-                      <div className="text-lg font-medium text-white mb-3">Movement Detection (Shield LED Replication)</div>
-                      <div className="flex items-center justify-center gap-4 mb-4">
-                        {/* LED Array - Replicates shield LEDs */}
-                        <div className="flex gap-2">
-                          {[0, 1, 2, 3, 4].map((index) => {
-                            // Each LED lights up based on intensity threshold
-                            // Only light up if movement is detected AND intensity is above threshold
-                            const threshold = (index + 1) * 20; // 20%, 40%, 60%, 80%, 100%
-                            const isLit = movementDetected && ledIntensity >= threshold;
-                            
-                            return (
-                              <div
-                                key={index}
-                                className={`w-12 h-12 rounded-full border-2 transition-all duration-100 ${
-                                  isLit 
-                                    ? 'bg-yellow-400 border-yellow-300 shadow-lg shadow-yellow-400/50' 
-                                    : 'bg-gray-800 border-gray-700'
-                                }`}
-                                style={{
-                                  opacity: isLit ? 1 : 0.2,
-                                  boxShadow: isLit ? `0 0 ${ledIntensity / 3}px rgba(250, 204, 21, 0.8)` : 'none'
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-center gap-3">
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                          movementDetected 
-                            ? 'bg-yellow-500/20 border border-yellow-400/50' 
-                            : 'bg-gray-700/50 border border-gray-600'
-                        }`}>
-                          <div className={`w-3 h-3 rounded-full ${
-                            movementDetected 
-                              ? 'bg-yellow-400 animate-pulse' 
-                              : 'bg-gray-500'
-                          }`} />
-                          <span className={`text-sm font-medium ${
-                            movementDetected ? 'text-yellow-200' : 'text-gray-400'
-                          }`}>
-                            {movementDetected ? 'Movement Detected' : 'No Movement'}
-                          </span>
-                        </div>
-                        {baselineVoltageRef.current !== null && (
-                          <div className="text-xs text-gray-400">
-                            Baseline: {baselineVoltageRef.current.toFixed(2)}V
-                          </div>
-                        )}
-                      </div>
-                      <div className="mt-3 flex items-center justify-center gap-3">
-                        <div className="text-xs text-gray-500">
-                          LEDs only light when movement detected (voltage change &gt; 0.05V from baseline)
-                        </div>
-                        <button
-                          onClick={() => {
-                            baselineVoltageRef.current = null;
-                            voltageHistoryRef.current = [];
-                            setMovementDetected(false);
-                            setLedIntensity(0);
-                          }}
-                          className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
-                          title="Reset baseline"
-                        >
-                          Reset Baseline
-                        </button>
-                      </div>
-                      {baselineVoltageRef.current === null && (
-                        <div className="mt-2 text-xs text-yellow-400 text-center">
-                          Establishing baseline... ({voltageHistoryRef.current.length}/30 samples) - Keep arm still
-                        </div>
-                      )}
                     </div>
 
                   {/* Live Metrics Summary */}
@@ -1816,18 +2896,6 @@ export default function EMGPage() {
                   </div>
                   </div>
                 )}
-
-                {/* EMG Chart */}
-                <div className="mb-4">
-                  <EMGChart 
-                    data={isMyoWareConnected ? chartData : []} 
-                    isConnected={isMyoWareConnected}
-                    onReset={() => {
-                      // Clear the chart data when reset is clicked
-                      setChartData([]);
-                    }}
-                  />
-                </div>
 
                 {/* EMG Metrics */}
                 <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">

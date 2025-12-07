@@ -132,7 +132,33 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
   // Check device connectivity with debouncing
   const checkDeviceConnectivity = async () => {
     try {
-      const response = await fetch(`${serverUrl}/api/emg/data`);
+      // Add timeout and error handling for when Next.js isn't ready
+      let response: Response;
+      try {
+        response = await fetch(`${serverUrl}/api/emg/data`, {
+          signal: AbortSignal.timeout(3000) // 3 second timeout
+        });
+      } catch (fetchError: any) {
+        if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError' || fetchError.message?.includes('Failed to fetch')) {
+          // Next.js not ready yet - this is normal during startup, don't log as error
+          // Only disconnect if we haven't had data for a while
+          const now = Date.now();
+          const timeSinceLastChange = now - lastConnectionChange.current;
+          if (isConnected && (Date.now() - lastDataReceived) > 45000 && timeSinceLastChange > 10000) {
+            setIsConnected(false);
+            setConnectionStatus('disconnected');
+            setIsTransmitting(false);
+            setDeviceOnline(false);
+            lastConnectionChange.current = now;
+            if (onConnectionChange) {
+              onConnectionChange(false);
+            }
+          }
+          return; // Exit early, will retry on next interval
+        }
+        throw fetchError; // Re-throw unexpected errors
+      }
+      
       if (response.ok) {
         const data = await response.json();
         if (data.lastHeartbeat) {
@@ -182,7 +208,19 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
       }
       
       // Also check what commands are available for the ESP32 and status data
-      const commandResponse = await fetch(`${serverUrl}/api/emg/command`);
+      let commandResponse: Response;
+      try {
+        commandResponse = await fetch(`${serverUrl}/api/emg/command`, {
+          signal: AbortSignal.timeout(3000) // 3 second timeout
+        });
+      } catch (fetchError: any) {
+        // Silently ignore command fetch errors - they're not critical
+        if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError' || fetchError.message?.includes('Failed to fetch')) {
+          return; // Exit early, commands are optional
+        }
+        throw fetchError; // Re-throw unexpected errors
+      }
+      
       if (commandResponse.ok) {
         const commandData = await commandResponse.json();
         if (commandData.hasCommand) {
@@ -196,18 +234,37 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
         }
       }
     } catch (error) {
-      console.error('Error checking device connectivity:', error);
-      // Only disconnect on network error if we haven't had data for a while AND haven't changed recently
-      const now = Date.now();
-      const timeSinceLastChange = now - lastConnectionChange.current;
-      if (isConnected && (Date.now() - lastDataReceived) > 45000 && timeSinceLastChange > 10000) {
-        setIsConnected(false);
-        setConnectionStatus('disconnected');
-        setIsTransmitting(false);
-        setDeviceOnline(false);
-        lastConnectionChange.current = now;
-        if (onConnectionChange) {
-          onConnectionChange(false);
+      // Don't log as error if it's just Next.js not being ready yet
+      if (error instanceof Error && (error.message?.includes('Failed to fetch') || error.name === 'AbortError' || error.name === 'TimeoutError')) {
+        // Next.js not ready yet - this is normal during startup
+        // Only disconnect if we haven't had data for a while AND haven't changed recently
+        const now = Date.now();
+        const timeSinceLastChange = now - lastConnectionChange.current;
+        if (isConnected && (Date.now() - lastDataReceived) > 45000 && timeSinceLastChange > 10000) {
+          setIsConnected(false);
+          setConnectionStatus('disconnected');
+          setIsTransmitting(false);
+          setDeviceOnline(false);
+          lastConnectionChange.current = now;
+          if (onConnectionChange) {
+            onConnectionChange(false);
+          }
+        }
+      } else {
+        // Log unexpected errors
+        console.error('Error checking device connectivity:', error);
+        // Only disconnect on network error if we haven't had data for a while AND haven't changed recently
+        const now = Date.now();
+        const timeSinceLastChange = now - lastConnectionChange.current;
+        if (isConnected && (Date.now() - lastDataReceived) > 45000 && timeSinceLastChange > 10000) {
+          setIsConnected(false);
+          setConnectionStatus('disconnected');
+          setIsTransmitting(false);
+          setDeviceOnline(false);
+          lastConnectionChange.current = now;
+          if (onConnectionChange) {
+            onConnectionChange(false);
+          }
         }
       }
     }

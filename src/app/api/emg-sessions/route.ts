@@ -71,7 +71,9 @@ export async function GET(request: NextRequest) {
         id: data[0].id,
         user_id: data[0].user_id,
         session_name: data[0].session_name,
-        created_at: data[0].created_at
+        created_at: data[0].created_at,
+        move_markers: data[0].move_markers,
+        move_markers_count: Array.isArray(data[0].move_markers) ? data[0].move_markers.length : 'not an array'
       } : null
     });
 
@@ -101,6 +103,7 @@ export async function POST(request: NextRequest) {
       endedAt, 
       durationSeconds,
       readings,
+      moveMarkers,
       averageVoltage,
       maxVoltage
     } = body;
@@ -131,6 +134,20 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    // Log the data being inserted for debugging
+    console.log('📝 Inserting EMG session:', {
+      userId,
+      sessionName,
+      startedAt,
+      endedAt,
+      durationSeconds,
+      readingsCount: readings?.length || 0,
+      moveMarkersCount: moveMarkers?.length || 0,
+      moveMarkers: moveMarkers,
+      averageVoltage,
+      maxVoltage
+    });
+
     // Insert the session
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from('emg_sessions')
@@ -141,6 +158,7 @@ export async function POST(request: NextRequest) {
         ended_at: endedAt,
         duration_seconds: durationSeconds,
         readings: readings || [],
+        move_markers: moveMarkers || [], // Store move markers array
         average_voltage: averageVoltage ?? null,
         max_voltage: maxVoltage ?? null,
       })
@@ -148,12 +166,21 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (sessionError) {
-      console.error('Error inserting EMG session:', sessionError);
+      console.error('❌ Error inserting EMG session:', {
+        code: sessionError.code,
+        message: sessionError.message,
+        details: sessionError.details,
+        hint: sessionError.hint
+      });
       return NextResponse.json({ 
         error: 'Failed to save session', 
-        details: sessionError.message 
+        details: sessionError.message,
+        code: sessionError.code,
+        hint: sessionError.hint
       }, { status: 500 });
     }
+
+    console.log('✅ EMG session inserted successfully:', sessionData?.id);
 
     return NextResponse.json({ data: sessionData });
   } catch (e) {

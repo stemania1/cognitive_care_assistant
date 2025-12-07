@@ -34,6 +34,12 @@ interface EMGReading {
   muscleActivity: number;
   muscleActivityProcessed: number;
   voltage?: number;
+  moveMarker?: 'request' | 'sensed' | 'end'; // Optional move marker type
+}
+
+interface MoveMarker {
+  timestamp: number;
+  type: 'request' | 'sensed' | 'end';
 }
 
 interface EMGSession {
@@ -44,6 +50,7 @@ interface EMGSession {
   ended_at: string;
   duration_seconds: number;
   readings: EMGReading[] | null;
+  move_markers?: MoveMarker[] | null; // Move markers array
   average_voltage: number | null;
   max_voltage: number | null;
   created_at: string;
@@ -54,6 +61,8 @@ export default function EMGHistoryPage() {
   const [sessions, setSessions] = useState<EMGSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<EMGSession | null>(null);
+  const [selectedSessions, setSelectedSessions] = useState<EMGSession[]>([]);
+  const [overlapMode, setOverlapMode] = useState(false);
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
@@ -115,6 +124,17 @@ export default function EMGHistoryPage() {
 
       if (response.ok && result.data) {
         console.log('✅ Loaded sessions:', result.data.length);
+        // Log move markers for debugging
+        result.data.forEach((session: EMGSession, index: number) => {
+          if (session.move_markers && Array.isArray(session.move_markers) && session.move_markers.length > 0) {
+            console.log(`📌 Session ${index} (${session.session_name}) has ${session.move_markers.length} move markers:`, session.move_markers);
+          } else {
+            console.log(`📌 Session ${index} (${session.session_name}) has no move markers`, {
+              move_markers: session.move_markers,
+              isArray: Array.isArray(session.move_markers)
+            });
+          }
+        });
         setSessions(result.data);
       } else {
         console.error('❌ Failed to load sessions:', result.error);
@@ -127,7 +147,20 @@ export default function EMGHistoryPage() {
   };
 
   const handleSessionClick = (session: EMGSession) => {
-    setSelectedSession(session);
+    if (overlapMode) {
+      // Toggle session in selectedSessions array
+      setSelectedSessions(prev => {
+        const isSelected = prev.some(s => s.id === session.id);
+        if (isSelected) {
+          return prev.filter(s => s.id !== session.id);
+        } else {
+          return [...prev, session];
+        }
+      });
+    } else {
+      setSelectedSession(session);
+      setSelectedSessions([]);
+    }
   };
 
   const handleDeleteSession = async (sessionId: string, event: React.MouseEvent) => {
@@ -235,19 +268,99 @@ export default function EMGHistoryPage() {
       return;
     }
 
-    const headers = ['Timestamp', 'Date/Time', 'Voltage (V)', 'Muscle Activity (Raw)', 'Muscle Activity (%)'];
-    const rows = session.readings.map(reading => [
-      reading.timestamp,
-      new Date(reading.timestamp).toISOString(),
-      reading.voltage?.toFixed(3) || '',
-      reading.muscleActivity,
-      reading.muscleActivityProcessed.toFixed(2)
-    ]);
+    // Get move markers from session (either from move_markers array or extract from readings)
+    let moveMarkers: MoveMarker[] = [];
+    if (session.move_markers && Array.isArray(session.move_markers)) {
+      moveMarkers = session.move_markers;
+    } else if (session.readings) {
+      // Extract move markers from readings that have moveMarker property
+      session.readings.forEach((reading) => {
+        if (reading.moveMarker && reading.timestamp) {
+          moveMarkers.push({
+            timestamp: reading.timestamp,
+            type: reading.moveMarker as 'request' | 'sensed' | 'end' | 'end'
+          });
+        }
+      });
+    }
 
-    const csvContent = [
+    // Create a map of timestamps to move markers for quick lookup
+    const markerMap = new Map<number, string>();
+    moveMarkers.forEach(marker => {
+      markerMap.set(marker.timestamp, marker.type);
+    });
+
+    const headers = ['Timestamp', 'Date/Time', 'Voltage (V)', 'Muscle Activity (Raw)', 'Muscle Activity (%)', 'Move Marker'];
+    const rows = session.readings.map(reading => {
+      const timestamp = typeof reading.timestamp === 'number' 
+        ? reading.timestamp 
+        : new Date(reading.timestamp as any).getTime();
+      const markerType = markerMap.get(timestamp) || '';
+      
+      return [
+        timestamp,
+        new Date(timestamp).toISOString(),
+        reading.voltage?.toFixed(3) || '',
+        reading.muscleActivity,
+        reading.muscleActivityProcessed.toFixed(2),
+        markerType
+      ];
+    });
+
+    // Build CSV content
+    const csvLines: string[] = [
       headers.join(','),
       ...rows.map(row => row.join(','))
-    ].join('\n');
+    ];
+
+    // Add move markers sections at the end
+    if (moveMarkers.length > 0) {
+      // Separate move requests, sensed moves, and end move events
+      const moveRequests = moveMarkers.filter(m => m.type === 'request');
+      const sensedMoves = moveMarkers.filter(m => m.type === 'sensed');
+      const endMoves = moveMarkers.filter(m => m.type === 'end');
+
+      if (moveRequests.length > 0) {
+        csvLines.push(''); // Empty line separator
+        csvLines.push('Move Requests:');
+        csvLines.push('Timestamp,Date/Time');
+        moveRequests.forEach(marker => {
+          const timestamp = marker.timestamp;
+          csvLines.push([
+            timestamp,
+            new Date(timestamp).toISOString()
+          ].join(','));
+        });
+      }
+
+      if (sensedMoves.length > 0) {
+        csvLines.push(''); // Empty line separator
+        csvLines.push('Sensed Moves:');
+        csvLines.push('Timestamp,Date/Time');
+        sensedMoves.forEach(marker => {
+          const timestamp = marker.timestamp;
+          csvLines.push([
+            timestamp,
+            new Date(timestamp).toISOString()
+          ].join(','));
+        });
+      }
+
+      if (endMoves.length > 0) {
+        csvLines.push(''); // Empty line separator
+        csvLines.push('End Move Events:');
+        csvLines.push('Timestamp,Date/Time');
+        endMoves.forEach(marker => {
+          const timestamp = marker.timestamp;
+          csvLines.push([
+            timestamp,
+            new Date(timestamp).toISOString()
+          ].join(','));
+        });
+      }
+    }
+
+    const csvContent = csvLines.join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -260,62 +373,100 @@ export default function EMGHistoryPage() {
     window.URL.revokeObjectURL(url);
   };
 
-  const getChartData = (session: EMGSession) => {
-    if (!session.readings || session.readings.length === 0) {
+  const getChartData = (sessionsToDisplay: EMGSession[]) => {
+    if (sessionsToDisplay.length === 0) {
+      return null;
+    }
+
+    // Filter out sessions without readings
+    const validSessions = sessionsToDisplay.filter(s => s.readings && s.readings.length > 0);
+    if (validSessions.length === 0) {
       return null;
     }
 
     try {
-      const readings = session.readings.map(reading => {
-        let timestamp: number;
-        if (typeof reading.timestamp === 'number') {
-          timestamp = reading.timestamp;
-        } else if (typeof reading.timestamp === 'string') {
-          const parsed = new Date(reading.timestamp).getTime();
-          timestamp = isNaN(parsed) ? Date.now() : parsed;
-        } else {
-          timestamp = Date.now();
-        }
+      // Color palette for multiple sessions
+      const colors = [
+        { border: 'rgb(251, 146, 60)', background: 'rgba(251, 146, 60, 0.1)' }, // Orange
+        { border: 'rgb(34, 211, 238)', background: 'rgba(34, 211, 238, 0.1)' }, // Cyan
+        { border: 'rgb(34, 197, 94)', background: 'rgba(34, 197, 94, 0.1)' }, // Green
+        { border: 'rgb(168, 85, 247)', background: 'rgba(168, 85, 247, 0.1)' }, // Purple
+        { border: 'rgb(239, 68, 68)', background: 'rgba(239, 68, 68, 0.1)' }, // Red
+        { border: 'rgb(250, 204, 21)', background: 'rgba(250, 204, 21, 0.1)' }, // Yellow
+        { border: 'rgb(59, 130, 246)', background: 'rgba(59, 130, 246, 0.1)' }, // Blue
+        { border: 'rgb(236, 72, 153)', background: 'rgba(236, 72, 153, 0.1)' }, // Pink
+      ];
 
-        return {
-          ...reading,
-          timestamp,
-        };
+      // Get the maximum duration to set label range
+      let maxDuration = 0;
+      const allDatasets: any[] = [];
+
+      validSessions.forEach((session, sessionIndex) => {
+        const readings = session.readings!.map(reading => {
+          let timestamp: number;
+          if (typeof reading.timestamp === 'number') {
+            timestamp = reading.timestamp;
+          } else if (typeof reading.timestamp === 'string') {
+            const parsed = new Date(reading.timestamp).getTime();
+            timestamp = isNaN(parsed) ? Date.now() : parsed;
+          } else {
+            timestamp = Date.now();
+          }
+
+          // Calculate voltage if not present
+          let voltage = reading.voltage;
+          if (voltage === undefined || voltage === null) {
+            if (reading.muscleActivity !== undefined && reading.muscleActivity !== null) {
+              voltage = (reading.muscleActivity * 3.3) / 4095.0;
+            } else {
+              voltage = 0;
+            }
+          }
+
+          return {
+            ...reading,
+            timestamp,
+            voltage,
+          };
+        });
+
+        // Find the first reading timestamp for this session (its own start time)
+        const sessionStartTime = readings[0]?.timestamp ?? new Date(session.started_at).getTime();
+
+        // Calculate seconds from this session's own start time (so all sessions start at x=0)
+        const dataPoints = readings.map((reading) => {
+          const seconds = (reading.timestamp - sessionStartTime) / 1000;
+          return { seconds, voltage: reading.voltage ?? 0 };
+        });
+
+        const duration = dataPoints[dataPoints.length - 1]?.seconds ?? 0;
+        maxDuration = Math.max(maxDuration, duration);
+
+        const color = colors[sessionIndex % colors.length];
+        allDatasets.push({
+          label: `${session.session_name} (Voltage)`,
+          data: dataPoints.map(p => ({ x: p.seconds, y: p.voltage })),
+          borderColor: color.border,
+          backgroundColor: color.background,
+          borderWidth: 2,
+          fill: false,
+          tension: 0.4,
+          pointRadius: 1,
+          pointHoverRadius: 4,
+        });
       });
-
-      const baseTime = readings[0]?.timestamp ?? new Date(session.started_at).getTime();
-      const labels = readings.map((reading) => {
-        const seconds = Math.floor((reading.timestamp - baseTime) / 1000);
-        return seconds;
-      });
-
-      const voltages = readings.map(r => r.voltage || 0);
-      const maxVoltage = Math.max(...voltages, 1.0);
 
       return {
-        labels,
-        datasets: [
-          {
-            label: 'Voltage (V)',
-            data: voltages,
-            borderColor: 'rgb(251, 146, 60)',
-            backgroundColor: 'rgba(251, 146, 60, 0.1)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 1,
-            pointHoverRadius: 4,
-          },
-        ],
+        datasets: allDatasets,
       };
     } catch (error) {
-      console.error('Error generating chart data:', error);
+      console.error('❌ Error generating chart data:', error);
       return null;
     }
   };
 
-  const getChartOptions = (session: EMGSession) => {
-    if (!session || !session.started_at) {
+  const getChartOptions = (sessionsToDisplay: EMGSession[]) => {
+    if (sessionsToDisplay.length === 0) {
       return {
         responsive: true,
         maintainAspectRatio: false,
@@ -323,21 +474,202 @@ export default function EMGHistoryPage() {
     }
 
     try {
-      const startTime = new Date(session.started_at);
-      const startTimeStr = isNaN(startTime.getTime()) 
-        ? 'Unknown' 
-        : startTime.toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
+      // Calculate min/max voltages across all sessions
+      let allVoltages: number[] = [];
+      sessionsToDisplay.forEach(session => {
+        const voltages = session.readings?.map(r => {
+          if (r.voltage !== undefined && r.voltage !== null) {
+            return r.voltage;
+          }
+          if (r.muscleActivity !== undefined && r.muscleActivity !== null) {
+            return (r.muscleActivity * 3.3) / 4095.0;
+          }
+          return 0;
+        }) || [];
+        allVoltages = [...allVoltages, ...voltages];
+      });
+
+      const maxVoltage = Math.max(...allVoltages, 1.0);
+      const minVoltage = Math.min(...allVoltages, 0);
+
+      // Build title
+      let titleText: string;
+      if (sessionsToDisplay.length === 1) {
+        const startTime = new Date(sessionsToDisplay[0].started_at);
+        const startTimeStr = isNaN(startTime.getTime()) 
+          ? 'Unknown' 
+          : startTime.toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            });
+        titleText = `EMG Session: ${sessionsToDisplay[0].session_name} (Started: ${startTimeStr})`;
+      } else {
+        titleText = `EMG Sessions Overlap: ${sessionsToDisplay.length} sessions`;
+      }
+
+      // Get move markers from all sessions
+      // For overlapping graphs, each session starts at x=0, so we need to calculate
+      // markers relative to each session's own start time
+      let allMoveMarkers: Array<{ marker: MoveMarker; sessionName: string; sessionStartTime: number }> = [];
+      
+      sessionsToDisplay.forEach(session => {
+        // Get this session's start time
+        let sessionStartTime: number;
+        if (session.readings && session.readings.length > 0) {
+          const firstReading = session.readings[0];
+          if (typeof firstReading.timestamp === 'number') {
+            sessionStartTime = firstReading.timestamp;
+          } else if (typeof firstReading.timestamp === 'string') {
+            sessionStartTime = new Date(firstReading.timestamp).getTime();
+          } else {
+            sessionStartTime = new Date(session.started_at).getTime();
+          }
+        } else {
+          sessionStartTime = new Date(session.started_at).getTime();
+        }
+        
+        let sessionMarkers: MoveMarker[] = [];
+        if (session.move_markers && Array.isArray(session.move_markers)) {
+          sessionMarkers = session.move_markers;
+        } else if (session.readings) {
+          session.readings.forEach((reading) => {
+            if (reading.moveMarker && reading.timestamp) {
+              sessionMarkers.push({
+                timestamp: reading.timestamp,
+                type: reading.moveMarker as 'request' | 'sensed' | 'end'
+              });
+            }
+          });
+        }
+        
+        sessionMarkers.forEach(marker => {
+          allMoveMarkers.push({ 
+            marker, 
+            sessionName: session.session_name,
+            sessionStartTime 
+          });
+        });
+      });
+
+      // Create plugin to draw move markers (will be added to plugins array)
+      const moveMarkerPlugin = {
+        id: 'moveMarkerLines',
+        afterDraw: (chart: any) => {
+          if (!allMoveMarkers || allMoveMarkers.length === 0) {
+            return;
+          }
+
+          const ctx = chart.ctx;
+          const xScale = chart.scales.x;
+          const yScale = chart.scales.y;
+
+          if (!xScale || !yScale) {
+            return;
+          }
+
+          ctx.save();
+
+          let drawnCount = 0;
+          allMoveMarkers.forEach(({ marker, sessionName, sessionStartTime }, index) => {
+            // Calculate seconds from this session's own start time (so it aligns with x=0 start)
+            const markerSeconds = (marker.timestamp - sessionStartTime) / 1000;
+            
+            // Get the actual data range from the chart to understand what's visible
+            const chartData = chart.data;
+            const dataMin = chartData.labels && chartData.labels.length > 0 
+              ? Math.min(...(chartData.labels as number[]))
+              : xScale.min;
+            const dataMax = chartData.labels && chartData.labels.length > 0
+              ? Math.max(...(chartData.labels as number[]))
+              : xScale.max;
+            
+            console.log(`📍 Processing marker ${index}:`, {
+              type: marker.type,
+              timestamp: marker.timestamp,
+              timestampDate: new Date(marker.timestamp).toISOString(),
+              sessionStartTime: sessionStartTime,
+              sessionStartTimeDate: new Date(sessionStartTime).toISOString(),
+              markerSeconds: markerSeconds.toFixed(3),
+              xScaleMin: xScale.min,
+              xScaleMax: xScale.max,
+              dataMin: dataMin,
+              dataMax: dataMax,
+              xScaleLeft: xScale.left,
+              xScaleRight: xScale.right
+            });
+            
+            // Get pixel position for this x value
+            let xPos: number | null = null;
+            try {
+              xPos = xScale.getPixelForValue(markerSeconds);
+            } catch (error) {
+              console.warn(`⚠️ Error getting pixel for marker ${index}:`, error);
+              return; // Skip this marker if we can't get position
+            }
+            
+            console.log(`  → xPos: ${xPos?.toFixed(1)}, bounds: [${xScale.left.toFixed(1)}, ${xScale.right.toFixed(1)}]`);
+            
+            // Check if position is valid
+            if (xPos !== null && !isNaN(xPos) && isFinite(xPos)) {
+              // Clamp xPos to chart bounds to ensure visibility
+              const clampedXPos = Math.max(xScale.left, Math.min(xScale.right, xPos));
+              
+              // Only draw if the marker is reasonably close to the visible range
+              // (within 10% of the chart width outside bounds)
+              const chartWidth = xScale.right - xScale.left;
+              const margin = chartWidth * 0.1; // 10% margin
+              const isWithinReasonableRange = xPos >= (xScale.left - margin) && xPos <= (xScale.right + margin);
+              
+              if (isWithinReasonableRange) {
+                // Set line style based on marker type
+                if (marker.type === 'request') {
+                  // Solid blue line for move requests
+                  ctx.strokeStyle = 'rgb(59, 130, 246)'; // Blue
+                  ctx.lineWidth = 2;
+                  ctx.setLineDash([]); // Solid line
+                } else if (marker.type === 'end') {
+                  // Solid red line for end move events
+                  ctx.strokeStyle = 'rgb(239, 68, 68)'; // Red
+                  ctx.lineWidth = 2;
+                  ctx.setLineDash([]); // Solid line
+                } else {
+                  // Dotted green line for sensed moves
+                  ctx.strokeStyle = 'rgb(34, 197, 94)'; // Green
+                  ctx.lineWidth = 2;
+                  ctx.setLineDash([5, 5]); // Dotted line
+                }
+
+                // Draw vertical line from top to bottom of chart area
+                // Use clamped position if original was outside bounds
+                const drawX = clampedXPos;
+                ctx.beginPath();
+                ctx.moveTo(drawX, yScale.top);
+                ctx.lineTo(drawX, yScale.bottom);
+                ctx.stroke();
+                
+                drawnCount++;
+                if (xPos !== clampedXPos) {
+                  console.log(`  ✅ Drew ${marker.type} line at clamped x=${drawX.toFixed(1)} (original: ${xPos.toFixed(1)})`);
+                } else {
+                  console.log(`  ✅ Drew ${marker.type} line at x=${drawX.toFixed(1)}`);
+                }
+              } else {
+                console.warn(`  ❌ Marker ${index} too far outside bounds: xPos=${xPos.toFixed(1)}, bounds: [${xScale.left.toFixed(1)}, ${xScale.right.toFixed(1)}]`);
+              }
+            } else {
+              console.warn(`  ❌ Marker ${index} invalid xPos: ${xPos}`);
+            }
           });
 
-      const voltages = session.readings?.map(r => r.voltage || 0) || [];
-      const maxVoltage = Math.max(...voltages, 1.0);
+          ctx.restore();
+          console.log(`✅ Drew ${drawnCount} of ${allMoveMarkers.length} move markers`);
+        },
+      };
 
-      return {
+      const chartOptions: any = {
         responsive: true,
         maintainAspectRatio: false,
         interaction: {
@@ -347,7 +679,7 @@ export default function EMGHistoryPage() {
         plugins: {
           title: {
             display: true,
-            text: `EMG Session: ${session.session_name} (Started: ${startTimeStr})`,
+            text: titleText,
             color: 'rgb(156, 163, 175)',
             font: {
               size: 16,
@@ -412,11 +744,16 @@ export default function EMGHistoryPage() {
             grid: {
               color: 'rgba(255, 255, 255, 0.1)',
             },
-            min: 0,
-            max: Math.max(maxVoltage * 1.1, 1.0),
+            min: Math.max(0, minVoltage - 0.1), // Add padding below
+            max: Math.max(1.0, Math.min(3.5, maxVoltage * 1.1)), // Add 10% padding above, cap at 3.5V, minimum 1.0V
           },
         },
       };
+
+      // Store the plugin on chartOptions so it can be retrieved in the render function
+      chartOptions._moveMarkerPlugin = moveMarkerPlugin;
+
+      return chartOptions;
     } catch (error) {
       console.error('Error generating chart options:', error);
       return {
@@ -474,7 +811,24 @@ export default function EMGHistoryPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Sessions List */}
           <div className="bg-white/5 backdrop-blur-sm rounded-lg border border-white/10 p-6">
-            <h2 className="text-2xl font-semibold mb-4">Sessions ({sessions.length})</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-semibold">Sessions ({sessions.length})</h2>
+              <button
+                onClick={() => {
+                  setOverlapMode(!overlapMode);
+                  if (overlapMode) {
+                    setSelectedSessions([]);
+                  }
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  overlapMode
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
+                    : 'bg-white/5 text-gray-300 border border-white/20 hover:bg-white/10'
+                }`}
+              >
+                {overlapMode ? '✓ Overlap Mode' : '📊 Overlap Graphs'}
+              </button>
+            </div>
             {sessions.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <p>No EMG sessions recorded yet.</p>
@@ -483,13 +837,25 @@ export default function EMGHistoryPage() {
                 </Link>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
-                {sessions.map((session) => (
+              <>
+                {overlapMode && selectedSessions.length > 0 && (
+                  <div className="mb-4 p-3 rounded-lg bg-cyan-500/10 border border-cyan-400/30">
+                    <p className="text-sm text-cyan-200">
+                      {selectedSessions.length} session{selectedSessions.length > 1 ? 's' : ''} selected for overlap
+                    </p>
+                  </div>
+                )}
+                <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+                {sessions.map((session) => {
+                  const isSelected = overlapMode 
+                    ? selectedSessions.some(s => s.id === session.id)
+                    : selectedSession?.id === session.id;
+                  return (
                   <div
                     key={session.id}
                     onClick={() => handleSessionClick(session)}
                     className={`p-4 rounded-lg border transition-all ${
-                      selectedSession?.id === session.id
+                      isSelected
                         ? 'border-cyan-400 bg-cyan-500/20 cursor-pointer'
                         : 'border-white/15 bg-white/5 hover:bg-white/10 cursor-pointer'
                     }`}
@@ -528,8 +894,18 @@ export default function EMGHistoryPage() {
                         </div>
                       ) : (
                         <>
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-lg">{session.session_name}</h3>
+                          <div className="flex items-start gap-2 flex-1">
+                            {overlapMode && (
+                              <input
+                                type="checkbox"
+                                checked={selectedSessions.some(s => s.id === session.id)}
+                                onChange={() => handleSessionClick(session)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="mt-1 w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"
+                              />
+                            )}
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-lg">{session.session_name}</h3>
                             <p className="text-sm text-gray-400 mt-1">
                               {new Date(session.started_at).toLocaleString()}
                             </p>
@@ -547,6 +923,7 @@ export default function EMGHistoryPage() {
                                 {session.readings.length} readings
                               </p>
                             )}
+                            </div>
                           </div>
                           <div className="flex gap-2">
                             <button
@@ -569,16 +946,21 @@ export default function EMGHistoryPage() {
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
+                  );
+                })}
+                </div>
+              </>
             )}
           </div>
 
           {/* Session Details */}
           <div className="bg-white/5 backdrop-blur-sm rounded-lg border border-white/10 p-6">
-            {selectedSession ? (
+            {(overlapMode ? selectedSessions.length > 0 : selectedSession) ? (
               <>
-                <h2 className="text-2xl font-semibold mb-4">Session Details</h2>
+                <h2 className="text-2xl font-semibold mb-4">
+                  {overlapMode ? `Overlapping ${selectedSessions.length} Session${selectedSessions.length > 1 ? 's' : ''}` : 'Session Details'}
+                </h2>
+                {!overlapMode && selectedSession && (
                 <div className="space-y-4 mb-6">
                   <div>
                     <h3 className="font-semibold text-lg mb-2">{selectedSession.session_name}</h3>
@@ -622,11 +1004,27 @@ export default function EMGHistoryPage() {
                     </button>
                   </div>
                 </div>
-                {selectedSession.readings && selectedSession.readings.length > 0 && (
-                  <div className="h-96">
-                    <Line data={getChartData(selectedSession)!} options={getChartOptions(selectedSession)} />
-                  </div>
                 )}
+                {(() => {
+                  const sessionsToDisplay = overlapMode ? selectedSessions : (selectedSession ? [selectedSession] : []);
+                  if (sessionsToDisplay.length === 0) return null;
+                  
+                  const chartData = getChartData(sessionsToDisplay);
+                  if (!chartData) return null;
+                  
+                  const options = getChartOptions(sessionsToDisplay);
+                  const moveMarkerPlugin = (options as any)._moveMarkerPlugin;
+                  
+                  return (
+                    <div className="h-96">
+                      <Line 
+                        data={chartData} 
+                        options={options}
+                        plugins={moveMarkerPlugin ? [moveMarkerPlugin] : []}
+                      />
+                    </div>
+                  );
+                })()}
               </>
             ) : (
               <div className="text-center py-8 text-gray-400">
