@@ -351,6 +351,9 @@ export default function ThermalHistoryPage() {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isEditingGraphTitle, setIsEditingGraphTitle] = useState(false);
+  const [editingGraphTitle, setEditingGraphTitle] = useState<string>('');
+  const [graphTitle, setGraphTitle] = useState<string>('');
 
   useEffect(() => {
     async function initializeUser() {
@@ -387,6 +390,26 @@ export default function ThermalHistoryPage() {
       loadSessions();
     }
   }, [userId]);
+
+  // Sync graph title with selected session (only if not manually edited)
+  useEffect(() => {
+    if (overlapMode) {
+      if (selectedSessionsForOverlap.length > 0 && !isEditingGraphTitle) {
+        const defaultTitle = `${selectedSessionsForOverlap.length} Sessions Overlapping`;
+        // Only update if title is empty or matches the old default pattern
+        if (!graphTitle || graphTitle.match(/^\d+ Sessions Overlapping$/)) {
+          setGraphTitle(defaultTitle);
+        }
+      }
+    } else {
+      if (selectedSession && !isEditingGraphTitle) {
+        // Only update if title matches the subject identifier (user hasn't customized it)
+        if (!graphTitle || graphTitle === selectedSession.subject_identifier) {
+          setGraphTitle(selectedSession.subject_identifier);
+        }
+      }
+    }
+  }, [selectedSession?.id, selectedSessionsForOverlap.length, overlapMode, isEditingGraphTitle]);
 
   // Render thermal canvas for playback (using same code as ThermalVisualization)
   useEffect(() => {
@@ -756,6 +779,129 @@ export default function ThermalHistoryPage() {
     }
   };
 
+  const exportMultipleSessionsToCSV = (sessions: ThermalSession[]) => {
+    if (sessions.length === 0) {
+      alert('No sessions to export');
+      return;
+    }
+
+    if (sessions.length === 1) {
+      exportToCSV(sessions[0]);
+      return;
+    }
+
+    // Combine all sessions into one CSV
+    const allRows: any[] = [];
+    
+    sessions.forEach((session, sessionIndex) => {
+      if (!session.samples || session.samples.length === 0) {
+        return;
+      }
+
+      // Get move events and movement detected for this session
+      const moveEvents = session.move_events || [];
+      const movementDetected = session.movement_detected || [];
+      const sessionStartTime = new Date(session.started_at).getTime();
+
+      const moveRequestMap = new Map<number, MoveEvent>();
+      const movementDetectedMap = new Map<number, MoveEvent>();
+
+      moveEvents.forEach(event => {
+        const eventTime = event.timestamp || (sessionStartTime + event.secondsFromStart * 1000);
+        moveRequestMap.set(eventTime, event);
+      });
+
+      movementDetected.forEach(event => {
+        const eventTime = event.timestamp || (sessionStartTime + event.secondsFromStart * 1000);
+        movementDetectedMap.set(eventTime, event);
+      });
+
+      // Add session header
+      if (sessionIndex > 0) {
+        allRows.push([]); // Empty row separator
+      }
+      allRows.push([`Session: ${session.subject_identifier}`, `Session #: ${session.session_number || 'N/A'}`, `Started: ${new Date(session.started_at).toISOString()}`]);
+      allRows.push(['Sample Index', 'Timestamp', 'Date/Time', 'Heatmap Variance', 'Pattern Stability (%)', 'Move Request', 'Movement Detected']);
+
+      // Add samples for this session
+      session.samples.forEach(sample => {
+        const sampleTime = typeof sample.timestamp === 'number' ? sample.timestamp : new Date(sample.timestamp as any).getTime();
+        
+        let moveRequest = '';
+        for (const [eventTime, event] of moveRequestMap.entries()) {
+          if (Math.abs(sampleTime - eventTime) < 1000) {
+            moveRequest = 'Yes';
+            break;
+          }
+        }
+
+        let movementDetected = '';
+        for (const [eventTime, event] of movementDetectedMap.entries()) {
+          if (Math.abs(sampleTime - eventTime) < 1000) {
+            movementDetected = 'Yes';
+            break;
+          }
+        }
+
+        allRows.push([
+          sample.sampleIndex,
+          sampleTime,
+          new Date(sampleTime).toISOString(),
+          sample.heatmapVariance !== null ? sample.heatmapVariance.toFixed(2) : '',
+          sample.patternStability !== null ? sample.patternStability.toFixed(1) : '',
+          moveRequest,
+          movementDetected,
+        ]);
+      });
+
+      // Add move events summary for this session
+      if (moveEvents.length > 0 || movementDetected.length > 0) {
+        allRows.push([]);
+        allRows.push([`Move Events Summary - ${session.subject_identifier}`]);
+        
+        if (moveEvents.length > 0) {
+          allRows.push(['Move Requests:']);
+          allRows.push(['Timestamp', 'Date/Time', 'Seconds From Start']);
+          moveEvents.forEach(event => {
+            const eventTime = event.timestamp || (sessionStartTime + event.secondsFromStart * 1000);
+            allRows.push([
+              eventTime,
+              new Date(eventTime).toISOString(),
+              event.secondsFromStart
+            ]);
+          });
+        }
+
+        if (movementDetected.length > 0) {
+          allRows.push([]);
+          allRows.push(['Detected Movements:']);
+          allRows.push(['Timestamp', 'Date/Time', 'Seconds From Start']);
+          movementDetected.forEach(event => {
+            const eventTime = event.timestamp || (sessionStartTime + event.secondsFromStart * 1000);
+            allRows.push([
+              eventTime,
+              new Date(eventTime).toISOString(),
+              event.secondsFromStart
+            ]);
+          });
+        }
+      }
+    });
+
+    // Build CSV content
+    const csvContent = allRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    const sessionNames = sessions.map(s => s.subject_identifier.replace(/[^a-z0-9]/gi, '_')).join('_');
+    link.setAttribute('download', `thermal_overlapped_sessions_${sessionNames}_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const exportToCSV = (session: ThermalSession) => {
     if (!session.samples || session.samples.length === 0) {
       alert('No sample data to export');
@@ -909,16 +1055,24 @@ export default function ThermalHistoryPage() {
     }
 
     try {
-      // Color palette for multiple sessions
-      const colors = [
-        { primary: 'rgb(34, 211, 238)', secondary: 'rgba(34, 211, 238, 0.1)' }, // Cyan
-        { primary: 'rgb(34, 197, 94)', secondary: 'rgba(34, 197, 94, 0.1)' }, // Green
-        { primary: 'rgb(251, 146, 60)', secondary: 'rgba(251, 146, 60, 0.1)' }, // Orange
-        { primary: 'rgb(168, 85, 247)', secondary: 'rgba(168, 85, 247, 0.1)' }, // Purple
-        { primary: 'rgb(239, 68, 68)', secondary: 'rgba(239, 68, 68, 0.1)' }, // Red
-        { primary: 'rgb(250, 204, 21)', secondary: 'rgba(250, 204, 21, 0.1)' }, // Yellow
-        { primary: 'rgb(59, 130, 246)', secondary: 'rgba(59, 130, 246, 0.1)' }, // Blue
-        { primary: 'rgb(236, 72, 153)', secondary: 'rgba(236, 72, 153, 0.1)' }, // Pink
+      // Distinct colors for each data type (easy to differentiate)
+      const dataTypeColors = {
+        motionVariance: { border: 'rgb(34, 211, 238)', background: 'rgba(34, 211, 238, 0.1)' }, // Cyan - Motion/Variance
+        avgTemp: { border: 'rgb(34, 197, 94)', background: 'rgba(34, 197, 94, 0.1)' }, // Green - Avg Temperature
+        tempRange: { border: 'rgb(251, 146, 60)', background: 'rgba(251, 146, 60, 0.1)' }, // Orange - Temp Range
+        tempChange: { border: 'rgb(168, 85, 247)', background: 'rgba(168, 85, 247, 0.1)' }, // Purple - Temp Change
+      };
+
+      // Color palette for session identification (used in legend)
+      const sessionColors = [
+        { primary: 'rgb(34, 211, 238)', name: 'Cyan' },
+        { primary: 'rgb(34, 197, 94)', name: 'Green' },
+        { primary: 'rgb(251, 146, 60)', name: 'Orange' },
+        { primary: 'rgb(168, 85, 247)', name: 'Purple' },
+        { primary: 'rgb(239, 68, 68)', name: 'Red' },
+        { primary: 'rgb(250, 204, 21)', name: 'Yellow' },
+        { primary: 'rgb(59, 130, 246)', name: 'Blue' },
+        { primary: 'rgb(236, 72, 153)', name: 'Pink' },
       ];
 
       const allDatasets: any[] = [];
@@ -945,7 +1099,6 @@ export default function ThermalHistoryPage() {
         // Find this session's start time (first sample timestamp)
         const sessionStartTime = samples[0]?.timestamp ?? new Date(session.started_at).getTime();
 
-        const color = colors[sessionIndex % colors.length];
         const sessionName = session.subject_identifier || `Session ${sessionIndex + 1}`;
 
         // Calculate seconds from this session's own start time (so all sessions start at x=0)
@@ -954,14 +1107,14 @@ export default function ThermalHistoryPage() {
           return { seconds, sample };
         });
 
-        // Create datasets for each metric
+        // Create datasets for each metric with distinct colors
         allDatasets.push(
           {
             label: `${sessionName} - Motion/Variance`,
             data: dataPoints.map(p => ({ x: p.seconds, y: p.sample.heatmapVariance ?? null })),
-            borderColor: color.primary,
-            backgroundColor: color.secondary,
-            borderWidth: 2,
+            borderColor: dataTypeColors.motionVariance.border,
+            backgroundColor: dataTypeColors.motionVariance.background,
+            borderWidth: 2.5,
             fill: false,
             tension: 0.4,
             pointRadius: 2,
@@ -971,41 +1124,41 @@ export default function ThermalHistoryPage() {
           {
             label: `${sessionName} - Avg Temp`,
             data: dataPoints.map(p => ({ x: p.seconds, y: p.sample.averageTemperature ?? null })),
-            borderColor: color.primary,
-            backgroundColor: color.secondary,
-            borderWidth: 1.5,
+            borderColor: dataTypeColors.avgTemp.border,
+            backgroundColor: dataTypeColors.avgTemp.background,
+            borderWidth: 2,
             fill: false,
             tension: 0.4,
-            pointRadius: 1,
+            pointRadius: 1.5,
             pointHoverRadius: 4,
             yAxisID: 'y2',
-            borderDash: [5, 5], // Dashed line for temperature
+            borderDash: [8, 4], // Dashed line for temperature
           },
           {
             label: `${sessionName} - Temp Range`,
             data: dataPoints.map(p => ({ x: p.seconds, y: p.sample.temperatureRange ?? null })),
-            borderColor: color.primary,
-            backgroundColor: color.secondary,
-            borderWidth: 1.5,
+            borderColor: dataTypeColors.tempRange.border,
+            backgroundColor: dataTypeColors.tempRange.background,
+            borderWidth: 2,
             fill: false,
             tension: 0.4,
-            pointRadius: 1,
+            pointRadius: 1.5,
             pointHoverRadius: 4,
             yAxisID: 'y1',
-            borderDash: [3, 3], // Different dash pattern
+            borderDash: [6, 3], // Dashed line
           },
           {
             label: `${sessionName} - Temp Change`,
             data: dataPoints.map(p => ({ x: p.seconds, y: p.sample.temperatureChange ?? null })),
-            borderColor: color.primary,
-            backgroundColor: color.secondary,
-            borderWidth: 1.5,
+            borderColor: dataTypeColors.tempChange.border,
+            backgroundColor: dataTypeColors.tempChange.background,
+            borderWidth: 2,
             fill: false,
             tension: 0.4,
-            pointRadius: 1,
+            pointRadius: 1.5,
             pointHoverRadius: 4,
             yAxisID: 'y1',
-            borderDash: [2, 2], // Different dash pattern
+            borderDash: [4, 2], // Dashed line
           }
         );
       });
@@ -1076,7 +1229,7 @@ export default function ThermalHistoryPage() {
         },
       },
       legend: {
-        display: true,
+        display: false, // Hide default legend, use custom dropdown instead
         position: 'top' as const,
         labels: {
           color: 'rgb(156, 163, 175)',
@@ -1888,34 +2041,84 @@ This indicates a problem with the session saving process.`);
                       );
                     }
                     
+                    // Get title for display above chart
+                    const defaultTitle = overlapMode 
+                      ? `${sessionsToDisplay.length} Sessions Overlapping`
+                      : sessionsToDisplay[0]?.subject_identifier || 'Unknown Subject';
+                    
+                    const currentTitle = graphTitle || defaultTitle;
+                    
                     return (
                       <div className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
                         <div className="mb-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-xl font-semibold">
-                              {overlapMode 
-                                ? `Motion Level Over Time - ${sessionsToDisplay.length} Sessions Overlapping`
-                                : `Motion Level Over Time - Subject: ${sessionsToDisplay[0]?.subject_identifier ?? 'Unknown'} (${sessionsToDisplay[0]?.samples?.length ?? 0} samples)`
-                              }
-                            </h3>
-                            {!overlapMode && sessionsToDisplay[0] && (
-                              <button
-                                onClick={() => {
-                                  if (sessionsToDisplay[0]) {
-                                    exportToCSV(sessionsToDisplay[0]);
-                                  }
-                                }}
-                                className="px-4 py-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all text-sm text-cyan-200"
-                              >
-                                Export CSV
-                              </button>
+                          {/* Title - Right above graph */}
+                          <div className="mb-2">
+                            {isEditingGraphTitle ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={editingGraphTitle}
+                                  onChange={(e) => setEditingGraphTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      setGraphTitle(editingGraphTitle.trim() || defaultTitle);
+                                      setIsEditingGraphTitle(false);
+                                      setEditingGraphTitle('');
+                                    } else if (e.key === 'Escape') {
+                                      setIsEditingGraphTitle(false);
+                                      setEditingGraphTitle('');
+                                    }
+                                  }}
+                                  className="flex-1 px-3 py-2 bg-gray-800 border border-cyan-400/50 rounded text-cyan-200 text-2xl font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => {
+                                    setGraphTitle(editingGraphTitle.trim() || defaultTitle);
+                                    setIsEditingGraphTitle(false);
+                                    setEditingGraphTitle('');
+                                  }}
+                                  className="px-3 py-2 bg-green-500/20 text-green-300 hover:bg-green-500/30 rounded text-sm transition-all"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setIsEditingGraphTitle(false);
+                                    setEditingGraphTitle('');
+                                  }}
+                                  className="px-3 py-2 bg-gray-500/20 text-gray-300 hover:bg-gray-500/30 rounded text-sm transition-all"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-2xl font-semibold text-cyan-200 flex-1">
+                                  {currentTitle}
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingGraphTitle(currentTitle);
+                                      setIsEditingGraphTitle(true);
+                                    }}
+                                    className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 rounded text-sm text-cyan-300 transition-all"
+                                    title="Edit title"
+                                  >
+                                    ✏️
+                                  </button>
+                                  {sessionsToDisplay.length > 0 && (
+                                    <button
+                                      onClick={() => exportMultipleSessionsToCSV(sessionsToDisplay)}
+                                      className="px-4 py-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all text-sm text-cyan-200"
+                                    >
+                                      Export CSV
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             )}
-                          </div>
-                          <div className="text-xs text-gray-400 space-y-1">
-                            <p><span className="text-orange-400">━━━</span> Orange line: Motion threshold (12.0) - values above indicate motion detected</p>
-                            <p><span className="text-yellow-400">━━ ━━</span> Yellow dashed: Manual move events | <span className="text-yellow-400">▼</span> Yellow triangles: Auto-detected movement</p>
-                            <p>Lines: <span className="text-cyan-400">Cyan</span> = Motion/Variance | <span className="text-green-400">Green</span> = Avg Temperature | <span className="text-orange-400">Orange</span> = Temp Range | <span className="text-purple-400">Purple</span> = Temp Change</p>
-                            {overlapMode && <p className="text-cyan-300 mt-2">💡 Each session uses a different color. Check legend to identify sessions.</p>}
                           </div>
                         </div>
                         <div className="h-96">
@@ -1931,6 +2134,32 @@ This indicates a problem with the session saving process.`);
                               options={getChartOptions(sessionsToDisplay)}
                             />
                           )}
+                        </div>
+                        {/* Legend - Right below graph, always visible */}
+                        <div className="mt-3 p-4 bg-white/5 border border-white/10 rounded-lg">
+                          <h4 className="text-cyan-200 font-semibold mb-3">Data Types (All Sessions)</h4>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-0.5" style={{ backgroundColor: 'rgb(34, 211, 238)' }} />
+                              <span className="text-gray-300 font-medium">Motion/Variance</span>
+                              <span className="text-gray-500 text-xs">(solid cyan line)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-0.5 border-dashed" style={{ borderTop: '2px dashed rgb(34, 197, 94)' }} />
+                              <span className="text-gray-300 font-medium">Average Temperature</span>
+                              <span className="text-gray-500 text-xs">(dashed green line)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-0.5 border-dashed" style={{ borderTop: '2px dashed rgb(251, 146, 60)' }} />
+                              <span className="text-gray-300 font-medium">Temperature Range</span>
+                              <span className="text-gray-500 text-xs">(dashed orange line)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-0.5 border-dashed" style={{ borderTop: '2px dashed rgb(168, 85, 247)' }} />
+                              <span className="text-gray-300 font-medium">Temperature Change</span>
+                              <span className="text-gray-500 text-xs">(dashed purple line)</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );

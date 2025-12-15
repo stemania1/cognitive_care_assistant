@@ -67,6 +67,10 @@ export default function EMGHistoryPage() {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isEditingGraphTitle, setIsEditingGraphTitle] = useState(false);
+  const [editingGraphTitle, setEditingGraphTitle] = useState<string>('');
+  const [graphTitle, setGraphTitle] = useState<string>('');
+  const [isLegendOpen, setIsLegendOpen] = useState(false);
 
   useEffect(() => {
     async function initializeUser() {
@@ -103,6 +107,26 @@ export default function EMGHistoryPage() {
       loadSessions();
     }
   }, [userId]);
+
+  // Sync graph title with selected session (only if not manually edited)
+  useEffect(() => {
+    if (overlapMode) {
+      if (selectedSessions.length > 0 && !isEditingGraphTitle) {
+        const defaultTitle = `${selectedSessions.length} Sessions Overlapping`;
+        // Only update if title is empty or matches the old default pattern
+        if (!graphTitle || graphTitle.match(/^\d+ Sessions Overlapping$/)) {
+          setGraphTitle(defaultTitle);
+        }
+      }
+    } else {
+      if (selectedSession && !isEditingGraphTitle) {
+        // Only update if title matches the session name (user hasn't customized it)
+        if (!graphTitle || graphTitle === selectedSession.session_name) {
+          setGraphTitle(selectedSession.session_name);
+        }
+      }
+    }
+  }, [selectedSession?.id, selectedSessions.length, overlapMode, isEditingGraphTitle]);
 
   const loadSessions = async () => {
     if (!userId) {
@@ -260,6 +284,84 @@ export default function EMGHistoryPage() {
     } finally {
       setIsRenaming(false);
     }
+  };
+
+  const exportMultipleSessionsToCSV = (sessions: EMGSession[]) => {
+    if (sessions.length === 0) {
+      alert('No sessions to export');
+      return;
+    }
+
+    if (sessions.length === 1) {
+      exportToCSV(sessions[0]);
+      return;
+    }
+
+    // Combine all sessions into one CSV
+    const allRows: any[] = [];
+    
+    sessions.forEach((session, sessionIndex) => {
+      if (!session.readings || session.readings.length === 0) {
+        return;
+      }
+
+      // Get move markers for this session
+      let moveMarkers: MoveMarker[] = [];
+      if (session.move_markers && Array.isArray(session.move_markers)) {
+        moveMarkers = session.move_markers;
+      } else if (session.readings) {
+        session.readings.forEach((reading) => {
+          if (reading.moveMarker && reading.timestamp) {
+            moveMarkers.push({
+              timestamp: reading.timestamp,
+              type: reading.moveMarker as 'request' | 'sensed' | 'end'
+            });
+          }
+        });
+      }
+
+      const markerMap = new Map<number, string>();
+      moveMarkers.forEach(marker => {
+        markerMap.set(marker.timestamp, marker.type);
+      });
+
+      // Add session header
+      if (sessionIndex > 0) {
+        allRows.push([]); // Empty row separator
+      }
+      allRows.push([`Session: ${session.session_name}`, `Started: ${new Date(session.started_at).toISOString()}`]);
+      allRows.push(['Timestamp', 'Date/Time', 'Voltage (V)', 'Muscle Activity (Raw)', 'Muscle Activity (%)', 'Move Marker']);
+
+      // Add readings for this session
+      session.readings.forEach(reading => {
+        const timestamp = typeof reading.timestamp === 'number' 
+          ? reading.timestamp 
+          : new Date(reading.timestamp as any).getTime();
+        const markerType = markerMap.get(timestamp) || '';
+        
+        allRows.push([
+          timestamp,
+          new Date(timestamp).toISOString(),
+          reading.voltage?.toFixed(3) || '',
+          reading.muscleActivity,
+          reading.muscleActivityProcessed.toFixed(2),
+          markerType
+        ]);
+      });
+    });
+
+    // Build CSV content
+    const csvContent = allRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const sessionNames = sessions.map(s => s.session_name.replace(/[^a-z0-9]/gi, '_')).join('_');
+    a.download = `emg_overlapped_sessions_${sessionNames}_${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   };
 
   const exportToCSV = (session: EMGSession) => {
@@ -687,7 +789,7 @@ export default function EMGHistoryPage() {
             },
           },
           legend: {
-            display: true,
+            display: false, // Hide default legend, use custom dropdown instead
             position: 'top' as const,
             labels: {
               color: 'rgb(156, 163, 175)',
@@ -1015,13 +1117,156 @@ export default function EMGHistoryPage() {
                   const options = getChartOptions(sessionsToDisplay);
                   const moveMarkerPlugin = (options as any)._moveMarkerPlugin;
                   
+                  // Get title for display above chart
+                  const defaultTitle = overlapMode 
+                    ? `${sessionsToDisplay.length} Sessions Overlapping`
+                    : sessionsToDisplay[0]?.session_name || 'EMG Session';
+                  
+                  const currentTitle = graphTitle || defaultTitle;
+                  
                   return (
-                    <div className="h-96">
-                      <Line 
-                        data={chartData} 
-                        options={options}
-                        plugins={moveMarkerPlugin ? [moveMarkerPlugin] : []}
-                      />
+                    <div>
+                      {/* Legend Dropdown */}
+                      <div className="mb-4">
+                        <button
+                          onClick={() => setIsLegendOpen(!isLegendOpen)}
+                          className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-left flex items-center justify-between transition-all"
+                        >
+                          <span className="text-cyan-300 font-medium">📊 Data Key / Legend</span>
+                          <span className="text-gray-400">{isLegendOpen ? '▼' : '▶'}</span>
+                        </button>
+                        {isLegendOpen && (
+                          <div className="mt-2 p-4 bg-white/5 border border-white/10 rounded-lg space-y-3">
+                            <div>
+                              <h4 className="text-cyan-200 font-semibold mb-2">Session Lines</h4>
+                              <div className="space-y-2 text-sm">
+                                {sessionsToDisplay.map((session, index) => {
+                                  const colors = [
+                                    { border: 'rgb(251, 146, 60)', name: 'Orange' },
+                                    { border: 'rgb(34, 211, 238)', name: 'Cyan' },
+                                    { border: 'rgb(34, 197, 94)', name: 'Green' },
+                                    { border: 'rgb(168, 85, 247)', name: 'Purple' },
+                                    { border: 'rgb(239, 68, 68)', name: 'Red' },
+                                    { border: 'rgb(250, 204, 21)', name: 'Yellow' },
+                                    { border: 'rgb(59, 130, 246)', name: 'Blue' },
+                                    { border: 'rgb(236, 72, 153)', name: 'Pink' },
+                                  ];
+                                  const color = colors[index % colors.length];
+                                  return (
+                                    <div key={session.id} className="flex items-center gap-2">
+                                      <div 
+                                        className="w-4 h-0.5" 
+                                        style={{ backgroundColor: color.border }}
+                                      />
+                                      <span className="text-gray-300">
+                                        {session.session_name} - Voltage (V)
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="text-cyan-200 font-semibold mb-2">Move Markers</h4>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-4 h-0.5 bg-blue-500" />
+                                  <span className="text-gray-300">Move Request (solid blue line)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-4 h-0.5 bg-green-500 border-dashed" style={{ borderTop: '2px dashed rgb(34, 197, 94)' }} />
+                                  <span className="text-gray-300">Sensed Move (dotted green line)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-4 h-0.5 bg-red-500" />
+                                  <span className="text-gray-300">End Move Event (solid red line)</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="text-cyan-200 font-semibold mb-2">Axis Information</h4>
+                              <div className="space-y-1 text-sm text-gray-400">
+                                <p>X-Axis: Time (seconds from start)</p>
+                                <p>Y-Axis: Voltage (V) - Range: 0V to 3.5V</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {/* Title - Right above graph */}
+                      <div className="mb-2">
+                        {isEditingGraphTitle ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={editingGraphTitle}
+                              onChange={(e) => setEditingGraphTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  setGraphTitle(editingGraphTitle.trim() || defaultTitle);
+                                  setIsEditingGraphTitle(false);
+                                  setEditingGraphTitle('');
+                                } else if (e.key === 'Escape') {
+                                  setIsEditingGraphTitle(false);
+                                  setEditingGraphTitle('');
+                                }
+                              }}
+                              className="flex-1 px-3 py-2 bg-white/10 border border-cyan-400/50 rounded text-cyan-200 text-2xl font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => {
+                                setGraphTitle(editingGraphTitle.trim() || defaultTitle);
+                                setIsEditingGraphTitle(false);
+                                setEditingGraphTitle('');
+                              }}
+                              className="px-3 py-2 bg-green-500/20 text-green-300 hover:bg-green-500/30 rounded text-sm transition-all"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIsEditingGraphTitle(false);
+                                setEditingGraphTitle('');
+                              }}
+                              className="px-3 py-2 bg-gray-500/20 text-gray-300 hover:bg-gray-500/30 rounded text-sm transition-all"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-2xl font-semibold text-cyan-200 flex-1">
+                              {currentTitle}
+                            </h3>
+                            <button
+                              onClick={() => {
+                                setEditingGraphTitle(currentTitle);
+                                setIsEditingGraphTitle(true);
+                              }}
+                              className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 rounded text-sm text-cyan-300 transition-all"
+                              title="Edit title"
+                            >
+                              ✏️
+                            </button>
+                            {sessionsToDisplay.length > 0 && (
+                              <button
+                                onClick={() => exportMultipleSessionsToCSV(sessionsToDisplay)}
+                                className="px-4 py-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 hover:bg-cyan-500/20 transition-all text-sm text-cyan-200"
+                              >
+                                Export CSV
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="h-96">
+                        <Line 
+                          data={chartData} 
+                          options={options}
+                          plugins={moveMarkerPlugin ? [moveMarkerPlugin] : []}
+                        />
+                      </div>
                     </div>
                   );
                 })()}
