@@ -11,8 +11,8 @@
 #include <ArduinoJson.h>
 
 // WiFi Configuration
-const char* ssid = "Dinosaur";
-const char* password = "AnnoyingKid2010!";
+const char* ssid = "";  //Your WiFi network
+const char* password = "";   //Your WiFi password
 
 // Server Configuration
 const char* server_host = "192.168.254.204";  // Your computer's IP
