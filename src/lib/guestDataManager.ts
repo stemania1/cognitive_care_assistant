@@ -242,8 +242,21 @@ export async function isGuestUser(): Promise<boolean> {
       
       // If there's an auth error (like refresh token issues), treat as no user
       if (error) {
-        console.log('Auth error (likely expired token):', error.message);
-        // Fall through to localStorage check
+        // Check if it's an "Auth session missing" error - this is normal when not logged in
+        if (error.message && (error.message.includes('Auth session missing') || error.message.includes('session missing'))) {
+          // This is normal when there's no session - fall through to localStorage check
+          console.log('No auth session (user not logged in), checking localStorage for guest session');
+        } else if (error.message && (error.message.includes('Refresh Token') || error.message.includes('refresh_token'))) {
+          // Check if it's a refresh token error - if so, it will be handled by the error handler
+          console.log('Auth error (likely expired token):', error.message);
+          // Import and call the handler
+          const { handleRefreshTokenError } = await import('@/lib/supabaseClient');
+          await handleRefreshTokenError();
+          return false; // Return false since we're redirecting
+        } else {
+          console.log('Auth error:', error.message);
+        }
+        // Fall through to localStorage check for other errors
       } else if (user) {
         // If user is authenticated via Supabase
         if (user.is_anonymous) {
@@ -263,10 +276,16 @@ export async function isGuestUser(): Promise<boolean> {
         localStorage.removeItem('cognitive_care_guest_session');
         return false;
       }
-    } catch (authError) {
+    } catch (authError: any) {
       // If Supabase auth fails (network issues, expired tokens, etc.), 
       // fall back to localStorage check only
-      console.log('Supabase auth check failed:', authError);
+      // Specifically ignore "Auth session missing" errors as they're expected when not logged in
+      if (authError?.message && (authError.message.includes('Auth session missing') || authError.message.includes('session missing'))) {
+        // This is normal - just continue to localStorage check
+        console.log('No auth session (expected when not logged in), checking localStorage');
+      } else {
+        console.log('Supabase auth check failed:', authError);
+      }
     }
     
     // FALLBACK: Only check localStorage if no Supabase user found

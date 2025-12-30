@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { supabase, handleRefreshTokenError } from '@/lib/supabaseClient';
+import { supabase, handleRefreshTokenError, safeGetUser } from '@/lib/supabaseClient';
 import { isGuestUser } from '@/lib/guestDataManager';
 import Link from 'next/link';
 
@@ -25,7 +25,13 @@ export function UserStatusIndicator() {
         }
 
         // Check for regular user
-        const { data: { user } } = await supabase.auth.getUser();
+        const { user, error } = await safeGetUser();
+        if (error) {
+          console.error('Error checking user status:', error);
+          setUserEmail(null);
+          setIsGuest(false);
+          return;
+        }
         if (user) {
           setUserEmail(user.email || null);
           setIsGuest(false);
@@ -35,14 +41,6 @@ export function UserStatusIndicator() {
         }
       } catch (error) {
         console.error('Error checking user status:', error);
-        
-        // Check if it's a refresh token error
-        if (error instanceof Error && error.message.includes('Refresh Token')) {
-          console.log('Refresh token error detected, handling...');
-          await handleRefreshTokenError();
-          return;
-        }
-        
         setUserEmail(null);
         setIsGuest(false);
       } finally {

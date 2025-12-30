@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
 import {
   Chart as ChartJS,
@@ -84,8 +84,11 @@ export default function EMGHistoryPage() {
           console.log('🎭 Guest user ID:', guestUserId);
           setUserId(guestUserId);
         } else {
-          const { data: { user } } = await supabase.auth.getUser();
+          const { user, error } = await safeGetUser();
           console.log('🔑 Supabase user:', user);
+          if (error) {
+            console.log('⚠️ Auth error:', error.message);
+          }
           if (user?.id) {
             console.log('✅ Setting user ID:', user.id);
             setUserId(user.id);
@@ -616,6 +619,7 @@ export default function EMGHistoryPage() {
       // For overlapping graphs, each session starts at x=0, so we need to calculate
       // markers relative to each session's own start time
       let allMoveMarkers: Array<{ marker: MoveMarker; sessionName: string; sessionStartTime: number }> = [];
+      let allMovementPeaks: Array<{ peak: { timestamp: number; voltage: number; seconds: number }; sessionName: string; sessionStartTime: number }> = [];
       
       sessionsToDisplay.forEach(session => {
         // Get this session's start time
@@ -654,16 +658,108 @@ export default function EMGHistoryPage() {
             sessionStartTime 
           });
         });
+
+        // Calculate peaks for each movement period
+        if (session.readings && session.readings.length > 0 && sessionMarkers.length > 0) {
+          // Sort markers by timestamp
+          const sortedMarkers = [...sessionMarkers].sort((a, b) => a.timestamp - b.timestamp);
+          
+          // Find movement periods (from request/sensed to end)
+          // Pair each start marker with the next end marker to ensure unique periods
+          let endMarkerIndex = 0;
+          
+          for (let i = 0; i < sortedMarkers.length; i++) {
+            const startMarker = sortedMarkers[i];
+            if (startMarker.type === 'request' || startMarker.type === 'sensed') {
+              // Find the next 'end' marker after this start marker
+              let endMarker: MoveMarker | null = null;
+              for (let j = Math.max(i + 1, endMarkerIndex); j < sortedMarkers.length; j++) {
+                if (sortedMarkers[j].type === 'end') {
+                  endMarker = sortedMarkers[j];
+                  endMarkerIndex = j + 1; // Move past this end marker for next iteration
+                  break;
+                }
+              }
+              
+              if (endMarker) {
+                // Find peak voltage within this specific period only
+                const periodReadings = session.readings
+                  .map(reading => {
+                    // Calculate voltage if not present
+                    let voltage = reading.voltage;
+                    if (voltage === undefined || voltage === null) {
+                      if (reading.muscleActivity !== undefined && reading.muscleActivity !== null) {
+                        voltage = (reading.muscleActivity * 3.3) / 4095.0;
+                      } else {
+                        voltage = 0;
+                      }
+                    }
+                    
+                    const timestamp = typeof reading.timestamp === 'number' 
+                      ? reading.timestamp 
+                      : new Date(reading.timestamp as any).getTime();
+                    
+                    return {
+                      ...reading,
+                      timestamp,
+                      voltage
+                    };
+                  })
+                  .filter(reading => {
+                    return reading.timestamp >= startMarker.timestamp && 
+                           reading.timestamp <= endMarker.timestamp && 
+                           reading.voltage !== undefined && 
+                           reading.voltage !== null &&
+                           reading.voltage > 0;
+                  });
+                
+                if (periodReadings.length > 0) {
+                  // Find the reading with maximum voltage within THIS period only
+                  let peakReading = periodReadings[0];
+                  let maxVoltage = peakReading.voltage || 0;
+                  
+                  for (const reading of periodReadings) {
+                    const readingVoltage = reading.voltage || 0;
+                    if (readingVoltage > maxVoltage) {
+                      maxVoltage = readingVoltage;
+                      peakReading = reading;
+                    }
+                  }
+                  
+                  if (peakReading.voltage !== undefined && peakReading.voltage !== null) {
+                    const peakTimestamp = typeof peakReading.timestamp === 'number' 
+                      ? peakReading.timestamp 
+                      : new Date(peakReading.timestamp as any).getTime();
+                    const peakSeconds = (peakTimestamp - sessionStartTime) / 1000;
+                    
+                    console.log(`📊 Movement period peak:`, {
+                      period: `Start: ${new Date(startMarker.timestamp).toISOString()} → End: ${new Date(endMarker.timestamp).toISOString()}`,
+                      peakVoltage: peakReading.voltage,
+                      peakTimestamp: new Date(peakTimestamp).toISOString(),
+                      readingsInPeriod: periodReadings.length
+                    });
+                    
+                    allMovementPeaks.push({
+                      peak: {
+                        timestamp: peakTimestamp,
+                        voltage: peakReading.voltage,
+                        seconds: peakSeconds
+                      },
+                      sessionName: session.session_name,
+                      sessionStartTime
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
       });
 
-      // Create plugin to draw move markers (will be added to plugins array)
+      // Create plugin to draw move markers and peaks (will be added to plugins array)
       const moveMarkerPlugin = {
         id: 'moveMarkerLines',
         afterDraw: (chart: any) => {
-          if (!allMoveMarkers || allMoveMarkers.length === 0) {
-            return;
-          }
-
           const ctx = chart.ctx;
           const xScale = chart.scales.x;
           const yScale = chart.scales.y;
@@ -673,6 +769,9 @@ export default function EMGHistoryPage() {
           }
 
           ctx.save();
+
+          // Draw move markers
+          if (allMoveMarkers && allMoveMarkers.length > 0) {
 
           let drawnCount = 0;
           allMoveMarkers.forEach(({ marker, sessionName, sessionStartTime }, index) => {
@@ -766,8 +865,51 @@ export default function EMGHistoryPage() {
             }
           });
 
+          }
+
+          // Draw movement peaks
+          if (allMovementPeaks && allMovementPeaks.length > 0) {
+            let peaksDrawn = 0;
+            allMovementPeaks.forEach(({ peak, sessionName, sessionStartTime }) => {
+              const peakSeconds = (peak.timestamp - sessionStartTime) / 1000;
+              
+              try {
+                const xPos = xScale.getPixelForValue(peakSeconds);
+                const yPos = yScale.getPixelForValue(peak.voltage);
+                
+                if (xPos !== null && !isNaN(xPos) && isFinite(xPos) && 
+                    yPos !== null && !isNaN(yPos) && isFinite(yPos) &&
+                    xPos >= xScale.left && xPos <= xScale.right &&
+                    yPos >= yScale.top && yPos <= yScale.bottom) {
+                  
+                  // Draw peak point (larger circle)
+                  ctx.fillStyle = 'rgb(250, 204, 21)'; // Yellow
+                  ctx.strokeStyle = 'rgb(217, 119, 6)'; // Darker yellow border
+                  ctx.lineWidth = 2;
+                  ctx.beginPath();
+                  ctx.arc(xPos, yPos, 6, 0, 2 * Math.PI);
+                  ctx.fill();
+                  ctx.stroke();
+                  
+                  // Draw peak value label
+                  ctx.fillStyle = 'rgb(250, 204, 21)';
+                  ctx.font = 'bold 11px sans-serif';
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'bottom';
+                  ctx.fillText(`${peak.voltage.toFixed(2)}V`, xPos, yPos - 8);
+                  
+                  peaksDrawn++;
+                }
+              } catch (error) {
+                console.warn('⚠️ Error drawing peak:', error);
+              }
+            });
+            console.log(`✅ Drew ${allMoveMarkers.length} move markers and ${peaksDrawn} movement peaks`);
+          } else if (allMoveMarkers && allMoveMarkers.length > 0) {
+            console.log(`✅ Drew ${allMoveMarkers.length} move markers`);
+          }
+
           ctx.restore();
-          console.log(`✅ Drew ${drawnCount} of ${allMoveMarkers.length} move markers`);
         },
       };
 
@@ -852,8 +994,9 @@ export default function EMGHistoryPage() {
         },
       };
 
-      // Store the plugin on chartOptions so it can be retrieved in the render function
+      // Store the plugin and peaks on chartOptions so it can be retrieved in the render function
       chartOptions._moveMarkerPlugin = moveMarkerPlugin;
+      chartOptions._movementPeaks = allMovementPeaks;
 
       return chartOptions;
     } catch (error) {
@@ -1166,23 +1309,27 @@ export default function EMGHistoryPage() {
                                 })}
                               </div>
                             </div>
-                            <div>
-                              <h4 className="text-cyan-200 font-semibold mb-2">Move Markers</h4>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-4 h-0.5 bg-blue-500" />
-                                  <span className="text-gray-300">Move Request (solid blue line)</span>
+                                <div>
+                                  <h4 className="text-cyan-200 font-semibold mb-2">Move Markers</h4>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-4 h-0.5 bg-blue-500" />
+                                      <span className="text-gray-300">Move Request (solid blue line)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-4 h-0.5 bg-green-500 border-dashed" style={{ borderTop: '2px dashed rgb(34, 197, 94)' }} />
+                                      <span className="text-gray-300">Sensed Move (dotted green line)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-4 h-0.5 bg-red-500" />
+                                      <span className="text-gray-300">End Move Event (solid red line)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-3 h-3 rounded-full bg-yellow-500 border-2" style={{ borderColor: 'rgb(217, 119, 6)' }} />
+                                      <span className="text-gray-300">Movement Peak (yellow circle with voltage label)</span>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-4 h-0.5 bg-green-500 border-dashed" style={{ borderTop: '2px dashed rgb(34, 197, 94)' }} />
-                                  <span className="text-gray-300">Sensed Move (dotted green line)</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-4 h-0.5 bg-red-500" />
-                                  <span className="text-gray-300">End Move Event (solid red line)</span>
-                                </div>
-                              </div>
-                            </div>
                             <div>
                               <h4 className="text-cyan-200 font-semibold mb-2">Axis Information</h4>
                               <div className="space-y-1 text-sm text-gray-400">

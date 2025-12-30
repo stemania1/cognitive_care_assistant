@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
 import {
   Chart as ChartJS,
@@ -367,8 +367,11 @@ export default function ThermalHistoryPage() {
           console.log('🎭 Guest user ID:', guestUserId);
           setUserId(guestUserId);
         } else {
-          const { data: { user } } = await supabase.auth.getUser();
+          const { user, error } = await safeGetUser();
           console.log('🔑 Supabase user:', user);
+          if (error) {
+            console.log('⚠️ Auth error:', error.message);
+          }
           if (user?.id) {
             console.log('✅ Setting user ID:', user.id);
             setUserId(user.id);

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from "next/link";
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, safeGetUser } from '@/lib/supabaseClient';
 import { isGuestUser, getGuestUserId } from '@/lib/guestDataManager';
 import MyoWareClient from '../components/MyoWareClient';
 import EMGChart from '../components/EMGChart';
@@ -767,7 +767,7 @@ export default function EMGPage() {
 
     setSaveStatus('saving');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { user } = await safeGetUser();
       const userId = user?.id || (await isGuestUser() ? getGuestUserId() : 'guest');
       
       // Calculate stats and ensure voltage is included in readings

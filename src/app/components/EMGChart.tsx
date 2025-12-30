@@ -71,7 +71,13 @@ const EMGChart: React.FC<EMGChartProps> = ({ data, isConnected, onReset, moveMar
   const moveMarkersRef = useRef<MoveMarker[]>(moveMarkers);
   const chartRef = useRef<any>(null);
   const [markerUpdateTick, setMarkerUpdateTick] = useState(0); // Force re-render when markers change
+  const dataRef = useRef<EMGData[]>(data); // Store data for peak calculation
   
+  // Update refs when data or moveMarkers change
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
   // Update ref when moveMarkers change and force chart redraw
   useEffect(() => {
     moveMarkersRef.current = moveMarkers;
@@ -357,9 +363,97 @@ const EMGChart: React.FC<EMGChartProps> = ({ data, isConnected, onReset, moveMar
         }
       });
 
+      // Calculate and draw movement peaks
+      const currentData = dataRef.current;
+      if (currentData && currentData.length > 0 && markers.length > 0) {
+        // Sort markers by timestamp
+        const sortedMarkers = [...markers].sort((a, b) => a.timestamp - b.timestamp);
+        
+        // Find movement periods and their peaks
+        // Pair each start marker with the next end marker to ensure unique periods
+        let endMarkerIndex = 0;
+        
+        for (let i = 0; i < sortedMarkers.length; i++) {
+          const startMarker = sortedMarkers[i];
+          if (startMarker.type === 'request' || startMarker.type === 'sensed') {
+            // Find the next 'end' marker after this start marker
+            let endMarker: MoveMarker | null = null;
+            for (let j = Math.max(i + 1, endMarkerIndex); j < sortedMarkers.length; j++) {
+              if (sortedMarkers[j].type === 'end') {
+                endMarker = sortedMarkers[j];
+                endMarkerIndex = j + 1; // Move past this end marker for next iteration
+                break;
+              }
+            }
+            
+            if (endMarker) {
+              // Find peak voltage within this specific period only
+              const periodData = currentData.filter(d => {
+                const timestamp = d.timestamp;
+                return timestamp >= startMarker.timestamp && timestamp <= endMarker.timestamp && d.voltage !== undefined && d.voltage !== null;
+              });
+              
+              if (periodData.length > 0) {
+                // Find the data point with maximum voltage within THIS period only
+                let peakData = periodData[0];
+                let maxVoltage = peakData.voltage || 0;
+                
+                for (const d of periodData) {
+                  const dataVoltage = d.voltage || 0;
+                  if (dataVoltage > maxVoltage) {
+                    maxVoltage = dataVoltage;
+                    peakData = d;
+                  }
+                }
+                
+                if (peakData.voltage !== undefined && peakData.voltage !== null) {
+                  const peakSeconds = (peakData.timestamp - base) / 1000;
+                  
+                  console.log(`📊 Live movement period peak:`, {
+                    period: `Start: ${new Date(startMarker.timestamp).toISOString()} → End: ${new Date(endMarker.timestamp).toISOString()}`,
+                    peakVoltage: peakData.voltage,
+                    peakTimestamp: new Date(peakData.timestamp).toISOString(),
+                    dataPointsInPeriod: periodData.length
+                  });
+                  
+                  try {
+                    const xPos = xScale.getPixelForValue(peakSeconds);
+                    const yPos = yScale.getPixelForValue(peakData.voltage);
+                    
+                    if (xPos !== null && !isNaN(xPos) && isFinite(xPos) && 
+                        yPos !== null && !isNaN(yPos) && isFinite(yPos) &&
+                        xPos >= xScale.left && xPos <= xScale.right &&
+                        yPos >= yScale.top && yPos <= yScale.bottom) {
+                      
+                      // Draw peak point (larger circle)
+                      ctx.fillStyle = 'rgb(250, 204, 21)'; // Yellow
+                      ctx.strokeStyle = 'rgb(217, 119, 6)'; // Darker yellow border
+                      ctx.lineWidth = 2;
+                      ctx.beginPath();
+                      ctx.arc(xPos, yPos, 6, 0, 2 * Math.PI);
+                      ctx.fill();
+                      ctx.stroke();
+                      
+                      // Draw peak value label
+                      ctx.fillStyle = 'rgb(250, 204, 21)';
+                      ctx.font = 'bold 11px sans-serif';
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'bottom';
+                      ctx.fillText(`${peakData.voltage.toFixed(2)}V`, xPos, yPos - 8);
+                    }
+                  } catch (error) {
+                    console.warn('⚠️ Error drawing peak:', error);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       ctx.restore();
     },
-  }), [moveMarkers, markerUpdateTick, sessionStartTime]); // Include dependencies to trigger re-render when markers change
+  }), [moveMarkers, markerUpdateTick, sessionStartTime, data]); // Include dependencies to trigger re-render when markers change
 
   const options = {
     responsive: true,

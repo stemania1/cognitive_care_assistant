@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useHistoricalData } from "@/hooks/useHistoricalData";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { ALL_QUESTIONS } from "@/constants/questions";
 import { DailyCheckSession, RecentAnswer } from "@/types/daily-questions";
 
@@ -28,7 +28,7 @@ export default function QuestionsHistoryPage() {
           setUserId(guestUserId);
         } else {
           // For regular users, get the actual user ID from Supabase
-      const { data: { user } } = await supabase.auth.getUser();
+          const { user } = await safeGetUser();
           if (user?.id) {
             setUserId(user.id);
           } else {

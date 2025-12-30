@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useDailyChecks } from "@/lib/useDailyChecks";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { getTodayKey } from "@/utils/date";
 import { ALL_QUESTIONS } from "@/constants/questions";
 import { useQuestionNavigation } from "@/hooks/useQuestionNavigation";
@@ -48,7 +48,7 @@ export default function DailyQuestionsPage() {
   useEffect(() => {
     const getUser = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const { user, error } = await safeGetUser();
         
         // If there's an auth error (like refresh token issues), check for guest session
         if (error) {

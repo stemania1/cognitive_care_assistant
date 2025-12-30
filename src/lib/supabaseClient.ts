@@ -43,4 +43,46 @@ export const handleRefreshTokenError = async () => {
   }
 };
 
+// Wrapper function to safely get user, handling refresh token errors
+export const safeGetUser = async () => {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (error) {
+      // Check if it's a refresh token error
+      if (error.message && (error.message.includes('Refresh Token') || error.message.includes('refresh_token'))) {
+        console.log('Refresh token error in safeGetUser, handling...');
+        await handleRefreshTokenError();
+        return { user: null, error: null };
+      }
+      
+      // Check if it's an "Auth session missing" error - this is normal when not logged in
+      if (error.message && (error.message.includes('Auth session missing') || error.message.includes('session missing'))) {
+        // This is normal when there's no session - just return no user
+        return { user: null, error: null };
+      }
+      
+      // For other errors, just return them
+      return { user: null, error };
+    }
+    
+    return { user, error: null };
+  } catch (err: any) {
+    // Check if it's a refresh token error
+    if (err?.message && (err.message.includes('Refresh Token') || err.message.includes('refresh_token'))) {
+      console.log('Refresh token error caught in safeGetUser, handling...');
+      await handleRefreshTokenError();
+      return { user: null, error: null };
+    }
+    
+    // Check if it's an "Auth session missing" error - this is normal when not logged in
+    if (err?.message && (err.message.includes('Auth session missing') || err.message.includes('session missing'))) {
+      // This is normal when there's no session - just return no user
+      return { user: null, error: null };
+    }
+    
+    return { user: null, error: err };
+  }
+};
+
 

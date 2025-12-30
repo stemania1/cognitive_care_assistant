@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import ThermalVisualization from "../components/ThermalVisualization";
 import { useAlertCenter } from "../components/AlertCenter";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
 import {
   Chart as ChartJS,
@@ -840,7 +840,7 @@ export default function SleepBehaviors() {
           const guestUserId = getGuestUserId();
           setUserId(guestUserId);
         } else {
-          const { data: { user } } = await supabase.auth.getUser();
+          const { user } = await safeGetUser();
           if (user?.id) {
             setUserId(user.id);
           }

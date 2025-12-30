@@ -114,3 +114,6 @@ The EMG server acts as a bridge between your Arduino (port 3001) and Next.js (po
 
 
 
+
+
+

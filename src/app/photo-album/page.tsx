@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, safeGetUser } from "@/lib/supabaseClient";
 
 interface PhotoEntry {
   id: string;
@@ -25,7 +25,7 @@ export default function PhotoAlbumPage() {
   // Get current user
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { user } = await safeGetUser();
       setUserId(user?.id || null);
     };
     getUser();
