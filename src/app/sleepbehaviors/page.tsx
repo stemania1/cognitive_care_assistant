@@ -7,32 +7,13 @@ import ThermalVisualization from "../components/ThermalVisualization";
 import { useAlertCenter } from "../components/AlertCenter";
 import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { ThermalData, ThermalMetricSnapshot } from '@/types/thermal';
 import { THERMAL_METRICS } from '@/constants/thermal-metrics';
+import { registerChartJS } from '@/utils/chart-registration';
 
 // Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+registerChartJS();
 
 // Component for live motion chart during recording
 interface LiveMotionChartProps {

@@ -10,6 +10,8 @@ import WorkoutVideo from '../components/WorkoutVideo';
 import { EMGData, MoveMarker, WorkoutExercise } from '@/types/emg';
 import { WORKOUT_ROUTINES } from '@/constants/workouts';
 import { EMG_METRICS } from '@/constants/emg-metrics';
+import { exportCSV, formatTimestampForCSV, generateFilenameWithDate } from '@/utils/csv-export';
+import { formatTime, formatToISO, formatToLocaleString, getDateString } from '@/utils/date-formatting';
 
 export default function EMGPage() {
   const [isConnected, setIsConnected] = useState(false);
@@ -334,13 +336,6 @@ export default function EMGPage() {
     };
   }, [isRecordingSession, sessionStartTime]);
 
-  // Format time as MM:SS
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const stopRecording = async () => {
     // Stop recording first
     isRecordingSessionRef.current = false; // Update ref immediately
@@ -464,9 +459,9 @@ export default function EMGPage() {
 
       const sessionData = {
         userId,
-        sessionName: recordingName || `EMG Session ${new Date().toLocaleString()}`,
-        startedAt: sessionStartTime ? new Date(sessionStartTime).toISOString() : new Date().toISOString(),
-        endedAt: new Date().toISOString(),
+        sessionName: recordingName || `EMG Session ${formatToLocaleString(new Date())}`,
+        startedAt: sessionStartTime ? formatToISO(sessionStartTime) : formatToISO(new Date()),
+        endedAt: formatToISO(new Date()),
         durationSeconds: Math.round((Date.now() - (sessionStartTime || Date.now())) / 1000),
         readings: readings, // Stores the full JSON array (includes moveMarker property on individual readings)
         moveMarkers: moveMarkersRef.current, // Also store move markers as separate array for easy querying
@@ -583,25 +578,14 @@ export default function EMGPage() {
     const headers = ['Timestamp', 'Date/Time', 'Voltage (V)', 'Muscle Activity (Raw)', 'Muscle Activity (%)'];
     const rows = recordedSessionDataRef.current.map(d => [
       d.timestamp,
-      new Date(d.timestamp).toISOString(),
+      formatTimestampForCSV(d.timestamp),
       d.voltage?.toFixed(4) || '0',
       d.muscleActivity,
       d.muscleActivityProcessed.toFixed(2)
     ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${recordingName || 'emg-recording'}_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const filename = generateFilenameWithDate(recordingName || 'emg-recording');
+    exportCSV(headers, rows, filename);
   };
 
   // Fetch real-time data from API with retry mechanism

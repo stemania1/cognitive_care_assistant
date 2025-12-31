@@ -4,31 +4,12 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { EMGData, MoveMarker } from '@/types/emg';
+import { registerChartJS } from '@/utils/chart-registration';
 
 // Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+registerChartJS();
 
 // Alias for compatibility
 type EMGReading = EMGData;

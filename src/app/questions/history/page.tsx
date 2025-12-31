@@ -7,6 +7,7 @@ import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
 import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { ALL_QUESTIONS } from "@/constants/questions";
 import { DailyCheckSession, RecentAnswer } from "@/types/daily-questions";
+import { exportCSV } from "@/utils/csv-export";
 
 export default function QuestionsHistoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -257,7 +258,7 @@ export default function QuestionsHistoryPage() {
   const exportToCSV = () => {
     try {
       const headers = ['Date', 'Time', 'Completion Time', ...ALL_QUESTIONS.map(q => `Q${ALL_QUESTIONS.indexOf(q) + 1}: ${q.text}`)];
-      const rows = [headers];
+      const rows: (string | number)[][] = [];
       
       questionnaireData.forEach(questionnaire => {
         const { date, time } = formatDateTime(questionnaire.createdAt);
@@ -272,19 +273,7 @@ export default function QuestionsHistoryPage() {
         rows.push(row);
       });
       
-      const csv = rows
-        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-        .join('\r\n');
-      
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'questionnaire_history.csv';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      exportCSV(headers, rows, 'questionnaire_history.csv', true);
     } catch (error) {
       console.error('Error exporting CSV:', error);
       alert('Failed to export CSV. Please try again.');

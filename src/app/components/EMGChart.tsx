@@ -1,31 +1,12 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { EMGData, MoveMarker } from '@/types/emg';
+import { registerChartJS } from '@/utils/chart-registration';
 
 // Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+registerChartJS();
 
 interface EMGChartProps {
   data: EMGData[];

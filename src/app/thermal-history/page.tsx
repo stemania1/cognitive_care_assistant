@@ -5,30 +5,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import { registerChartJS } from '@/utils/chart-registration';
 
 // Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+registerChartJS();
 
 // Component wrapper to add move event lines to chart
 function MoveEventChart({ data, options, session }: { data: any; options: any; session: ThermalSession }) {
