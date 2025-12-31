@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,24 +12,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
       return NextResponse.json({ 
-        error: 'Service role key not configured', 
-        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
       }, { status: 500 });
     }
-
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
 
     console.log('🔍 Fetching EMG sessions for userId:', userId, 'limit:', limit, 'debug:', debug);
     
@@ -115,24 +104,13 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
       return NextResponse.json({ 
-        error: 'Service role key not configured', 
-        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
       }, { status: 500 });
     }
-
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
 
     // Log the data being inserted for debugging
     console.log('📝 Inserting EMG session:', {
@@ -209,24 +187,13 @@ export async function PATCH(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
       return NextResponse.json({ 
-        error: 'Service role key not configured', 
-        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
       }, { status: 500 });
     }
-
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
 
     // Update the session's session_name
     const { data: updatedSession, error } = await supabaseAdmin
@@ -264,24 +231,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'User ID and Session ID are required' }, { status: 400 });
     }
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
       return NextResponse.json({ 
-        error: 'Service role key not configured', 
-        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
       }, { status: 500 });
     }
-
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
 
     // Delete the session
     const { error } = await supabaseAdmin

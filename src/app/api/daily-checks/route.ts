@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,42 +19,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Create a Supabase client with service role key for admin operations
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    
-    console.log('Environment check:', {
-      hasServiceRoleKey: !!serviceRoleKey,
-      hasSupabaseUrl: !!supabaseUrl,
-      serviceRoleKeyLength: serviceRoleKey?.length || 0
-    });
-
-    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
       console.log('Service role key not configured properly');
       return NextResponse.json({ 
-        error: 'Service role key not configured', 
-        details: 'Please create .env.local file with SUPABASE_SERVICE_ROLE_KEY. See README for setup instructions.' 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please create .env.local file with SUPABASE_SERVICE_ROLE_KEY. See README for setup instructions.' 
       }, { status: 500 });
     }
-
-    if (!supabaseUrl) {
-      console.log('Supabase URL not configured');
-      return NextResponse.json({ 
-        error: 'Supabase URL not configured', 
-        details: 'Please create .env.local file with NEXT_PUBLIC_SUPABASE_URL. See README for setup instructions.' 
-      }, { status: 500 });
-    }
-
-    console.log('Creating Supabase admin client');
-    const supabaseAdmin = createClient(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
 
     console.log('Building query for daily_checks table');
     const query = supabaseAdmin
@@ -107,24 +79,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a Supabase client with service role key for admin operations
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
       return NextResponse.json({ 
-        error: 'Service role key not configured', 
-        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
       }, { status: 500 });
     }
-
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
 
     // Check if answer already exists for this user, question, and date
     const { data: existing } = await supabaseAdmin
@@ -196,24 +157,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Create a Supabase client with service role key for admin operations
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
       return NextResponse.json({ 
-        error: 'Service role key not configured', 
-        details: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
       }, { status: 500 });
     }
-
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
 
     if (entryId) {
       // Delete specific entry (for photo deletion)

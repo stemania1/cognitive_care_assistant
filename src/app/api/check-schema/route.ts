@@ -1,27 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
   try {
     console.log('=== DATABASE SCHEMA CHECK ===');
     
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    
-    if (!serviceRoleKey || !supabaseUrl) {
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
       return NextResponse.json({ 
-        error: 'Missing environment variables',
-        hasServiceRoleKey: !!serviceRoleKey,
-        hasSupabaseUrl: !!supabaseUrl
+        error: adminError?.message || 'Missing environment variables',
+        details: adminError?.details
       }, { status: 500 });
     }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
 
     // Check daily_checks table schema
     const { data: dailyChecksSchema, error: dailyChecksError } = await supabaseAdmin

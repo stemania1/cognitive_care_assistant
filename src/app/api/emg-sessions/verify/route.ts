@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseAdminClient } from '@/lib/supabase-admin';
 
 /**
  * Diagnostic endpoint to verify EMG sessions table setup
@@ -42,34 +42,18 @@ export async function GET(request: NextRequest) {
       }
     };
 
-    // Check if service role key is configured
-    if (!serviceRoleKey || serviceRoleKey === '<your-service-role-key>') {
-      return NextResponse.json({
-        ...diagnostics,
-        error: 'Service role key not configured',
-        message: 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local'
-      }, { status: 500 });
-    }
-
-    if (!supabaseUrl) {
-      return NextResponse.json({
-        ...diagnostics,
-        error: 'Supabase URL not configured',
-        message: 'Please set NEXT_PUBLIC_SUPABASE_URL in .env.local'
-      }, { status: 500 });
-    }
-
     // Create admin client
-    const supabaseAdmin = createClient(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    let supabaseAdmin;
+    try {
+      supabaseAdmin = createSupabaseAdminClient();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return NextResponse.json({
+        ...diagnostics,
+        error: 'Service role key or Supabase URL not configured',
+        message: errorMessage
+      }, { status: 500 });
+    }
 
     // Check if table exists by trying to query it
     try {
