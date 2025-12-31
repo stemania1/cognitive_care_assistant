@@ -12,6 +12,7 @@ import { WORKOUT_ROUTINES } from '@/constants/workouts';
 import { EMG_METRICS } from '@/constants/emg-metrics';
 import { exportCSV, formatTimestampForCSV, generateFilenameWithDate } from '@/utils/csv-export';
 import { formatTime, formatToISO, formatToLocaleString, getDateString } from '@/utils/date-formatting';
+import { processMyoWareData, calculateVoltage, detectMove, createSensedMoveMarker, calculateEMGStats } from '@/utils/emg-processing';
 
 export default function EMGPage() {
   const [isConnected, setIsConnected] = useState(false);
@@ -57,17 +58,11 @@ export default function EMGPage() {
 
 
   // MyoWare 2.0 data processing functions
-  const processMyoWareData = (rawValue: number): number => {
+  const processMyoWareDataLocal = (rawValue: number): number => {
     // MyoWare 2.0 outputs 0-1023 analog range (0-5V)
     // Convert to percentage based on calibration data
     const cal = calibrationData['muscleActivity'];
-    if (!cal) return 0;
-    const range = cal.max - cal.min;
-    if (range <= 0) return 0;
-    const normalized = Math.max(0, Math.min(100,
-      ((rawValue - cal.min) / range) * 100
-    ));
-    return normalized;
+    return processMyoWareData(rawValue, cal || null);
   };
 
   // Note: Simulation functions removed - only real MyoWare device data is used
@@ -80,30 +75,22 @@ export default function EMGPage() {
     if (isRecordingSessionRef.current && data.voltage !== undefined && data.voltage !== null) {
       const currentVoltage = data.voltage;
       
-      if (lastVoltageRef.current !== null) {
-        const voltageChange = Math.abs(currentVoltage - lastVoltageRef.current);
+      if (detectMove(currentVoltage, lastVoltageRef.current, moveDetectionThreshold)) {
+        const sensedMove = createSensedMoveMarker(data.timestamp);
         
-        // If voltage change exceeds threshold, detect a move
-        if (voltageChange >= moveDetectionThreshold) {
-          const sensedMove: MoveMarker = {
-            timestamp: data.timestamp,
-            type: 'sensed'
-          };
-          
-          // Add to markers
-          moveMarkersRef.current = [...moveMarkersRef.current, sensedMove];
-          setMoveMarkers([...moveMarkersRef.current]);
-          
-          // Mark the data point with the move marker
-          data.moveMarker = 'sensed';
-          
-          console.log('🎯 Sensed move detected:', {
-            timestamp: data.timestamp,
-            voltageChange: voltageChange.toFixed(3) + 'V',
-            currentVoltage: currentVoltage.toFixed(3) + 'V',
-            previousVoltage: lastVoltageRef.current.toFixed(3) + 'V'
-          });
-        }
+        // Add to markers
+        moveMarkersRef.current = [...moveMarkersRef.current, sensedMove];
+        setMoveMarkers([...moveMarkersRef.current]);
+        
+        // Mark the data point with the move marker
+        data.moveMarker = 'sensed';
+        
+        console.log('🎯 Sensed move detected:', {
+          timestamp: data.timestamp,
+          voltageChange: (Math.abs(currentVoltage - (lastVoltageRef.current || 0))).toFixed(3) + 'V',
+          currentVoltage: currentVoltage.toFixed(3) + 'V',
+          previousVoltage: (lastVoltageRef.current || 0).toFixed(3) + 'V'
+        });
       }
       
       lastVoltageRef.current = currentVoltage;
@@ -425,34 +412,33 @@ export default function EMGPage() {
           // Calculate from muscleActivity (ESP32: 12-bit ADC, 3.3V reference)
           return {
             ...r,
-            voltage: (r.muscleActivity * 3.3) / 4095.0
+            voltage: calculateVoltage(r.muscleActivity)
           };
         }
         return r;
       });
       
-      const voltages = readings.map(r => r.voltage!).filter(v => !isNaN(v) && isFinite(v));
+      const stats = calculateEMGStats(readings);
       
-      console.log('💾 Prepared readings for save:', {
-        totalReadings: readings.length,
-        voltagesCount: voltages.length,
-        firstReading: readings[0],
-        lastReading: readings[readings.length - 1],
-        voltageRange: voltages.length > 0 ? `${Math.min(...voltages).toFixed(3)}V - ${Math.max(...voltages).toFixed(3)}V` : 'N/A'
-      });
-      
-      if (voltages.length === 0) {
+      if (stats.sampleCount === 0 || stats.averageVoltage === null) {
         throw new Error('No valid voltage readings to save');
       }
       
-      const avgVoltage = voltages.reduce((a, b) => a + b, 0) / voltages.length;
-      const maxVoltage = Math.max(...voltages);
+      console.log('💾 Prepared readings for save:', {
+        totalReadings: readings.length,
+        voltagesCount: stats.sampleCount,
+        firstReading: readings[0],
+        lastReading: readings[readings.length - 1],
+        voltageRange: stats.minVoltage !== null && stats.maxVoltage !== null 
+          ? `${stats.minVoltage.toFixed(3)}V - ${stats.maxVoltage.toFixed(3)}V` 
+          : 'N/A'
+      });
       
       console.log('💾 Saving recording:', {
         readingsCount: readings.length,
-        voltagesCount: voltages.length,
-        avgVoltage,
-        maxVoltage,
+        voltagesCount: stats.sampleCount,
+        avgVoltage: stats.averageVoltage,
+        maxVoltage: stats.maxVoltage,
         sessionName: recordingName,
         userId
       });
@@ -465,8 +451,8 @@ export default function EMGPage() {
         durationSeconds: Math.round((Date.now() - (sessionStartTime || Date.now())) / 1000),
         readings: readings, // Stores the full JSON array (includes moveMarker property on individual readings)
         moveMarkers: moveMarkersRef.current, // Also store move markers as separate array for easy querying
-        averageVoltage: avgVoltage,
-        maxVoltage: maxVoltage
+        averageVoltage: stats.averageVoltage,
+        maxVoltage: stats.maxVoltage
       };
 
       console.log('📤 Sending session data to API:', {
@@ -751,7 +737,7 @@ export default function EMGPage() {
           const calculatedVoltage = latestData.voltage !== undefined 
             ? 'N/A (using ESP32 value)' 
             : (typeof latestData.muscleActivity === 'number' 
-                ? ((latestData.muscleActivity * 3.3 / 4095).toFixed(3) + 'V')
+                ? (calculateVoltage(latestData.muscleActivity).toFixed(3) + 'V')
                 : 'Invalid');
           
           // Check last few values to see if they're varying
@@ -786,7 +772,7 @@ export default function EMGPage() {
           calculatedVoltage = latestData.voltage;
         } else {
           // ESP32: 12-bit ADC (0-4095), 3.3V reference
-          calculatedVoltage = (latestData.muscleActivity * 3.3) / 4095.0;
+          calculatedVoltage = calculateVoltage(latestData.muscleActivity);
         }
         
         // Warn if voltage is suspiciously high (sensor might be disconnected)
@@ -2431,7 +2417,7 @@ export default function EMGPage() {
                         <div className="text-xs text-gray-500 mt-2">
                           Voltage: {currentData.voltage !== undefined 
                             ? currentData.voltage.toFixed(2) 
-                            : (currentData.muscleActivity * 3.3 / 4095).toFixed(2) // ESP32: 12-bit ADC (0-4095), 3.3V reference
+                            : calculateVoltage(currentData.muscleActivity).toFixed(2)
                           }V
                           {currentData.voltage !== undefined && currentData.voltage > 2.9 && (
                             <span className="ml-2 text-yellow-400 text-xs">⚠️ High - Check sensor</span>

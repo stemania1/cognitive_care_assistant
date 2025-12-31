@@ -7,26 +7,14 @@ import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
 import { Line } from 'react-chartjs-2';
 import { EMGData, MoveMarker } from '@/types/emg';
 import { registerChartJS } from '@/utils/chart-registration';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { EMGSession } from '@/lib/supabase-queries';
 
 // Register Chart.js components
 registerChartJS();
 
 // Alias for compatibility
 type EMGReading = EMGData;
-
-interface EMGSession {
-  id: string;
-  user_id: string;
-  session_name: string;
-  started_at: string;
-  ended_at: string;
-  duration_seconds: number;
-  readings: EMGReading[] | null;
-  move_markers?: MoveMarker[] | null; // Move markers array
-  average_voltage: number | null;
-  max_voltage: number | null;
-  created_at: string;
-}
 
 export default function EMGHistoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -111,20 +99,19 @@ export default function EMGHistoryPage() {
 
     try {
       console.log('📡 Loading EMG sessions for userId:', userId);
-      const response = await fetch(`/api/emg-sessions?userId=${userId}`);
-      const result = await response.json();
+      const { fetchEMGSessions } = await import('@/lib/supabase-queries');
+      const { data, error } = await fetchEMGSessions(userId);
 
-      console.log('📊 API Response:', {
-        ok: response.ok,
-        status: response.status,
-        dataCount: result.data?.length || 0,
-        error: result.error
-      });
+      if (error) {
+        console.error('❌ Failed to load sessions:', error);
+        alert(`Failed to load sessions: ${error}`);
+        return;
+      }
 
-      if (response.ok && result.data) {
-        console.log('✅ Loaded sessions:', result.data.length);
+      if (data) {
+        console.log('✅ Loaded sessions:', data.length);
         // Log move markers for debugging
-        result.data.forEach((session: EMGSession, index: number) => {
+        data.forEach((session: EMGSession, index: number) => {
           if (session.move_markers && Array.isArray(session.move_markers) && session.move_markers.length > 0) {
             console.log(`📌 Session ${index} (${session.session_name}) has ${session.move_markers.length} move markers:`, session.move_markers);
           } else {
@@ -134,10 +121,7 @@ export default function EMGHistoryPage() {
             });
           }
         });
-        setSessions(result.data);
-      } else {
-        console.error('❌ Failed to load sessions:', result.error);
-        alert(`Failed to load sessions: ${result.error || 'Unknown error'}`);
+        setSessions(data);
       }
     } catch (error) {
       console.error('💥 Error loading sessions:', error);
@@ -981,15 +965,7 @@ export default function EMGHistoryPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-xl">Loading...</div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading EMG sessions..." />;
   }
 
   return (

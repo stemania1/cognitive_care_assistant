@@ -7,6 +7,8 @@ import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
 import { Line } from 'react-chartjs-2';
 import { registerChartJS } from '@/utils/chart-registration';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { fetchThermalSessions, ThermalSession } from '@/lib/supabase-queries';
 
 // Register Chart.js components
 registerChartJS();
@@ -295,22 +297,7 @@ interface MoveEvent {
   secondsFromStart: number;
 }
 
-interface ThermalSession {
-  id: string;
-  user_id: string;
-  subject_identifier: string;
-  session_number: number | null;
-  started_at: string;
-  ended_at: string;
-  duration_seconds: number;
-  average_surface_temp: number | null;
-  average_temperature_range: number | null;
-  thermal_event_count: number;
-  samples: ThermalSample[] | null;
-  move_events: MoveEvent[] | null;
-  movement_detected: MoveEvent[] | null;
-  created_at: string;
-}
+// ThermalSession is now imported from '@/lib/supabase-queries'
 
 export default function ThermalHistoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -536,20 +523,16 @@ export default function ThermalHistoryPage() {
     try {
       setLoading(true);
       console.log('🔍 Loading thermal sessions for userId:', userId);
-      const response = await fetch(`/api/thermal-sessions?userId=${userId}&limit=100`);
-      const result = await response.json();
+      const { data, error } = await fetchThermalSessions(userId, { limit: 100 });
 
-      console.log('📊 Thermal sessions API response:', {
-        status: response.status,
-        ok: response.ok,
-        result: result
-      });
+      if (error) {
+        console.error('❌ Error loading sessions:', error);
+        return;
+      }
 
-      if (response.ok && result.data) {
-        console.log('✅ Successfully loaded sessions:', result.data.length, 'sessions');
-        setSessions(result.data);
-      } else {
-        console.error('❌ Error loading sessions:', result.error, result.details);
+      if (data) {
+        console.log('✅ Successfully loaded sessions:', data.length, 'sessions');
+        setSessions(data);
       }
     } catch (error) {
       console.error('💥 Exception loading sessions:', error);
@@ -1327,14 +1310,7 @@ export default function ThermalHistoryPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading sessions...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading sessions..." />;
   }
 
   const sessionsToDisplayForChart = overlapMode ? selectedSessionsForOverlap : (selectedSession ? [selectedSession] : []);
@@ -1413,25 +1389,20 @@ export default function ThermalHistoryPage() {
                   setTestResults(null);
                   try {
                     console.log('🧪 Testing API call with debug mode...');
-                    const response = await fetch(`/api/thermal-sessions?userId=${userId}&limit=100&debug=true`);
-                    const result = await response.json();
+                    const { data, error } = await fetchThermalSessions(userId, { limit: 100, debug: true });
+                    
                     console.log('🧪 Direct API test result:', {
                       url: `/api/thermal-sessions?userId=${userId}&limit=100&debug=true`,
-                      status: response.status,
-                      statusText: response.statusText,
-                      ok: response.ok,
-                      headers: Object.fromEntries(response.headers.entries()),
-                      result: result
+                      dataCount: data?.length || 0,
+                      error: error
                     });
                     
                     const testResult = `API Test Results:
-Status: ${response.status} ${response.statusText}
-Success: ${response.ok ? 'Yes' : 'No'}
-Data Count: ${result.data?.length || 0}
-Error: ${result.error || 'None'}
-Debug Info: ${result.debug ? JSON.stringify(result.debug, null, 2) : 'Not available'}
+Success: ${error ? 'No' : 'Yes'}
+Data Count: ${data?.length || 0}
+Error: ${error || 'None'}
 
-${result.data?.length > 0 ? 'Sessions found! They should appear above.' : 'No sessions found in database for your user ID.'}`;
+${data && data.length > 0 ? 'Sessions found! They should appear above.' : 'No sessions found in database for your user ID.'}`;
                     
                     setTestResults(testResult);
                   } catch (error) {
@@ -1862,7 +1833,7 @@ This indicates a problem with the session saving process.`);
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-gray-300 mt-2">
                       <div>
-                        <span className="text-gray-400">Duration:</span> {formatDuration(session.duration_seconds)}
+                        <span className="text-gray-400">Duration:</span> {formatDuration(session.duration_seconds ?? 0)}
                       </div>
                       <div>
                         <span className="text-gray-400">Events:</span> {session.thermal_event_count}
@@ -1948,7 +1919,7 @@ This indicates a problem with the session saving process.`);
                       </div>
                       <div>
                         <p className="text-sm text-gray-400">Duration</p>
-                        <p className="text-lg font-medium">{formatDuration(selectedSession.duration_seconds)}</p>
+                        <p className="text-lg font-medium">{formatDuration(selectedSession.duration_seconds ?? 0)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-400">Thermal Events</p>
@@ -1957,7 +1928,7 @@ This indicates a problem with the session saving process.`);
                       <div>
                         <p className="text-sm text-gray-400">Avg Surface Temp</p>
                         <p className="text-lg font-medium">
-                          {selectedSession.average_surface_temp !== null
+                          {selectedSession.average_surface_temp !== null && selectedSession.average_surface_temp !== undefined
                             ? `${selectedSession.average_surface_temp.toFixed(1)}°C`
                             : '—'}
                         </p>
@@ -1965,7 +1936,7 @@ This indicates a problem with the session saving process.`);
                       <div>
                         <p className="text-sm text-gray-400">Avg Temp Range</p>
                         <p className="text-lg font-medium">
-                          {selectedSession.average_temperature_range !== null
+                          {selectedSession.average_temperature_range !== null && selectedSession.average_temperature_range !== undefined
                             ? `${selectedSession.average_temperature_range.toFixed(1)}°C`
                             : '—'}
                         </p>

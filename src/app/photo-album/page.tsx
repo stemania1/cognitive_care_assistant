@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { supabase, safeGetUser } from "@/lib/supabaseClient";
+import { fetchDailyChecks } from "@/lib/supabase-queries";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 interface PhotoEntry {
   id: string;
@@ -38,12 +40,16 @@ export default function PhotoAlbumPage() {
 
       try {
         setLoading(true);
-        const response = await fetch(`/api/daily-checks?userId=${userId}`);
-        const result = await response.json();
+        const { data, error } = await fetchDailyChecks(userId);
 
-        if (response.ok && result.data) {
+        if (error) {
+          console.error('Error fetching photos:', error);
+          return;
+        }
+
+        if (data) {
           // Filter entries that have photos
-          const photosOnly = result.data
+          const photosOnly = data
             .filter((entry: any) => entry.photo_url)
             .map((entry: any) => ({
               id: entry.id,
@@ -132,11 +138,7 @@ export default function PhotoAlbumPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
-            <div className="text-center py-20">
-              <div className="text-white/60">Loading your photos...</div>
-            </div>
-          )}
+          {loading && <LoadingSpinner message="Loading your photos..." className="py-20" />}
 
           {/* No Photos State */}
           {!loading && photos.length === 0 && (

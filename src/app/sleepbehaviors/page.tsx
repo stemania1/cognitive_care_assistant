@@ -11,6 +11,7 @@ import { Line } from 'react-chartjs-2';
 import { ThermalData, ThermalMetricSnapshot } from '@/types/thermal';
 import { THERMAL_METRICS } from '@/constants/thermal-metrics';
 import { registerChartJS } from '@/utils/chart-registration';
+import { calculateThermalStats, isStableFrame, calculateBaseline, detectThermalEvent } from '@/utils/thermal-processing';
 
 // Register Chart.js components
 registerChartJS();
@@ -286,7 +287,7 @@ export default function SleepBehaviors() {
   const [chartUpdateTrigger, setChartUpdateTrigger] = useState(0);
 
   const frameStatsRef = useRef<
-    Array<{ timestamp: number; average: number; min: number; max: number; variance: number }>
+    Array<{ timestamp: number; average: number; min: number; max: number; range: number; variance: number }>
   >([]);
   const totalFramesRef = useRef(0);
   const stableFrameCountRef = useRef(0);
@@ -430,16 +431,8 @@ export default function SleepBehaviors() {
     }
 
     // Calculate statistics on RAW data for accurate variance detection
-    const avgTemp = rawTemps.reduce((sum, temp) => sum + temp, 0) / rawTemps.length;
-    const minTemp = Math.min(...rawTemps);
-    const maxTemp = Math.max(...rawTemps);
-    const range = maxTemp - minTemp;
-    // Variance calculated on raw thermal data to detect motion accurately
-    const variance =
-      rawTemps.reduce((acc, temp) => acc + Math.pow(temp - avgTemp, 2), 0) /
-      rawTemps.length;
-
-    setCurrentTemp(avgTemp);
+    const stats = calculateThermalStats(data.thermal_data);
+    setCurrentTemp(stats.average);
 
     totalFramesRef.current += 1;
     if (isRecording) {
@@ -447,10 +440,11 @@ export default function SleepBehaviors() {
     }
     frameStatsRef.current.push({
       timestamp: data.timestamp ?? now,
-      average: avgTemp,
-      min: minTemp,
-      max: maxTemp,
-      variance,
+      average: stats.average,
+      min: stats.min,
+      max: stats.max,
+      range: stats.range,
+      variance: stats.variance,
     });
     if (frameStatsRef.current.length > 600) {
       frameStatsRef.current.shift();
@@ -461,19 +455,18 @@ export default function SleepBehaviors() {
     }
 
     let baselineForFrame = baselineTemp;
-    if (baselineForFrame === null && frameStatsRef.current.length >= 10) {
-      const recent = frameStatsRef.current.slice(-10);
-      const computedBaseline =
-        recent.reduce((sum, stat) => sum + stat.average, 0) / recent.length;
-      baselineForFrame = computedBaseline;
-      setBaselineTemp(computedBaseline);
+    if (baselineForFrame === null) {
+      const computedBaseline = calculateBaseline(frameStatsRef.current, 10);
+      if (computedBaseline !== null) {
+        baselineForFrame = computedBaseline;
+        setBaselineTemp(computedBaseline);
+      }
     }
 
     // A stable frame has low variance (sensor noise level) and reasonable temperature range
     // Adjusted thresholds to account for sensor noise - range and variance thresholds are more lenient
     // when still, range can be 2-4°C due to sensor noise and thermal variation across the frame
-    const stableFrame =
-      range < 4.0 && variance < 8.0 && baselineForFrame !== null; // Adjusted for sensor noise
+    const stableFrame = isStableFrame(stats, baselineForFrame, 8.0, 4.0);
     if (stableFrame) {
       stableFrameCountRef.current += 1;
       if (isRecording) {
@@ -489,7 +482,7 @@ export default function SleepBehaviors() {
     const ALERT_COOLDOWN_MS = 2 * 60 * 1000;
 
     if (baselineForFrame !== null) {
-      const tempDiff = avgTemp - baselineForFrame;
+      const tempDiff = stats.average - baselineForFrame;
       const warmPixelRatio =
         rawTemps.filter((temp) => temp >= baselineForFrame - 1).length / rawTemps.length;
 
@@ -498,7 +491,7 @@ export default function SleepBehaviors() {
 
       if (isHighTemp && now - lastAlertsRef.current.highTemp > ALERT_COOLDOWN_MS) {
         addAlert({
-          message: `High surface temperature ${avgTemp.toFixed(
+          message: `High surface temperature ${stats.average.toFixed(
             1
           )}°C detected (${tempDiff.toFixed(1)}°C over baseline).`,
           severity: "critical",
@@ -509,7 +502,7 @@ export default function SleepBehaviors() {
 
       if (isLowTemp && now - lastAlertsRef.current.highTemp > ALERT_COOLDOWN_MS) {
         addAlert({
-          message: `Surface temperature dropped to ${avgTemp.toFixed(
+          message: `Surface temperature dropped to ${stats.average.toFixed(
             1
           )}°C (${Math.abs(tempDiff).toFixed(1)}°C under baseline).`,
           severity: "warning",
@@ -519,26 +512,26 @@ export default function SleepBehaviors() {
       }
 
       const restlessFrame =
-        range > RESTLESS_RANGE_THRESHOLD ||
-        variance > RESTLESS_VARIANCE_THRESHOLD ||
+        stats.range > RESTLESS_RANGE_THRESHOLD ||
+        stats.variance > RESTLESS_VARIANCE_THRESHOLD ||
         Math.abs(tempDiff) > HIGH_TEMP_THRESHOLD;
 
       // Debug logging for movement detection (only during recording to avoid spam)
       if (isRecording && (restlessFrame || restlessnessStreakRef.current > 0)) {
         console.log(`🔍 Movement Detection Debug:`, {
-          range: range.toFixed(2),
+          range: stats.range.toFixed(2),
           rangeThreshold: RESTLESS_RANGE_THRESHOLD,
-          rangeExceeded: range > RESTLESS_RANGE_THRESHOLD,
-          variance: variance.toFixed(2),
+          rangeExceeded: stats.range > RESTLESS_RANGE_THRESHOLD,
+          variance: stats.variance.toFixed(2),
           varianceThreshold: RESTLESS_VARIANCE_THRESHOLD,
-          varianceExceeded: variance > RESTLESS_VARIANCE_THRESHOLD,
+          varianceExceeded: stats.variance > RESTLESS_VARIANCE_THRESHOLD,
           tempDiff: tempDiff.toFixed(2),
           tempThreshold: HIGH_TEMP_THRESHOLD,
           tempExceeded: Math.abs(tempDiff) > HIGH_TEMP_THRESHOLD,
           restlessFrame,
           currentStreak: restlessnessStreakRef.current,
           baselineTemp: baselineForFrame?.toFixed(2) || 'null',
-          avgTemp: avgTemp.toFixed(2)
+          avgTemp: stats.average.toFixed(2)
         });
       }
 
@@ -576,7 +569,7 @@ export default function SleepBehaviors() {
       }
 
       const outOfFrameFrame =
-        avgTemp <= baselineForFrame - OUT_OF_FRAME_TEMP_DROP ||
+        stats.average <= baselineForFrame - OUT_OF_FRAME_TEMP_DROP ||
         warmPixelRatio < OUT_OF_FRAME_WARM_RATIO;
 
       if (outOfFrameFrame) {
@@ -622,7 +615,7 @@ export default function SleepBehaviors() {
 
     const calibrationDrift =
       baselineForFrame !== null && elapsedMinutes
-        ? (avgTemp - baselineForFrame) / elapsedMinutes
+        ? (stats.average - baselineForFrame) / elapsedMinutes
         : null;
 
     const finalStability = stabilityPercent !== null
@@ -630,10 +623,10 @@ export default function SleepBehaviors() {
       : null;
 
     setMetricSnapshot({
-      averageSurfaceTemperature: avgTemp,
-      temperatureRange: range,
+      averageSurfaceTemperature: stats.average,
+      temperatureRange: stats.range,
       thermalEventCount: eventCountRef.current,
-      heatmapVariance: variance,
+      heatmapVariance: stats.variance,
       thermalPatternStability: finalStability,
       calibrationDrift,
       thermalSleepCorrelation: null,
@@ -642,13 +635,13 @@ export default function SleepBehaviors() {
     if (isRecording) {
       setSessionData((prev) => [...prev, data]);
       // Calculate temperature change from baseline
-      const tempChange = baselineForFrame !== null ? avgTemp - baselineForFrame : null;
+      const tempChange = baselineForFrame !== null ? stats.average - baselineForFrame : null;
       
       // Calculate restlessness value: 1 if restless frame detected, 0 otherwise
       // Use the same logic as the restlessFrame calculation above
       const restlessnessFrame = baselineForFrame !== null && (
-        range > RESTLESS_RANGE_THRESHOLD ||
-        variance > RESTLESS_VARIANCE_THRESHOLD ||
+        stats.range > RESTLESS_RANGE_THRESHOLD ||
+        stats.variance > RESTLESS_VARIANCE_THRESHOLD ||
         Math.abs(tempChange ?? 0) > HIGH_TEMP_THRESHOLD
       );
       const restlessnessValue = restlessnessFrame ? 1 : 0;
@@ -657,12 +650,12 @@ export default function SleepBehaviors() {
       sessionSamplesRef.current.push({
         sampleIndex: sessionSamplesRef.current.length,
         timestamp: data.timestamp ?? now,
-        heatmapVariance: variance,
+        heatmapVariance: stats.variance,
         patternStability: finalStability,
-        temperatureRange: range,
+        temperatureRange: stats.range,
         temperatureChange: tempChange,
         restlessness: restlessnessValue,
-        averageTemperature: avgTemp,
+        averageTemperature: stats.average,
         thermalData: data.thermal_data ? JSON.parse(JSON.stringify(data.thermal_data)) : null, // Deep copy the thermal grid
       });
       
