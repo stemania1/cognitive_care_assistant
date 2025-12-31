@@ -13,6 +13,7 @@ import {
   Filler,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import { EMGData, MoveMarker } from '@/types/emg';
 
 // Register Chart.js components
 ChartJS.register(
@@ -25,18 +26,6 @@ ChartJS.register(
   Legend,
   Filler
 );
-
-interface EMGData {
-  timestamp: number;
-  muscleActivity: number;
-  muscleActivityProcessed: number;
-  voltage?: number; // Voltage in volts (ESP32: 0-3.3V)
-}
-
-interface MoveMarker {
-  timestamp: number;
-  type: 'request' | 'sensed' | 'end'; // 'request' = user clicked Move button, 'sensed' = detected from EMG data, 'end' = user clicked End Move button
-}
 
 interface EMGChartProps {
   data: EMGData[];

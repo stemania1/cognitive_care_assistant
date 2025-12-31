@@ -16,6 +16,7 @@ import {
   Filler,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import { EMGData, MoveMarker } from '@/types/emg';
 
 // Register Chart.js components
 ChartJS.register(
@@ -29,18 +30,8 @@ ChartJS.register(
   Filler
 );
 
-interface EMGReading {
-  timestamp: number;
-  muscleActivity: number;
-  muscleActivityProcessed: number;
-  voltage?: number;
-  moveMarker?: 'request' | 'sensed' | 'end'; // Optional move marker type
-}
-
-interface MoveMarker {
-  timestamp: number;
-  type: 'request' | 'sensed' | 'end';
-}
+// Alias for compatibility
+type EMGReading = EMGData;
 
 interface EMGSession {
   id: string;
