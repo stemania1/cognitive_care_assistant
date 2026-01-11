@@ -370,27 +370,34 @@ export default function EMGPage() {
         }
       }
       
-      console.error('⚠️ No data recorded!', {
-        sampleCount,
-        isMyoWareConnected,
-        isConnected,
-        hasCurrentData: currentData !== null,
-        currentDataVoltage: currentData?.voltage,
-        wasRecording: isRecordingSessionRef.current,
-        duration: duration
-      });
-      
-      const errorDetails = {
-        sampleCount,
-        duration: `${duration.toFixed(1)}s`,
-        isMyoWareConnected,
-        isConnected,
-        hasCurrentData: currentData !== null
-      };
-      
-      console.error('Error details:', errorDetails);
-      
-      alert(`No data was recorded (${sampleCount} samples in ${duration.toFixed(1)}s).\n\nPossible causes:\n1. Recording stopped too quickly (wait at least 3-5 seconds)\n2. Device disconnected during recording\n3. No data received from device\n\nPlease:\n- Make sure device shows green "Connected" indicator\n- Record for at least 5 seconds\n- Check browser console (F12) for details`);
+      // Only warn if recording actually happened (duration > 1 second)
+      // This prevents warnings when just disconnecting without recording
+      if (duration > 1) {
+        console.warn('⚠️ No data recorded during recording session!', {
+          sampleCount,
+          isMyoWareConnected,
+          isConnected,
+          hasCurrentData: currentData !== null,
+          currentDataVoltage: currentData?.voltage,
+          wasRecording: isRecordingSessionRef.current,
+          duration: duration
+        });
+        
+        const errorDetails = {
+          sampleCount,
+          duration: `${duration.toFixed(1)}s`,
+          isMyoWareConnected,
+          isConnected,
+          hasCurrentData: currentData !== null
+        };
+        
+        console.warn('Recording details:', errorDetails);
+        
+        alert(`No data was recorded (${sampleCount} samples in ${duration.toFixed(1)}s).\n\nPossible causes:\n1. Recording stopped too quickly (wait at least 3-5 seconds)\n2. Device disconnected during recording\n3. No data received from device\n\nPlease:\n- Make sure device shows green "Connected" indicator\n- Record for at least 5 seconds\n- Check browser console (F12) for details`);
+      } else {
+        // Very short recording or disconnect - just log info
+        console.log('ℹ️ Recording stopped with no data (likely disconnected or very short recording)');
+      }
     }
   };
 

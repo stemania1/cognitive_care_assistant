@@ -1,9 +1,31 @@
 import { NextResponse } from "next/server";
 import { SENSOR_CONFIG } from "@/app/config/sensor-config";
+import { getThermalData } from "@/lib/thermal-data-store";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  // First, check if we have Bluetooth data (more recent than 30 seconds)
+  const btData = getThermalData();
+  if (btData.data && btData.isConnected) {
+    // Convert timestamp to number if it's a string
+    const timestamp = typeof btData.data.timestamp === 'string'
+      ? new Date(btData.data.timestamp).getTime()
+      : btData.data.timestamp;
+    
+    return NextResponse.json({
+      ...btData.data,
+      timestamp: timestamp
+    }, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
+  
+  // Fallback to WiFi/HTTP connection to Raspberry Pi
   // Define these with fallbacks so they're accessible in catch block
   let host = SENSOR_CONFIG.RASPBERRY_PI_IP;
   let port = String(SENSOR_CONFIG.HTTP_PORT);

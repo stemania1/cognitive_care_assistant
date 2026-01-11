@@ -307,7 +307,7 @@ export default function SignIn() {
                 </p>
               </div>
 
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center text-sm">
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -315,12 +315,6 @@ export default function SignIn() {
                   />
                   <span className="text-gray-300">Remember me</span>
                 </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-purple-400 hover:text-purple-300 transition-colors duration-200"
-                >
-                  Forgot password?
-                </Link>
               </div>
 
               <button
