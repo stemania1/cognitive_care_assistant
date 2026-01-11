@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
 import { UserStatusIndicator } from "./components/UserStatusIndicator";
 import { AlertProvider } from "./components/AlertCenter";
 import { GlobalAlertButton } from "./components/GlobalAlertButton";
@@ -26,16 +27,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <AlertProvider>
-          <UserStatusIndicator />
-          {children}
-          <GlobalAlertButton />
-        </AlertProvider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        >
+          <AlertProvider>
+            <UserStatusIndicator />
+            {children}
+            <GlobalAlertButton />
+          </AlertProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
