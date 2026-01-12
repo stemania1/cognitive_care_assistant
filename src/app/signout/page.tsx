@@ -1,43 +1,64 @@
 "use client";
 
-import { useState } from "react";
+import { useClerk } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
 
 export default function SignOut() {
+  const { signOut } = useClerk();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
-  const router = useRouter();
+
+  // Auto-redirect if not confirmed after component mounts
+  useEffect(() => {
+    if (!isConfirmed && !isLoading) {
+      // If user is already here, they probably want to sign out
+      // Automatically trigger sign out after a brief moment
+      const timer = setTimeout(() => {
+        handleSignOut();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const handleSignOut = async () => {
     setIsLoading(true);
     
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("Error signing out:", error);
-        return;
-      }
-      
-      // Set confirmed state to show success message
-      setIsConfirmed(true);
-      
-      // Redirect to home page after a brief delay
-      setTimeout(() => {
-        router.push("/");
-      }, 2000);
+      // Sign out and redirect immediately
+      await signOut(() => {
+        router.push("/signin");
+      });
     } catch (err) {
       console.error("Error signing out:", err);
-    } finally {
-      setIsLoading(false);
+      // Even on error, redirect to sign in
+      router.push("/signin");
     }
   };
 
   const handleCancel = () => {
-    router.back();
+    router.push("/dashboard");
   };
+
+  if (isLoading) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+        {/* Background gradients */}
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
+        <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
+
+        <main className="relative mx-auto max-w-md px-6 sm:px-8 py-12 sm:py-20 flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-300">Signing out...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (isConfirmed) {
     return (
@@ -68,50 +89,8 @@ export default function SignOut() {
                 Signed Out Successfully
               </h1>
               <p className="text-gray-300 text-sm">
-                You have been signed out of your account
+                Redirecting you to the sign in page...
               </p>
-            </div>
-          </div>
-
-          {/* Success Message */}
-          <div className="relative">
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-green-500/10 via-emerald-500/5 to-teal-500/10 blur-xl" />
-            <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6 sm:p-8 text-center">
-              <div className="mb-6">
-                <div className="mx-auto w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-8 h-8 text-green-400"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <p className="text-gray-300">
-                  Redirecting you to the home page...
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <Link
-                  href="/signin"
-                  className="block w-full py-3 px-4 rounded-lg bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500 text-white font-medium hover:from-purple-600 hover:via-fuchsia-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 focus:ring-offset-black transition-all duration-200"
-                >
-                  Sign In Again
-                </Link>
-                
-                <Link
-                  href="/dashboard"
-                  className="block w-full py-3 px-4 rounded-lg border border-white/20 bg-white/5 text-white font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black transition-all duration-200"
-                >
-                  Go to Home
-                </Link>
-              </div>
             </div>
           </div>
         </main>
