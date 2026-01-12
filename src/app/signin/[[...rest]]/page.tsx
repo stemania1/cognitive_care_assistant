@@ -3,6 +3,7 @@
 import { SignIn } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
+import { CongressionalAppChallengeBanner } from "../../components/CongressionalAppChallengeBanner";
 
 const YOUTUBE_WATCH_URL = "https://youtu.be/pIXN4iN-VQA";
 const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed/pIXN4iN-VQA";
@@ -10,11 +11,14 @@ const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed/pIXN4iN-VQA";
 export default function SignInPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+      {/* Congressional App Challenge Moving Banner */}
+      <CongressionalAppChallengeBanner />
+      
       {/* Background gradients */}
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
       <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
 
-      <main className="relative mx-auto max-w-6xl px-4 sm:px-6 md:px-8 py-6 sm:py-12 md:py-20">
+      <main className="relative mx-auto max-w-6xl px-4 sm:px-6 md:px-8 py-6 sm:py-12 md:py-20 pt-16 sm:pt-20 md:pt-24">
         {/* Logo and Title */}
         <div className="flex flex-col items-center text-center gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="relative">
