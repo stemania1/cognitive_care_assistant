@@ -72,7 +72,10 @@ export async function fetchEMGSessions(
     if (response.ok && result.data) {
       return { data: result.data, error: null };
     } else {
-      return { data: null, error: result.error || 'Failed to fetch EMG sessions' };
+      // Include error details if available
+      const errorMessage = result.error || 'Failed to fetch EMG sessions';
+      const errorDetails = result.details ? `: ${result.details}` : '';
+      return { data: null, error: `${errorMessage}${errorDetails}` };
     }
   } catch (error) {
     return {

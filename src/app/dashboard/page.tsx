@@ -6,6 +6,8 @@ import Image from "next/image";
 import HomeCards from "../components/HomeCards";
 import { GuestIndicator } from "../components/GuestIndicator";
 import DementiaStagesButton from "../components/DementiaStagesButton";
+import { CongressionalAppChallengeButton } from "../components/CongressionalAppChallengeButton";
+import { UserProfileTopLeft } from "../components/UserProfileTopLeft";
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -14,6 +16,12 @@ export default function Dashboard() {
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
       {/* Guest Account Indicator */}
       <GuestIndicator />
+      
+      {/* User Profile Top Left */}
+      <UserProfileTopLeft />
+      
+      {/* Congressional App Challenge Button */}
+      <CongressionalAppChallengeButton />
       
       {/* Background gradients (slightly brighter) */}
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.2),transparent)]" />

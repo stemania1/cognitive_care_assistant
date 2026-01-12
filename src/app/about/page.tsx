@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function AboutPage() {
   return (
@@ -9,11 +10,45 @@ export default function AboutPage() {
       <main className="relative mx-auto max-w-4xl px-6 sm:px-10 py-10 sm:py-14">
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-6">About Cognitive Care</h1>
 
+        {/* Congressional App Challenge Winners Section */}
+        <div className="relative mb-8">
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/20 via-purple-500/15 to-cyan-500/20 blur-xl" />
+          <div className="relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6 sm:p-8">
+            <div className="flex flex-col items-center gap-6">
+              <div className="text-center">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
+                  Winners of the 2025 Congressional App Challenge
+                </h2>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-8 w-full">
+                <div className="flex-1 max-w-sm">
+                  <Image
+                    src="/images/CAClogo-dome-only-color.png"
+                    alt="Congressional App Challenge Capitol Dome"
+                    width={400}
+                    height={400}
+                    className="w-full h-auto object-contain"
+                  />
+                </div>
+                <div className="flex-1 max-w-sm">
+                  <Image
+                    src="/images/CAClogo-white-letters-only.png"
+                    alt="Congressional App Challenge Logo"
+                    width={400}
+                    height={200}
+                    className="w-full h-auto object-contain"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="relative">
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/15 via-purple-500/10 to-cyan-500/15 blur-xl" />
           <div className="relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5 sm:p-7 text-gray-100 text-base leading-relaxed">
             <p>
-              We created the Cognitive Care Assistant because dementia has touched our own families, and we’ve seen firsthand the challenges it brings. Today, nearly 1 in 10 people over the age of 65 live with dementia, and the number is only rising each year. It is now the fifth leading cause of death, not because of the disease itself, but because those affected lose the ability to remember or manage vital daily functions. Watching a loved one struggle in this way is heartbreaking, and we knew something had to be done. With the Cognitive Care Assistant, our goal is to create a safe, supportive space that helps people hold on to their independence, stay healthy, and feel cared for. More than just a tool, it’s a promise of comfort and dignity for those living with dementia—and peace of mind for the families who love them.
+              Winning the 2025 Congressional App Challenge for Florida's District 17 was an incredible honor, and I am truly grateful to everyone who supported this journey. A huge thank-you to my parents for providing the constant support, encouragement, and resources I needed throughout the entire process. I am also sincerely thankful to the judges for taking the time to review the submissions and for choosing my app—your recognition means so much to me. A special shout-out to Greg Steube for supporting student innovation and STEM education through the Congressional App Challenge. This experience motivated me to keep learning, building, and using technology to make a real impact.
             </p>
           </div>
         </div>

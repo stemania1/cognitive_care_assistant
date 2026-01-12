@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase, safeGetUser } from "@/lib/supabaseClient";
-import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
+import { useUser } from "@clerk/nextjs";
 import { Line } from 'react-chartjs-2';
 import { EMGData, MoveMarker } from '@/types/emg';
 import { registerChartJS } from '@/utils/chart-registration';
@@ -32,38 +31,24 @@ export default function EMGHistoryPage() {
   const [graphTitle, setGraphTitle] = useState<string>('');
   const [isLegendOpen, setIsLegendOpen] = useState(false);
 
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+
   useEffect(() => {
-    async function initializeUser() {
-      try {
-        console.log('🔐 Initializing user for EMG history...');
-        const guestStatus = await isGuestUser();
-        console.log('👤 Guest status:', guestStatus);
-        
-        if (guestStatus) {
-          const guestUserId = getGuestUserId();
-          console.log('🎭 Guest user ID:', guestUserId);
-          setUserId(guestUserId);
-        } else {
-          const { user, error } = await safeGetUser();
-          console.log('🔑 Supabase user:', user);
-          if (error) {
-            console.log('⚠️ Auth error:', error.message);
-          }
-          if (user?.id) {
-            console.log('✅ Setting user ID:', user.id);
-            setUserId(user.id);
-          } else {
-            console.log('❌ No user ID found');
-          }
-        }
-      } catch (error) {
-        console.error('💥 Error getting user:', error);
-      } finally {
-        setLoading(false);
-      }
+    if (!clerkLoaded) {
+      console.log('⏳ Clerk not loaded yet');
+      return;
     }
-    initializeUser();
-  }, []);
+
+    if (clerkUser?.id) {
+      console.log('✅ Clerk user ID:', clerkUser.id);
+      setUserId(clerkUser.id);
+      setLoading(false);
+    } else {
+      console.log('❌ No user ID found (not signed in)');
+      setUserId(null);
+      setLoading(false);
+    }
+  }, [clerkUser, clerkLoaded]);
 
   useEffect(() => {
     if (userId) {

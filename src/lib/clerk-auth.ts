@@ -47,3 +47,26 @@ export async function isAuthenticated(): Promise<boolean> {
   }
 }
 
+
+/**
+ * Validate that the provided userId matches the authenticated Clerk user
+ * Returns the authenticated user ID if valid, throws error if not
+ * Use this in API routes to ensure users can only access their own data
+ */
+export async function validateUserId(requestedUserId: string | null): Promise<string> {
+  const authenticatedUserId = await getClerkUserId();
+  
+  if (!authenticatedUserId) {
+    throw new Error('Unauthorized: User not authenticated');
+  }
+  
+  if (!requestedUserId) {
+    throw new Error('Bad Request: User ID is required');
+  }
+  
+  if (requestedUserId !== authenticatedUserId) {
+    throw new Error('Forbidden: User ID does not match authenticated user');
+  }
+  
+  return authenticatedUserId;
+}

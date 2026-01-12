@@ -337,7 +337,7 @@ export default function RemindersPage() {
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
       <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
 
-      <main className="relative mx-auto max-w-2xl px-6 sm:px-10 py-12 sm:py-16">
+      <main className="relative mx-auto max-w-6xl px-6 sm:px-10 py-2 sm:py-4">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl sm:text-3xl font-semibold mb-1">Nutrition</h1>

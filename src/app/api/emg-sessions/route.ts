@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { getAllUserIdsForQuery } from '@/lib/user-id-mapping';
 
 export async function GET(request: NextRequest) {
   try {
+    // Check if user is authenticated (pass request to auth)
+    const { userId: authenticatedUserId } = await auth();
+    if (!authenticatedUserId) {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const limit = Number(searchParams.get('limit') || '50');
@@ -10,6 +18,11 @@ export async function GET(request: NextRequest) {
     
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    // Verify the requested userId matches the authenticated user
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
@@ -20,7 +33,10 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log('🔍 Fetching EMG sessions for userId:', userId, 'limit:', limit, 'debug:', debug);
+    // Get all user IDs (Clerk ID + mapped Supabase UUID) for querying
+    // Use userId from request (frontend already validates with Clerk's useUser() hook)
+    const allUserIds = await getAllUserIdsForQuery(userId);
+    console.log('🔍 Fetching EMG sessions for user IDs:', allUserIds, 'limit:', limit, 'debug:', debug);
     
     // If debug mode, also check total count and recent sessions
     if (debug) {
@@ -31,7 +47,7 @@ export async function GET(request: NextRequest) {
       const { count: userCount } = await supabaseAdmin
         .from('emg_sessions')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
+        .in('user_id', allUserIds);
         
       const { data: recentSessions } = await supabaseAdmin
         .from('emg_sessions')
@@ -46,10 +62,11 @@ export async function GET(request: NextRequest) {
       });
     }
     
+    // Query with all user IDs (Clerk ID + mapped Supabase UUID)
     const { data, error } = await supabaseAdmin
       .from('emg_sessions')
       .select('*')
-      .eq('user_id', userId)
+      .in('user_id', allUserIds)
       .order('created_at', { ascending: false })
       .limit(limit);
 

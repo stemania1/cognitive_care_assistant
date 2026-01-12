@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { supabase, safeGetUser } from "@/lib/supabaseClient";
+import { useUser } from "@clerk/nextjs";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
 import { Line } from 'react-chartjs-2';
 import { registerChartJS } from '@/utils/chart-registration';
@@ -300,6 +300,7 @@ interface MoveEvent {
 // ThermalSession is now imported from '@/lib/supabase-queries'
 
 export default function ThermalHistoryPage() {
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const [userId, setUserId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ThermalSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -327,6 +328,12 @@ export default function ThermalHistoryPage() {
     async function initializeUser() {
       try {
         console.log('🔐 Initializing user for thermal history...');
+        
+        if (!clerkLoaded) {
+          console.log('⏳ Clerk not loaded yet');
+          return;
+        }
+
         const guestStatus = await isGuestUser();
         console.log('👤 Guest status:', guestStatus);
         
@@ -334,27 +341,22 @@ export default function ThermalHistoryPage() {
           const guestUserId = getGuestUserId();
           console.log('🎭 Guest user ID:', guestUserId);
           setUserId(guestUserId);
+          setLoading(false);
+        } else if (clerkUser?.id) {
+          console.log('✅ Clerk user ID:', clerkUser.id);
+          setUserId(clerkUser.id);
+          setLoading(false);
         } else {
-          const { user, error } = await safeGetUser();
-          console.log('🔑 Supabase user:', user);
-          if (error) {
-            console.log('⚠️ Auth error:', error.message);
-          }
-          if (user?.id) {
-            console.log('✅ Setting user ID:', user.id);
-            setUserId(user.id);
-          } else {
-            console.log('❌ No user ID found');
-          }
+          console.log('❌ No user ID found (not signed in)');
+          setLoading(false);
         }
       } catch (error) {
         console.error('💥 Error getting user:', error);
-      } finally {
         setLoading(false);
       }
     }
     initializeUser();
-  }, []);
+  }, [clerkUser, clerkLoaded]);
 
   useEffect(() => {
     if (userId) {

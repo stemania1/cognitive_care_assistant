@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { getClerkUserId } from '@/lib/clerk-auth';
+import { getAllUserIdsForQuery } from '@/lib/user-id-mapping';
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +22,10 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log('🔍 Fetching thermal sessions for userId:', userId, 'limit:', limit, 'debug:', debug);
+    // Get all user IDs (Clerk ID + mapped Supabase UUID) for querying
+    // Use userId from request (frontend already validates with Clerk's useUser() hook)
+    const allUserIds = await getAllUserIdsForQuery(userId);
+    console.log('🔍 Fetching thermal sessions for user IDs:', allUserIds, 'limit:', limit, 'debug:', debug);
     
     // If debug mode, also check total count and recent sessions
     if (debug) {
@@ -31,7 +36,7 @@ export async function GET(request: NextRequest) {
       const { count: userCount } = await supabaseAdmin
         .from('thermal_sessions')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
+        .in('user_id', allUserIds);
         
       const { data: recentSessions } = await supabaseAdmin
         .from('thermal_sessions')
@@ -46,10 +51,11 @@ export async function GET(request: NextRequest) {
       });
     }
     
+    // Query with all user IDs (Clerk ID + mapped Supabase UUID)
     const { data, error } = await supabaseAdmin
       .from('thermal_sessions')
       .select('*')
-      .eq('user_id', userId)
+      .in('user_id', allUserIds)
       .order('created_at', { ascending: false })
       .limit(limit);
 
