@@ -1,7 +1,5 @@
 import Link from 'next/link';
-import { supabase } from '@/lib/supabaseClient';
-import { useState, useEffect } from 'react';
-import { isGuestUser } from '@/lib/guestDataManager';
+import { useUser } from '@clerk/nextjs';
 
 interface AuthenticationGuardProps {
   children: React.ReactNode;
@@ -9,25 +7,8 @@ interface AuthenticationGuardProps {
 }
 
 export function AuthenticationGuard({ children, userId }: AuthenticationGuardProps) {
-  const [isGuest, setIsGuest] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const checkUserType = async () => {
-      if (userId) {
-        try {
-          const guestStatus = await isGuestUser();
-          setIsGuest(guestStatus);
-        } catch (error) {
-          console.error('Error checking user type:', error);
-          setIsGuest(false);
-        }
-      }
-      setIsLoading(false);
-    };
-
-    checkUserType();
-  }, [userId]);
+  const { isLoaded } = useUser();
+  const isLoading = !isLoaded;
 
   if (isLoading) {
     return (

@@ -1,7 +1,6 @@
 'use client';
 
 import { Question } from '@/types/daily-questions';
-import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
@@ -55,35 +54,26 @@ export function QuestionCard({ question, value, onChange, photoUrl, onPhotoChang
       setUploading(true);
       setUploadError(null);
 
-      // Create unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+      // Upload via API route (uses service role key, bypasses RLS)
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', userId);
 
-      // Upload to Supabase storage
-      const { data, error } = await supabase.storage
-        .from('daily-check-photos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      const response = await fetch('/api/photos/upload', {
+        method: 'POST',
+        body: formData
+      });
 
-      if (error) {
-        console.error('Supabase storage error:', error);
-        if (error.message.includes('bucket') || error.message.includes('not found')) {
-          setUploadError('Storage not set up. Please run the database migration first.');
-        } else {
-          setUploadError(`Upload failed: ${error.message}`);
-        }
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('Photo upload error:', result);
+        setUploadError(result.error || result.details || 'Upload failed. Please try again.');
         return;
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('daily-check-photos')
-        .getPublicUrl(fileName);
-
-      console.log('Photo uploaded successfully! URL:', publicUrl);
-      onPhotoChange(publicUrl);
+      console.log('Photo uploaded successfully! URL:', result.url);
+      onPhotoChange(result.url);
     } catch (error) {
       console.error('Error uploading photo:', error);
       setUploadError('Could not upload photo. Please try again.');

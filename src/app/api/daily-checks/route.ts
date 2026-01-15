@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { validateUserId } from '@/lib/clerk-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,6 +65,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if user is authenticated (pass request to auth)
+    const { userId: authenticatedUserId } = await auth();
+    if (!authenticatedUserId) {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { userId, questionId, questionText, answer, answerType = 'text', date, photoUrl } = body;
 
@@ -76,6 +84,11 @@ export async function POST(request: NextRequest) {
         error: 'Missing required fields', 
         details: `Missing: ${missing.join(', ')}` 
       }, { status: 400 });
+    }
+
+    // Verify the requested userId matches the authenticated user
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Create a Supabase client with service role key for admin operations

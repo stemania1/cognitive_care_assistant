@@ -72,7 +72,6 @@ export default function HomeCards() {
         title="Memory Games"
         description="Play cognitive exercises to train memory"
         accent="from-green-500 to-emerald-500"
-        targetBlank
         emoji="🧠"
       />
     </div>

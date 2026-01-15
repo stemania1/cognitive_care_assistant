@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useUser } from "@clerk/nextjs";
 import { useDailyChecks } from "@/lib/useDailyChecks";
-import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { getTodayKey } from "@/utils/date";
 import { ALL_QUESTIONS } from "@/constants/questions";
 import { useQuestionNavigation } from "@/hooks/useQuestionNavigation";
@@ -44,45 +44,23 @@ export default function DailyQuestionsPage() {
   const { windowStart, todaysQuestions, nextThree, prevThree, resetToStart, navigateToPage } = useQuestionNavigation(today);
   const { sessions, recentAnswers, loadSessions, loadRecentAnswers, deleteDailyChecks } = useHistoricalData(userId);
 
-  // Get current user
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+
+  // Get current user from Clerk
   useEffect(() => {
-    const getUser = async () => {
-      try {
-        const { user, error } = await safeGetUser();
-        
-        // If there's an auth error (like refresh token issues), check for guest session
-        if (error) {
-          console.log('Auth error, checking for guest session:', error.message);
-          const guestSession = localStorage.getItem('cognitive_care_guest_session');
-          if (guestSession) {
-            const session = JSON.parse(guestSession);
-            setUserId(session.userId);
-          }
-          return;
-        }
-        
-        if (user?.id) {
-          setUserId(user.id);
-        } else {
-          // Check for guest session in localStorage
-          const guestSession = localStorage.getItem('cognitive_care_guest_session');
-          if (guestSession) {
-            const session = JSON.parse(guestSession);
-            setUserId(session.userId);
-          }
-        }
-      } catch (error) {
-        console.error('Error getting user:', error);
-        // Fall back to guest session check
-        const guestSession = localStorage.getItem('cognitive_care_guest_session');
-        if (guestSession) {
-          const session = JSON.parse(guestSession);
-          setUserId(session.userId);
-        }
-      }
-    };
-    getUser();
-  }, []);
+    if (!clerkLoaded) {
+      console.log('⏳ Clerk not loaded yet');
+      return;
+    }
+
+    if (clerkUser?.id) {
+      console.log('✅ Clerk user ID:', clerkUser.id);
+      setUserId(clerkUser.id);
+    } else {
+      console.log('❌ No user ID found (not signed in)');
+      setUserId(null);
+    }
+  }, [clerkUser, clerkLoaded]);
 
   // Reset auto-navigation flag when page changes
   useEffect(() => {

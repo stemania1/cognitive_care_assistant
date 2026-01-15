@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { supabase, safeGetUser } from "@/lib/supabaseClient";
+import { useUser } from "@clerk/nextjs";
 import { fetchDailyChecks } from "@/lib/supabase-queries";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
@@ -24,19 +24,35 @@ export default function PhotoAlbumPage() {
   const [deletingPhoto, setDeletingPhoto] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<PhotoEntry | null>(null);
 
-  // Get current user
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+
+  // Get current user from Clerk
   useEffect(() => {
-    const getUser = async () => {
-      const { user } = await safeGetUser();
-      setUserId(user?.id || null);
-    };
-    getUser();
-  }, []);
+    if (!clerkLoaded) {
+      console.log('⏳ Clerk not loaded yet');
+      return;
+    }
+
+    if (clerkUser?.id) {
+      console.log('✅ Clerk user ID:', clerkUser.id);
+      setUserId(clerkUser.id);
+    } else {
+      console.log('❌ No user ID found (not signed in)');
+      setUserId(null);
+      setLoading(false); // Stop loading if user is not signed in
+    }
+  }, [clerkUser, clerkLoaded]);
 
   // Fetch photos
   useEffect(() => {
     const fetchPhotos = async () => {
-      if (!userId) return;
+      if (!userId) {
+        // If no userId after Clerk loads, stop loading
+        if (clerkLoaded) {
+          setLoading(false);
+        }
+        return;
+      }
 
       try {
         setLoading(true);
@@ -44,6 +60,7 @@ export default function PhotoAlbumPage() {
 
         if (error) {
           console.error('Error fetching photos:', error);
+          setLoading(false);
           return;
         }
 
@@ -72,10 +89,13 @@ export default function PhotoAlbumPage() {
       }
     };
 
-    if (userId) {
+    if (userId && clerkLoaded) {
       fetchPhotos();
+    } else if (clerkLoaded && !userId) {
+      // User is not signed in, stop loading
+      setLoading(false);
     }
-  }, [userId]);
+  }, [userId, clerkLoaded]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -140,8 +160,25 @@ export default function PhotoAlbumPage() {
           {/* Loading State */}
           {loading && <LoadingSpinner message="Loading your photos..." className="py-20" />}
 
+          {/* Not Signed In State */}
+          {!loading && !userId && clerkLoaded && (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-12 text-center">
+              <div className="text-6xl mb-4">🔒</div>
+              <h2 className="text-xl font-semibold mb-2">Please Sign In</h2>
+              <p className="text-white/60 mb-6">
+                You need to be signed in to view your photo album.
+              </p>
+              <Link 
+                href="/signin"
+                className="inline-block rounded-full bg-cyan-500 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-cyan-600"
+              >
+                Sign In
+              </Link>
+            </div>
+          )}
+
           {/* No Photos State */}
-          {!loading && photos.length === 0 && (
+          {!loading && userId && photos.length === 0 && (
             <div className="rounded-xl border border-white/10 bg-white/5 p-12 text-center">
               <div className="text-6xl mb-4">📸</div>
               <h2 className="text-xl font-semibold mb-2">No Photos Yet</h2>
@@ -158,7 +195,7 @@ export default function PhotoAlbumPage() {
           )}
 
           {/* Photo Grid */}
-          {!loading && photos.length > 0 && (
+          {!loading && userId && photos.length > 0 && (
             <>
               <div className="mb-4 text-sm text-white/60">
                 {photos.length} {photos.length === 1 ? 'photo' : 'photos'} in your album
