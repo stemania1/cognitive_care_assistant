@@ -279,7 +279,8 @@ export default function ThermalVisualization({
 
         ws.onerror = (error) => {
           clearTimeout(connectionTimeout);
-          console.error('❌ WebSocket error:', error);
+          // WebSocket errors are expected when using Bluetooth - HTTP polling will handle data
+          console.warn('⚠️ WebSocket connection failed (expected with Bluetooth mode) - falling back to HTTP polling');
           // Handle WebSocket errors - HTTP polling will handle data retrieval
           if (lastConnectionStatus.current !== 'disconnected') {
             lastConnectionStatus.current = 'disconnected';

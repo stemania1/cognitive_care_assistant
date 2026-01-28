@@ -35,7 +35,12 @@ export function CongressionalAppChallengeBanner() {
 
         {/* Scrolling Content */}
         <div className="flex items-center gap-3 py-2 sm:py-3 pr-10 sm:pr-14 overflow-hidden w-full">
-          <div className="flex items-center gap-3 animate-scroll-banner whitespace-nowrap ml-auto">
+          <a
+            href="https://www.congressionalappchallenge.us/25-FL17/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 animate-scroll-banner whitespace-nowrap ml-auto cursor-pointer hover:opacity-90 transition-opacity"
+          >
             {/* Multiple instances for seamless loop */}
             {[...Array(3)].map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-12 sm:px-16">
@@ -56,7 +61,7 @@ export function CongressionalAppChallengeBanner() {
                 </span>
               </div>
             ))}
-          </div>
+          </a>
         </div>
       </div>
     </div>

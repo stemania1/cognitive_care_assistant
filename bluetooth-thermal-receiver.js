@@ -16,34 +16,172 @@ const { ReadlineParser } = require('@serialport/parser-readline');
 
 // Configuration
 const NEXTJS_API_URL = process.env.NEXTJS_API_URL || 'http://localhost:3000/api/thermal/bt';
-const SERIAL_PORT = process.argv[2] || process.env.THERMAL_BLUETOOTH_PORT;
+let SERIAL_PORT = process.argv[2] || process.env.THERMAL_BLUETOOTH_PORT;
 
-if (!SERIAL_PORT) {
-  console.error('❌ Error: Serial port not specified!');
-  console.log('\nUsage:');
-  console.log('  node bluetooth-thermal-receiver.js <COM_PORT>');
-  console.log('\nExamples:');
-  console.log('  Windows: node bluetooth-thermal-receiver.js COM9');
-  console.log('  Mac:     node bluetooth-thermal-receiver.js /dev/tty.Bluetooth-Incoming-Port');
-  console.log('  Linux:   node bluetooth-thermal-receiver.js /dev/rfcomm0');
-  console.log('\nTo find available ports:');
-  console.log('  Windows: Check Device Manager > Ports (COM & LPT)');
-  console.log('  Mac/Linux: ls /dev/tty.* or ls /dev/rfcomm*');
-  process.exit(1);
+/**
+ * Auto-detect Raspberry Pi Bluetooth port by scanning all available ports
+ */
+async function autoDetectPort() {
+  console.log('🔍 Auto-detecting Raspberry Pi Bluetooth port...\n');
+  
+  try {
+    const ports = await SerialPort.list();
+    
+    if (ports.length === 0) {
+      console.error('❌ No serial ports found!');
+      return null;
+    }
+    
+    // Filter for Bluetooth ports (case-insensitive search)
+    const bluetoothPorts = ports.filter(port => {
+      const desc = (port.manufacturer || '').toLowerCase() + ' ' + (port.pnpId || '').toLowerCase();
+      const path = port.path.toLowerCase();
+      return desc.includes('bluetooth') || desc.includes('bt') || 
+             path.includes('bluetooth') || path.includes('bt');
+    });
+    
+    if (bluetoothPorts.length === 0) {
+      console.error('❌ No Bluetooth ports found by name!');
+      console.log('\n🔍 Will try all available ports instead...');
+      console.log('\nAvailable ports:');
+      ports.forEach(port => {
+        console.log(`  - ${port.path} (${port.manufacturer || 'Unknown'} ${port.pnpId || ''})`);
+      });
+      console.log('');
+      
+      // Try all ports if no Bluetooth ports found by name
+      for (const portInfo of ports) {
+        const portName = portInfo.path;
+        console.log(`🔌 Testing ${portName}...`);
+        
+        const foundPort = await testPort(portName);
+        if (foundPort) {
+          console.log(`\n✅ Found Raspberry Pi on ${portName}!\n`);
+          return portName;
+        } else {
+          console.log(`   ⚠️  ${portName}: No thermal data received\n`);
+        }
+      }
+      
+      console.error('\n❌ Could not find Raspberry Pi on any port.');
+      console.log('\n💡 Troubleshooting:');
+      console.log('  1. Make sure Raspberry Pi is powered on');
+      console.log('  2. Pair Raspberry Pi in Windows: Settings → Bluetooth & devices');
+      console.log('  3. Check connection status: Settings → Bluetooth → Is Raspberry Pi connected?');
+      console.log('  4. Check Device Manager → Ports (COM & LPT) for the COM port number');
+      console.log('  5. Make sure bluetooth-thermal-sender.py is running on Raspberry Pi');
+      console.log('  6. Try manually with COM port: node bluetooth-thermal-receiver.js COM9');
+      return null;
+    }
+    
+    console.log(`📋 Found ${bluetoothPorts.length} Bluetooth port(s):`);
+    bluetoothPorts.forEach(port => {
+      console.log(`  - ${port.path} (${port.manufacturer || 'Unknown'})`);
+    });
+    console.log('');
+    
+    // Try each Bluetooth port to find the one receiving thermal data
+    for (const portInfo of bluetoothPorts) {
+      const portName = portInfo.path;
+      console.log(`🔌 Testing ${portName} (waiting 5 seconds for data)...`);
+      
+      const foundPort = await testPort(portName);
+      if (foundPort) {
+        console.log(`\n✅ Found Raspberry Pi on ${portName}!\n`);
+        return portName;
+      } else {
+        console.log(`   ⚠️  ${portName}: No thermal data received\n`);
+      }
+    }
+    
+    console.error('\n❌ Could not find Raspberry Pi on any Bluetooth port.');
+    console.log('\n💡 Troubleshooting:');
+    console.log('  1. Make sure Raspberry Pi is powered on');
+    console.log('  2. Pair Raspberry Pi in Windows: Settings → Bluetooth & devices');
+    console.log('  3. Check connection status: Settings → Bluetooth → Is Raspberry Pi connected?');
+    console.log('  4. Check Device Manager → Ports (COM & LPT) for the COM port number');
+    console.log('  5. Make sure bluetooth-thermal-sender.py is running on Raspberry Pi');
+    console.log('  6. Try manually with COM port: node bluetooth-thermal-receiver.js COM9');
+    return null;
+  } catch (error) {
+    console.error('❌ Error scanning ports:', error.message);
+    return null;
+  }
 }
 
-console.log('🔵 Bluetooth Thermal Receiver for AMG8833');
-console.log('==========================================');
-console.log(`📡 Serial Port: ${SERIAL_PORT}`);
-console.log(`🌐 Forwarding to: ${NEXTJS_API_URL}`);
-console.log('');
+/**
+ * Test a port to see if it's receiving thermal data
+ */
+function testPort(portName) {
+  return new Promise((resolve) => {
+    const testPort = new SerialPort({
+      path: portName,
+      baudRate: 115200,
+      autoOpen: false
+    });
+    
+    const parser = testPort.pipe(new ReadlineParser({ delimiter: '\n' }));
+    let receivedData = false;
+    let timeout;
+    
+    parser.on('data', (line) => {
+      try {
+        const data = JSON.parse(line.trim());
+        if (data.type === 'thermal_data' || data.thermal_data !== undefined) {
+          receivedData = true;
+          clearTimeout(timeout);
+          testPort.close(() => resolve(true));
+        }
+      } catch (e) {
+        // Not JSON or not thermal data
+      }
+    });
+    
+    testPort.on('error', () => {
+      clearTimeout(timeout);
+      testPort.close(() => resolve(false));
+    });
+    
+    testPort.on('open', () => {
+      timeout = setTimeout(() => {
+        if (!receivedData) {
+          testPort.close(() => resolve(false));
+        }
+      }, 5000); // Wait 5 seconds for data
+    });
+    
+    testPort.open((err) => {
+      if (err) {
+        resolve(false);
+      }
+    });
+  });
+}
 
-// Create serial port connection
-const port = new SerialPort({
-  path: SERIAL_PORT,
-  baudRate: 115200,
-  autoOpen: true
-});
+// Main execution
+(async () => {
+  // If no port specified, try to auto-detect
+  if (!SERIAL_PORT) {
+    SERIAL_PORT = await autoDetectPort();
+    if (!SERIAL_PORT) {
+      console.log('\n💡 You can also specify the port manually:');
+      console.log('   node bluetooth-thermal-receiver.js COM9');
+      process.exit(1);
+    }
+  }
+
+  console.log('🔵 Bluetooth Thermal Receiver for AMG8833');
+  console.log('==========================================');
+  console.log(`📡 Serial Port: ${SERIAL_PORT}`);
+  console.log(`🌐 Forwarding to: ${NEXTJS_API_URL}`);
+  console.log('');
+
+  // Create serial port connection
+  const port = new SerialPort({
+    path: SERIAL_PORT,
+    baudRate: 115200,
+    autoOpen: true
+  });
 
 // Create parser for reading line-delimited JSON
 const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
@@ -166,5 +304,6 @@ process.on('SIGINT', () => {
   });
 });
 
-console.log('💡 Press Ctrl+C to stop\n');
+  console.log('💡 Press Ctrl+C to stop\n');
+})();
 

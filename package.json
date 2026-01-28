@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "emg-server": "node emg-server.js",
-    "dev:all": "concurrently \"npm run dev\" \"npm run emg-server\""
+    "dev:all": "concurrently \"npm run dev\" \"npm run emg-server\"",
+    "start:emg": "concurrently --names \"NEXT,EMG,BT\" --prefix-colors \"blue,yellow,green\" \"npm run dev\" \"npm run emg-server\" \"node bluetooth-receiver.js\"",
+    "start:thermal": "concurrently --names \"NEXT,THERMAL\" --prefix-colors \"blue,green\" \"npm run dev\" \"node bluetooth-thermal-receiver.js\""
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.7",

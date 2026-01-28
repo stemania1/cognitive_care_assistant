@@ -4,6 +4,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { AlertProvider } from "./components/AlertCenter";
 import { GlobalAlertButton } from "./components/GlobalAlertButton";
+import { StructuredData } from "./components/StructuredData";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,8 +17,77 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard - Cognitive Care Assistant",
-  description: "A hub for EMG, motion/thermal sensing, assessments, and reminders",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://cognitive-care-assistant.vercel.app'),
+  title: {
+    default: "Cognitive Care Assistant - Health Monitoring for Dementia Patients",
+    template: "%s | Cognitive Care Assistant"
+  },
+  description: "Winners of the 2025 Congressional App Challenge. A comprehensive health-monitoring platform designed to improve daily life for dementia patients and caregivers. Features EMG sensors, thermal monitoring, daily assessments, medication reminders, and more.",
+  keywords: [
+    "dementia care",
+    "cognitive health",
+    "health monitoring",
+    "elderly care",
+    "caregiver support",
+    "EMG sensor",
+    "thermal monitoring",
+    "medication reminders",
+    "Congressional App Challenge",
+    "Florida District 17",
+    "Corbin Craig",
+    "Connor Craig",
+    "Pine View School"
+  ],
+  authors: [{ name: "Corbin Craig and Connor Craig" }],
+  creator: "Corbin Craig and Connor Craig",
+  publisher: "Cognitive Care Assistant",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "/",
+    siteName: "Cognitive Care Assistant",
+    title: "Cognitive Care Assistant - Health Monitoring for Dementia Patients",
+    description: "Winners of the 2025 Congressional App Challenge. A comprehensive health-monitoring platform designed to improve daily life for dementia patients and caregivers.",
+    images: [
+      {
+        url: "/digital_brain.png",
+        width: 1200,
+        height: 630,
+        alt: "Cognitive Care Assistant Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cognitive Care Assistant - Health Monitoring for Dementia Patients",
+    description: "Winners of the 2025 Congressional App Challenge. A comprehensive health-monitoring platform for dementia patients and caregivers.",
+    images: ["/digital_brain.png"],
+    creator: "@CognitiveCare",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  verification: {
+    // Add Google Search Console verification when available
+    // google: "your-verification-code",
+  },
+  alternates: {
+    canonical: "/",
+  },
+  category: "healthcare",
 };
 
 export default function RootLayout({
@@ -25,12 +95,56 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const organizationStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Cognitive Care Assistant",
+    "description": "A comprehensive health-monitoring platform designed to improve daily life for dementia patients and caregivers. Winners of the 2025 Congressional App Challenge for Florida's District 17.",
+    "applicationCategory": "HealthApplication",
+    "operatingSystem": "Web",
+    "url": process.env.NEXT_PUBLIC_APP_URL || "https://cognitive-care-assistant.vercel.app",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "award": "Winner of the 2025 Congressional App Challenge - Florida District 17",
+    "creator": [
+      {
+        "@type": "Person",
+        "name": "Corbin Craig",
+        "affiliation": {
+          "@type": "EducationalOrganization",
+          "name": "Pine View School"
+        }
+      },
+      {
+        "@type": "Person",
+        "name": "Connor Craig",
+        "affiliation": {
+          "@type": "EducationalOrganization",
+          "name": "Pine View School"
+        }
+      }
+    ],
+    "featureList": [
+      "EMG sensor monitoring",
+      "Thermal sensor monitoring",
+      "Daily health assessments",
+      "Medication reminders",
+      "Photo album",
+      "Memory games",
+      "Sleep behavior tracking"
+    ]
+  };
+
   return (
     <ClerkProvider>
       <html lang="en">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
+          <StructuredData data={organizationStructuredData} />
           <AlertProvider>
             {children}
             <GlobalAlertButton />

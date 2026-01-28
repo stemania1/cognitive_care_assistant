@@ -1,9 +1,84 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
+import { StructuredData } from "../components/StructuredData";
+
+export const metadata: Metadata = {
+  title: "About - Winners of the 2025 Congressional App Challenge",
+  description: "Cognitive Care Assistant won the 2025 Congressional App Challenge for Florida's District 17. Learn about our journey, inspiration, and recognition from Rep. Gregory Steube.",
+  openGraph: {
+    title: "About - Winners of the 2025 Congressional App Challenge",
+    description: "Cognitive Care Assistant won the 2025 Congressional App Challenge for Florida's District 17. Learn about our journey and recognition.",
+    url: "/about",
+    images: [
+      {
+        url: "/images/CAClogo-dome-only-color.png",
+        width: 400,
+        height: 400,
+        alt: "Congressional App Challenge Capitol Dome",
+      },
+    ],
+  },
+  alternates: {
+    canonical: "/about",
+  },
+};
 
 export default function AboutPage() {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "About Cognitive Care Assistant - Winners of the 2025 Congressional App Challenge",
+    "description": "Cognitive Care Assistant won the 2025 Congressional App Challenge for Florida's District 17. Learn about our journey, inspiration, and recognition from Rep. Gregory Steube.",
+    "url": "https://cognitive-care-assistant.vercel.app/about",
+    "mainEntity": {
+      "@type": "SoftwareApplication",
+      "name": "Cognitive Care Assistant",
+      "applicationCategory": "HealthApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "5",
+        "ratingCount": "1"
+      },
+      "award": "Winner of the 2025 Congressional App Challenge - Florida District 17",
+      "creator": {
+        "@type": "Organization",
+        "name": "Corbin Craig and Connor Craig",
+        "affiliation": {
+          "@type": "EducationalOrganization",
+          "name": "Pine View School"
+        }
+      }
+    },
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://cognitive-care-assistant.vercel.app"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "About",
+          "item": "https://cognitive-care-assistant.vercel.app/about"
+        }
+      ]
+    }
+  };
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+    <>
+      <StructuredData data={structuredData} />
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.2),transparent)]" />
       <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/40 via-purple-500/35 to-cyan-500/40 blur-3xl -z-10" />
 
@@ -63,6 +138,7 @@ export default function AboutPage() {
         </div>
       </main>
     </div>
+    </>
   );
 }
 
