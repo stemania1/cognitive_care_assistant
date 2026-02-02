@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
-import { getClerkUserId } from '@/lib/clerk-auth';
 import { getAllUserIdsForQuery } from '@/lib/user-id-mapping';
 
 export async function GET(request: NextRequest) {
   try {
+    // Check if user is authenticated
+    const { userId: authenticatedUserId } = await auth();
+    if (!authenticatedUserId) {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const limit = Number(searchParams.get('limit') || '50');
@@ -12,6 +18,11 @@ export async function GET(request: NextRequest) {
     
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    // Verify the requested userId matches the authenticated user
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
@@ -202,6 +213,12 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    // Check if user is authenticated
+    const { userId: authenticatedUserId } = await auth();
+    if (!authenticatedUserId) {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { userId, sessionId, subjectIdentifier } = body;
     
@@ -209,6 +226,11 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ 
         error: 'User ID, Session ID, and Subject Identifier are required' 
       }, { status: 400 });
+    }
+
+    // Verify the requested userId matches the authenticated user
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     if (typeof subjectIdentifier !== 'string' || subjectIdentifier.trim().length === 0) {
@@ -254,11 +276,22 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    // Check if user is authenticated
+    const { userId: authenticatedUserId } = await auth();
+    if (!authenticatedUserId) {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { userId, sessionId } = body;
     
     if (!userId || !sessionId) {
       return NextResponse.json({ error: 'User ID and Session ID are required' }, { status: 400 });
+    }
+
+    // Verify the requested userId matches the authenticated user
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();

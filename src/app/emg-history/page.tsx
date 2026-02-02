@@ -19,6 +19,7 @@ export default function EMGHistoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<EMGSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<EMGSession | null>(null);
   const [selectedSessions, setSelectedSessions] = useState<EMGSession[]>([]);
   const [overlapMode, setOverlapMode] = useState(false);
@@ -83,13 +84,16 @@ export default function EMGHistoryPage() {
     }
 
     try {
+      setLoading(true);
+      setError(null); // Clear any previous errors
       console.log('📡 Loading EMG sessions for userId:', userId);
       const { fetchEMGSessions } = await import('@/lib/supabase-queries');
       const { data, error } = await fetchEMGSessions(userId);
 
       if (error) {
         console.error('❌ Failed to load sessions:', error);
-        alert(`Failed to load sessions: ${error}`);
+        setError(error);
+        setSessions([]); // Clear sessions on error
         return;
       }
 
@@ -107,10 +111,18 @@ export default function EMGHistoryPage() {
           }
         });
         setSessions(data);
+        setError(null); // Clear error on success
+      } else {
+        setSessions([]);
+        setError('No sessions found');
       }
     } catch (error) {
       console.error('💥 Error loading sessions:', error);
-      alert(`Error loading sessions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(errorMessage);
+      setSessions([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -977,7 +989,20 @@ export default function EMGHistoryPage() {
           </div>
           <h1 className="text-4xl font-bold mb-2">EMG Session History</h1>
           <p className="text-gray-400">View and manage your recorded EMG sessions</p>
-          {sessions.length === 0 && !loading && (
+          {error && (
+            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <p className="text-red-200 text-sm mb-2">
+                ❌ <strong>Error:</strong> {error}
+              </p>
+              <button
+                onClick={loadSessions}
+                className="px-3 py-1 rounded bg-red-500/20 hover:bg-red-500/30 text-red-200 transition-all text-sm"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {sessions.length === 0 && !loading && !error && (
             <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
               <p className="text-yellow-200 text-sm">
                 💡 <strong>Tip:</strong> After recording on the EMG page, make sure to click <strong>"Save to Cloud"</strong> to save your session here.
@@ -1008,11 +1033,26 @@ export default function EMGHistoryPage() {
               </button>
             </div>
             {sessions.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <p>No EMG sessions recorded yet.</p>
-                <Link href="/emg" className="text-cyan-400 hover:text-cyan-300 mt-2 inline-block">
-                  Go to EMG page to record a session
-                </Link>
+              <div className="text-center py-8">
+                {error ? (
+                  <div className="max-w-md mx-auto p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <h3 className="text-red-300 font-medium mb-2">❌ Error Loading Sessions</h3>
+                    <p className="text-red-200 text-sm mb-3">{error}</p>
+                    <button
+                      onClick={loadSessions}
+                      className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 transition-all text-sm"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-gray-400">
+                    <p>No EMG sessions recorded yet.</p>
+                    <Link href="/emg" className="text-cyan-400 hover:text-cyan-300 mt-2 inline-block">
+                      Go to EMG page to record a session
+                    </Link>
+                  </div>
+                )}
               </div>
             ) : (
               <>

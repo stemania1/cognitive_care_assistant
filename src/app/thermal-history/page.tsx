@@ -304,6 +304,7 @@ export default function ThermalHistoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ThermalSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<ThermalSession | null>(null);
   const [selectedSessionsForOverlap, setSelectedSessionsForOverlap] = useState<ThermalSession[]>([]);
   const [overlapMode, setOverlapMode] = useState(false);
@@ -315,14 +316,19 @@ export default function ThermalHistoryPage() {
   const [isTestingAPI, setIsTestingAPI] = useState(false);
   const [isPlayingBack, setIsPlayingBack] = useState(false);
   const [playbackIndex, setPlaybackIndex] = useState(0);
+  const [playbackSeconds, setPlaybackSeconds] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null);
+  const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const playbackMaxSecondsRef = useRef<number>(0);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
   const [isRenaming, setIsRenaming] = useState(false);
   const [isEditingGraphTitle, setIsEditingGraphTitle] = useState(false);
   const [editingGraphTitle, setEditingGraphTitle] = useState<string>('');
   const [graphTitle, setGraphTitle] = useState<string>('');
+  const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
+  const [sessionOrder, setSessionOrder] = useState<string[]>([]);
 
   useEffect(() => {
     async function initializeUser() {
@@ -383,6 +389,63 @@ export default function ThermalHistoryPage() {
       }
     }
   }, [selectedSession?.id, selectedSessionsForOverlap.length, overlapMode, isEditingGraphTitle]);
+
+  // Reset playback when session changes
+  useEffect(() => {
+    setPlaybackSeconds(0);
+    setPlaybackIndex(0);
+    setIsPlayingBack(false);
+    if (playbackIntervalRef.current) {
+      clearInterval(playbackIntervalRef.current);
+      playbackIntervalRef.current = null;
+    }
+  }, [selectedSession?.id]);
+
+  // Update playbackIndex when playbackSeconds changes
+  useEffect(() => {
+    if (!selectedSession?.samples || selectedSession.samples.length === 0) {
+      setPlaybackIndex(0);
+      return;
+    }
+    
+    // Normalize timestamp - handle both number and string formats
+    const normalizeTimestamp = (ts: any): number => {
+      if (typeof ts === 'number') return ts;
+      if (typeof ts === 'string') {
+        const parsed = new Date(ts).getTime();
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
+    };
+    
+    const startTime = normalizeTimestamp(selectedSession.samples[0].timestamp);
+    if (!startTime || startTime === 0) {
+      console.warn('⚠️ Invalid start timestamp, using index-based playback');
+      // Fallback to index-based if timestamps are invalid
+      const index = Math.min(Math.floor(playbackSeconds), selectedSession.samples.length - 1);
+      setPlaybackIndex(Math.max(0, index));
+      return;
+    }
+    
+    const targetTime = startTime + (playbackSeconds * 1000);
+    
+    // Find the closest sample by timestamp
+    let closestIndex = 0;
+    let minDiff = Infinity;
+    
+    selectedSession.samples.forEach((sample, index) => {
+      const sampleTime = normalizeTimestamp(sample.timestamp);
+      if (sampleTime === 0) return; // Skip invalid timestamps
+      
+      const diff = Math.abs(sampleTime - targetTime);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIndex = index;
+      }
+    });
+    
+    setPlaybackIndex(closestIndex);
+  }, [playbackSeconds, selectedSession]);
 
   // Render thermal canvas for playback (using same code as ThermalVisualization)
   useEffect(() => {
@@ -517,27 +580,96 @@ export default function ThermalHistoryPage() {
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [selectedSession, playbackIndex]);
+  }, [selectedSession, playbackIndex, playbackSeconds]);
 
   const loadSessions = async () => {
     if (!userId) return;
     
     try {
       setLoading(true);
+      setError(null); // Clear any previous errors
       console.log('🔍 Loading thermal sessions for userId:', userId);
       const { data, error } = await fetchThermalSessions(userId, { limit: 100 });
 
       if (error) {
         console.error('❌ Error loading sessions:', error);
+        setError(error);
+        setSessions([]); // Clear sessions on error
         return;
       }
 
       if (data) {
         console.log('✅ Successfully loaded sessions:', data.length, 'sessions');
-        setSessions(data);
+        
+        // Load saved order from localStorage
+        const orderKey = `thermal-session-order-${userId}`;
+        let savedOrder: string | null = null;
+        try {
+          savedOrder = localStorage.getItem(orderKey);
+          console.log('📦 Loaded saved order from localStorage:', savedOrder);
+        } catch (error) {
+          console.error('❌ Error reading from localStorage:', error);
+        }
+        
+        let orderedSessions = data;
+        
+        if (savedOrder) {
+          try {
+            const orderArray: string[] = JSON.parse(savedOrder);
+            console.log('📋 Parsed order array:', orderArray);
+            
+            // Create a map for quick lookup
+            const sessionMap = new Map(data.map(s => [s.id, s]));
+            const ordered: ThermalSession[] = [];
+            const unordered: ThermalSession[] = [];
+            
+            // Add sessions in saved order
+            orderArray.forEach(id => {
+              const session = sessionMap.get(id);
+              if (session) {
+                ordered.push(session);
+                sessionMap.delete(id);
+              }
+            });
+            
+            // Add any new sessions that weren't in the saved order
+            sessionMap.forEach(session => unordered.push(session));
+            
+            // Sort unordered sessions by created_at (newest first) and append
+            unordered.sort((a, b) => {
+              const dateA = new Date(a.created_at || a.started_at || 0).getTime();
+              const dateB = new Date(b.created_at || b.started_at || 0).getTime();
+              return dateB - dateA;
+            });
+            
+            orderedSessions = [...ordered, ...unordered];
+            
+            // Update sessionOrder state with the full order (including new sessions)
+            const fullOrder = [...orderArray, ...unordered.map(s => s.id)];
+            setSessionOrder(fullOrder);
+            console.log('✅ Applied saved order, total sessions:', orderedSessions.length);
+          } catch (e) {
+            console.error('❌ Error parsing saved order:', e);
+            // If parsing fails, use default order
+            orderedSessions = data;
+            setSessionOrder([]);
+          }
+        } else {
+          console.log('📋 No saved order found, using default order');
+          setSessionOrder([]);
+        }
+        
+        setSessions(orderedSessions);
+        setError(null); // Clear error on success
+      } else {
+        setSessions([]);
+        setError('No sessions found');
       }
     } catch (error) {
       console.error('💥 Exception loading sessions:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(errorMessage);
+      setSessions([]);
     } finally {
       setLoading(false);
     }
@@ -592,6 +724,19 @@ export default function ThermalHistoryPage() {
         setSessions(sessions.filter(s => s.id !== sessionId));
         if (selectedSession?.id === sessionId) {
           setSelectedSession(null);
+        }
+        
+        // Update order in localStorage
+        if (userId && sessionOrder.length > 0) {
+          const newOrder = sessionOrder.filter(id => id !== sessionId);
+          const orderKey = `thermal-session-order-${userId}`;
+          if (newOrder.length > 0) {
+            localStorage.setItem(orderKey, JSON.stringify(newOrder));
+            setSessionOrder(newOrder);
+          } else {
+            localStorage.removeItem(orderKey);
+            setSessionOrder([]);
+          }
         }
       } else {
         alert(`Failed to delete session: ${result.error || 'Unknown error'}`);
@@ -680,6 +825,79 @@ export default function ThermalHistoryPage() {
       newSelected.add(sessionId);
     }
     setSelectedSessions(newSelected);
+  };
+
+  const handleDragStart = (sessionId: string, event: React.DragEvent) => {
+    event.stopPropagation();
+    setDraggingSessionId(sessionId);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', sessionId);
+  };
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggingSessionId(null);
+  };
+
+  const handleDrop = (targetSessionId: string, event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (!draggingSessionId || draggingSessionId === targetSessionId || !userId) {
+      setDraggingSessionId(null);
+      return;
+    }
+
+    // Get current order - use sessionOrder if it exists, otherwise build from current sessions
+    const currentOrder = sessionOrder.length > 0 && sessionOrder.length === sessions.length
+      ? [...sessionOrder] 
+      : sessions.map(s => s.id);
+    
+    const fromIndex = currentOrder.indexOf(draggingSessionId);
+    const toIndex = currentOrder.indexOf(targetSessionId);
+    
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggingSessionId(null);
+      return;
+    }
+
+    // Reorder the array
+    const newOrder = [...currentOrder];
+    newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, draggingSessionId);
+    
+    // Save to localStorage FIRST
+    const orderKey = `thermal-session-order-${userId}`;
+    try {
+      localStorage.setItem(orderKey, JSON.stringify(newOrder));
+      console.log('✅ Saved session order to localStorage:', newOrder);
+    } catch (error) {
+      console.error('❌ Error saving to localStorage:', error);
+    }
+    
+    // Update state
+    setSessionOrder(newOrder);
+    
+    // Reorder sessions array
+    const sessionMap = new Map(sessions.map(s => [s.id, s]));
+    const reorderedSessions = newOrder
+      .map(id => sessionMap.get(id))
+      .filter((s): s is ThermalSession => s !== undefined);
+    
+    // Add any sessions not in the order (shouldn't happen, but safety check)
+    sessions.forEach(session => {
+      if (!newOrder.includes(session.id)) {
+        reorderedSessions.push(session);
+      }
+    });
+    
+    setSessions(reorderedSessions);
+    setDraggingSessionId(null);
   };
 
   const selectAllSessions = () => {
@@ -1551,32 +1769,47 @@ This indicates a problem with the session saving process.`);
         {/* Sessions List */}
         {sessions.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-400 mb-4">
-              {loading ? 'Loading thermal sessions...' : 'No thermal sessions found.'}
-            </p>
-            {!loading && (
-              <>
-                <div className="mb-6 p-4 rounded-lg bg-orange-500/10 border border-orange-500/20 max-w-md mx-auto">
-                  <h3 className="text-orange-300 font-medium mb-2">⚠️ Important</h3>
-                  <p className="text-orange-200 text-sm">
-                    Sessions are only saved if you:
-                  </p>
-                  <ul className="text-orange-200 text-sm mt-2 space-y-1 text-left">
-                    <li>1. Fill in the <strong>"Subject"</strong> field</li>
-                    <li>2. Start the thermal sensor</li>
-                    <li>3. Record for at least a few seconds</li>
-                    <li>4. Stop recording</li>
-                  </ul>
-                  <p className="text-orange-300 text-xs mt-2">
-                    Without a subject identifier, recordings are discarded!
-                  </p>
-                </div>
-                <Link
-                  href="/sleepbehaviors"
-                  className="inline-block px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-all"
+            {error ? (
+              <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/20 max-w-md mx-auto">
+                <h3 className="text-red-300 font-medium mb-2">❌ Error Loading Sessions</h3>
+                <p className="text-red-200 text-sm mb-3">{error}</p>
+                <button
+                  onClick={loadSessions}
+                  className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 transition-all text-sm"
                 >
-                  Start a Recording
-                </Link>
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-gray-400 mb-4">
+                  {loading ? 'Loading thermal sessions...' : 'No thermal sessions found.'}
+                </p>
+                {!loading && (
+                  <>
+                    <div className="mb-6 p-4 rounded-lg bg-orange-500/10 border border-orange-500/20 max-w-md mx-auto">
+                      <h3 className="text-orange-300 font-medium mb-2">⚠️ Important</h3>
+                      <p className="text-orange-200 text-sm">
+                        Sessions are only saved if you:
+                      </p>
+                      <ul className="text-orange-200 text-sm mt-2 space-y-1 text-left">
+                        <li>1. Fill in the <strong>"Subject"</strong> field</li>
+                        <li>2. Start the thermal sensor</li>
+                        <li>3. Record for at least a few seconds</li>
+                        <li>4. Stop recording</li>
+                      </ul>
+                      <p className="text-orange-300 text-xs mt-2">
+                        Without a subject identifier, recordings are discarded!
+                      </p>
+                    </div>
+                    <Link
+                      href="/sleepbehaviors"
+                      className="inline-block px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-all"
+                    >
+                      Start a Recording
+                    </Link>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -1712,12 +1945,21 @@ This indicates a problem with the session saving process.`);
                 {sessions.map((session) => (
                   <div
                     key={session.id}
+                    draggable={!bulkSelectMode && !overlapMode && editingSessionId !== session.id}
+                    onDragStart={(e) => handleDragStart(session.id, e)}
+                    onDragOver={handleDragOver}
+                    onDragEnd={handleDragEnd}
+                    onDrop={(e) => handleDrop(session.id, e)}
                     onClick={() => {
                       if (bulkSelectMode) return;
                       handleSessionClick(session);
                     }}
                     className={`p-4 rounded-lg border transition-all ${
-                      bulkSelectMode
+                      draggingSessionId === session.id
+                        ? 'opacity-50 border-cyan-400 bg-cyan-500/10 scale-95'
+                        : draggingSessionId && draggingSessionId !== session.id
+                        ? 'border-dashed border-cyan-400/30'
+                        : bulkSelectMode
                         ? selectedSessions.has(session.id)
                           ? 'border-cyan-400 bg-cyan-500/20 cursor-pointer ring-2 ring-cyan-400/30'
                           : 'border-white/15 bg-white/5 hover:bg-white/10 cursor-pointer hover:border-white/25'
@@ -1728,7 +1970,7 @@ This indicates a problem with the session saving process.`);
                         : selectedSession?.id === session.id
                         ? 'border-cyan-400 bg-cyan-500/20 cursor-pointer'
                         : 'border-white/15 bg-white/5 hover:bg-white/10 cursor-pointer'
-                    }`}
+                    } ${!bulkSelectMode && !overlapMode && editingSessionId !== session.id ? 'cursor-move' : ''}`}
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-start gap-3">
@@ -1752,6 +1994,25 @@ This indicates a problem with the session saving process.`);
                                 ⚠️
                               </span>
                             )}
+                          </div>
+                        )}
+                        {!bulkSelectMode && !overlapMode && editingSessionId !== session.id && (
+                          <div 
+                            className="mt-1 cursor-move text-gray-400 hover:text-cyan-400 transition-colors"
+                            title="Drag to reorder"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                              <circle cx="2" cy="2" r="1"/>
+                              <circle cx="6" cy="2" r="1"/>
+                              <circle cx="10" cy="2" r="1"/>
+                              <circle cx="2" cy="6" r="1"/>
+                              <circle cx="6" cy="6" r="1"/>
+                              <circle cx="10" cy="6" r="1"/>
+                              <circle cx="2" cy="10" r="1"/>
+                              <circle cx="6" cy="10" r="1"/>
+                              <circle cx="10" cy="10" r="1"/>
+                            </svg>
                           </div>
                         )}
                         <div className="flex-1">
@@ -2142,19 +2403,55 @@ This indicates a problem with the session saving process.`);
                             onClick={() => {
                               if (isPlayingBack) {
                                 setIsPlayingBack(false);
+                                if (playbackIntervalRef.current) {
+                                  clearInterval(playbackIntervalRef.current);
+                                  playbackIntervalRef.current = null;
+                                }
                               } else {
                                 setIsPlayingBack(true);
-                                // Auto-play through samples
-                                const interval = setInterval(() => {
-                                  setPlaybackIndex(prev => {
-                                    if (prev >= (selectedSession.samples?.length || 0) - 1) {
+                                // Auto-play through seconds
+                                const normalizeTimestamp = (ts: any): number => {
+                                  if (typeof ts === 'number') return ts;
+                                  if (typeof ts === 'string') {
+                                    const parsed = new Date(ts).getTime();
+                                    return isNaN(parsed) ? 0 : parsed;
+                                  }
+                                  return 0;
+                                };
+                                
+                                const firstTimestamp = normalizeTimestamp(selectedSession.samples?.[0]?.timestamp);
+                                const lastTimestamp = normalizeTimestamp(selectedSession.samples?.[selectedSession.samples.length - 1]?.timestamp);
+                                
+                                let maxSeconds = 0;
+                                if (firstTimestamp && lastTimestamp && firstTimestamp > 0 && lastTimestamp > 0) {
+                                  const calculated = Math.floor((lastTimestamp - firstTimestamp) / 1000);
+                                  maxSeconds = isNaN(calculated) || calculated < 0 ? selectedSession.samples.length : calculated;
+                                } else {
+                                  // Fallback: use sample count as max seconds if timestamps are invalid
+                                  maxSeconds = selectedSession.samples.length;
+                                }
+                                
+                                // Store maxSeconds in ref to avoid stale closure
+                                playbackMaxSecondsRef.current = maxSeconds;
+                                
+                                console.log('▶️ Starting playback:', { maxSeconds, playbackSpeed, currentSeconds: playbackSeconds });
+                                
+                                playbackIntervalRef.current = setInterval(() => {
+                                  setPlaybackSeconds(prev => {
+                                    const currentMax = playbackMaxSecondsRef.current;
+                                    const nextSecond = prev + (1 * playbackSpeed);
+                                    console.log('⏱️ Playback update:', { prev, nextSecond, maxSeconds: currentMax });
+                                    if (nextSecond >= currentMax) {
                                       setIsPlayingBack(false);
-                                      clearInterval(interval);
+                                      if (playbackIntervalRef.current) {
+                                        clearInterval(playbackIntervalRef.current);
+                                        playbackIntervalRef.current = null;
+                                      }
                                       return 0;
                                     }
-                                    return prev + 1;
+                                    return nextSecond;
                                   });
-                                }, 1000 / playbackSpeed);
+                                }, 1000); // Update every second
                               }
                             }}
                             className={`px-4 py-2 rounded-lg font-medium transition-all ${
@@ -2174,17 +2471,38 @@ This indicates a problem with the session saving process.`);
                             Sample {playbackIndex + 1} of {selectedSession.samples.length}
                           </span>
                           <span className="text-sm text-gray-400">
-                          {selectedSession.samples && selectedSession.samples[playbackIndex] ? 
-                            `${Math.floor((selectedSession.samples[playbackIndex].timestamp - selectedSession.samples[0].timestamp) / 1000)}s` 
-                            : '0s'}
+                            {playbackSeconds}s / {(() => {
+                              if (!selectedSession?.samples || selectedSession.samples.length === 0) return '0s';
+                              const firstTimestamp = selectedSession.samples[0]?.timestamp;
+                              const lastTimestamp = selectedSession.samples[selectedSession.samples.length - 1]?.timestamp;
+                              if (!firstTimestamp || !lastTimestamp || typeof firstTimestamp !== 'number' || typeof lastTimestamp !== 'number') {
+                                return '0s';
+                              }
+                              const maxSeconds = Math.floor((lastTimestamp - firstTimestamp) / 1000);
+                              return isNaN(maxSeconds) || maxSeconds < 0 ? '0s' : `${maxSeconds}s`;
+                            })()}
                           </span>
                         </div>
                         <input
                           type="range"
                           min={0}
-                          max={selectedSession.samples.length - 1}
-                          value={playbackIndex}
-                          onChange={(e) => setPlaybackIndex(Number(e.target.value))}
+                          max={(() => {
+                            if (!selectedSession?.samples || selectedSession.samples.length === 0) return 0;
+                            const firstTimestamp = selectedSession.samples[0]?.timestamp;
+                            const lastTimestamp = selectedSession.samples[selectedSession.samples.length - 1]?.timestamp;
+                            if (!firstTimestamp || !lastTimestamp || typeof firstTimestamp !== 'number' || typeof lastTimestamp !== 'number') {
+                              return 0;
+                            }
+                            const maxSeconds = Math.floor((lastTimestamp - firstTimestamp) / 1000);
+                            return isNaN(maxSeconds) || maxSeconds < 0 ? 0 : maxSeconds;
+                          })()}
+                          value={playbackSeconds}
+                          onChange={(e) => {
+                            setPlaybackSeconds(Number(e.target.value));
+                            if (isPlayingBack) {
+                              setIsPlayingBack(false);
+                            }
+                          }}
                           className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                         />
                       </div>

@@ -1,12 +1,13 @@
 'use client';
 
-import Link from 'next/link';
 import Image from 'next/image';
 
 export function CongressionalAppChallengeButton() {
   return (
-    <Link
-      href="/about"
+    <a
+      href="https://www.congressionalappchallenge.us/25-FL17/"
+      target="_blank"
+      rel="noopener noreferrer"
       className="fixed top-4 right-4 z-50 group"
     >
       <div className="relative">
@@ -29,6 +30,6 @@ export function CongressionalAppChallengeButton() {
           </span>
         </div>
       </div>
-    </Link>
+    </a>
   );
 }

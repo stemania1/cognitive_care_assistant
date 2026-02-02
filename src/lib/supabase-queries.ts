@@ -67,17 +67,32 @@ export async function fetchEMGSessions(
     if (options?.debug) params.append('debug', 'true');
 
     const response = await fetch(`/api/emg-sessions?${params.toString()}`);
+    
+    // Check if response is OK before trying to parse JSON
+    if (!response.ok) {
+      let errorMessage = `Failed to fetch sessions (${response.status})`;
+      try {
+        const errorResult = await response.json();
+        errorMessage = errorResult.error || errorResult.details || errorMessage;
+      } catch {
+        // If JSON parsing fails, use status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      return { data: null, error: errorMessage };
+    }
+
     const result = await response.json();
 
-    if (response.ok && result.data) {
+    if (result.data) {
       return { data: result.data, error: null };
     } else {
-      // Include error details if available
-      const errorMessage = result.error || 'Failed to fetch EMG sessions';
-      const errorDetails = result.details ? `: ${result.details}` : '';
-      return { data: null, error: `${errorMessage}${errorDetails}` };
+      return { 
+        data: null, 
+        error: result.error || result.details || 'Failed to fetch EMG sessions' 
+      };
     }
   } catch (error) {
+    console.error('Error in fetchEMGSessions:', error);
     return {
       data: null,
       error: error instanceof Error ? error.message : 'Unknown error fetching EMG sessions'
@@ -98,14 +113,32 @@ export async function fetchThermalSessions(
     if (options?.debug) params.append('debug', 'true');
 
     const response = await fetch(`/api/thermal-sessions?${params.toString()}`);
+    
+    // Check if response is OK before trying to parse JSON
+    if (!response.ok) {
+      let errorMessage = `Failed to fetch sessions (${response.status})`;
+      try {
+        const errorResult = await response.json();
+        errorMessage = errorResult.error || errorResult.details || errorMessage;
+      } catch {
+        // If JSON parsing fails, use status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      return { data: null, error: errorMessage };
+    }
+
     const result = await response.json();
 
-    if (response.ok && result.data) {
+    if (result.data) {
       return { data: result.data, error: null };
     } else {
-      return { data: null, error: result.error || 'Failed to fetch thermal sessions' };
+      return { 
+        data: null, 
+        error: result.error || result.details || 'Failed to fetch thermal sessions' 
+      };
     }
   } catch (error) {
+    console.error('Error in fetchThermalSessions:', error);
     return {
       data: null,
       error: error instanceof Error ? error.message : 'Unknown error fetching thermal sessions'
