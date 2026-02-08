@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SENSOR_CONFIG } from "@/app/config/sensor-config";
+import { SENSOR_CONFIG, getPiHost } from "@/app/config/sensor-config";
 import { getThermalData } from "@/lib/thermal-data-store";
 
 export const runtime = "nodejs";
@@ -25,17 +25,32 @@ export async function GET(request: Request) {
     });
   }
   
-  // Fallback to WiFi/HTTP connection to Raspberry Pi
-  // Define these with fallbacks so they're accessible in catch block
-  let host = SENSOR_CONFIG.RASPBERRY_PI_IP;
+  // If user selected Bluetooth, do not fall back to Pi over WiFi/USB
+  if (SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth') {
+    return NextResponse.json({
+      status: 'no_data',
+      isConnected: false,
+      data: null,
+      timeSinceLastUpdate: btData.timeSinceLastUpdate
+    }, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
+
+  // Fallback to WiFi/USB HTTP connection to Raspberry Pi
+  let host = getPiHost();
   let port = String(SENSOR_CONFIG.HTTP_PORT);
-  
+
   try {
     const { searchParams } = new URL(request.url);
     const ipParam = searchParams.get("ip");
     const portParam = searchParams.get("port");
-    
-    host = ipParam || process.env.PI_HOST || SENSOR_CONFIG.RASPBERRY_PI_IP;
+
+    host = ipParam || process.env.PI_HOST || getPiHost();
     port = portParam || process.env.PI_PORT || String(SENSOR_CONFIG.HTTP_PORT);
     const url = `http://${host}:${port}/thermal-data`;
     

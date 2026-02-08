@@ -7,15 +7,15 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    router.push("/signin");
+    // Redirect to sign-in page immediately
+    router.replace("/signin");
   }, [router]);
 
-  // Show a loading state while redirecting
+  // Show a minimal loading state while redirecting
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a]">
-      <div className="text-white text-center">
-        <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
-        <p>Redirecting to sign in...</p>
+    <div className="min-h-screen bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-gray-300">Redirecting to sign in...</p>
       </div>
     </div>
   );

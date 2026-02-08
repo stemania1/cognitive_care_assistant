@@ -5,6 +5,9 @@ import Link from "next/link";
 import Image from "next/image";
 import ThermalVisualization from "../components/ThermalVisualization";
 import { useAlertCenter } from "../components/AlertCenter";
+import { SENSOR_CONFIG, getPiHost, type ConnectionMode } from "../config/sensor-config";
+
+const THERMAL_CONNECTION_MODE_KEY = "thermal-connection-mode";
 import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
 import { Line } from 'react-chartjs-2';
@@ -285,6 +288,16 @@ export default function SleepBehaviors() {
   const [moveEventCount, setMoveEventCount] = useState(0);
   const [moveButtonPressed, setMoveButtonPressed] = useState(false);
   const [chartUpdateTrigger, setChartUpdateTrigger] = useState(0);
+  const [thermalConnectionMode, setThermalConnectionMode] = useState<ConnectionMode>(() => {
+    if (typeof window === "undefined") return SENSOR_CONFIG.CONNECTION_MODE;
+    const saved = localStorage.getItem(THERMAL_CONNECTION_MODE_KEY) as ConnectionMode | null;
+    if (saved === "wifi" || saved === "usb" || saved === "bluetooth") return saved;
+    return SENSOR_CONFIG.CONNECTION_MODE;
+  });
+
+  useEffect(() => {
+    SENSOR_CONFIG.CONNECTION_MODE = thermalConnectionMode;
+  }, [thermalConnectionMode]);
 
   const frameStatsRef = useRef<
     Array<{ timestamp: number; average: number; min: number; max: number; range: number; variance: number }>
@@ -1122,12 +1135,40 @@ export default function SleepBehaviors() {
           <div className="lg:col-span-2">
             <div className="relative rounded-2xl border border-white/15 bg-white/5 backdrop-blur p-6">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-cyan-500/10 via-sky-500/5 to-blue-500/10 blur-xl" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-6">
+                <div className="relative">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                   <h2 className="text-xl font-semibold">Thermal Sensor Monitor</h2>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${isThermalActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-                    <span className="text-sm">{isThermalActive ? 'Active' : 'Inactive'}</span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${isThermalActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+                      <span className="text-sm">{isThermalActive ? 'Active' : 'Inactive'}</span>
+                    </div>
+                    {/* Connection: Wi‑Fi / USB / Bluetooth */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Connection:</span>
+                      <div className="flex rounded-lg overflow-hidden border border-white/10">
+                        {(["wifi", "usb", "bluetooth"] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => {
+                              SENSOR_CONFIG.CONNECTION_MODE = mode;
+                              try {
+                                localStorage.setItem(THERMAL_CONNECTION_MODE_KEY, mode);
+                              } catch (_) {}
+                              setThermalConnectionMode(mode);
+                            }}
+                            className={`py-1.5 px-3 text-xs font-medium transition-colors ${
+                              thermalConnectionMode === mode
+                                ? "bg-cyan-600 text-white"
+                                : "bg-white/5 text-gray-400 hover:bg-white/10"
+                            }`}
+                          >
+                            {mode === "wifi" ? "Wi‑Fi" : mode === "usb" ? "USB" : "Bluetooth"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1136,7 +1177,8 @@ export default function SleepBehaviors() {
                   <div className="relative inline-flex items-center justify-center rounded-xl border border-white/20 bg-gradient-to-br from-gray-900 to-gray-800 overflow-hidden">
                     {isThermalActive ? (
                       <div className="flex items-center justify-center p-4">
-                        <ThermalVisualization 
+                        <ThermalVisualization
+                          key={`thermal-${thermalConnectionMode}`}
                           isActive={isThermalActive}
                           onDataReceived={handleThermalDataReceived}
                           onConnectionStatusChange={handleConnectionStatusChange}

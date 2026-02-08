@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { SENSOR_CONFIG } from "../config/sensor-config";
+import { SENSOR_CONFIG, getPiHost, isPiTcpConnection, type ConnectionMode } from "../config/sensor-config";
+
+const CONNECTION_MODE_KEY = "thermal-connection-mode";
 
 interface ThermalFrame {
   timestamp: number;
@@ -23,14 +25,35 @@ export default function Sensors() {
   const [connectionStatus, setConnectionStatus] = useState("Disconnected");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [connectionMode, setConnectionModeState] = useState<ConnectionMode>(() => {
+    if (typeof window === "undefined") return SENSOR_CONFIG.CONNECTION_MODE;
+    const saved = localStorage.getItem(CONNECTION_MODE_KEY) as ConnectionMode | null;
+    if (saved === "wifi" || saved === "usb" || saved === "bluetooth") return saved;
+    return SENSOR_CONFIG.CONNECTION_MODE;
+  });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  const setConnectionMode = (mode: ConnectionMode) => {
+    SENSOR_CONFIG.CONNECTION_MODE = mode;
+    setConnectionModeState(mode);
+    // Reset connection state so we don't show "Connected via X" until actually connected with this mode
+    setIsConnected(false);
+    setConnectionStatus("Disconnected");
+    setThermalData(null);
+    try {
+      localStorage.setItem(CONNECTION_MODE_KEY, mode);
+    } catch (_) {}
+  };
+
   // AMG8833 specifications
   const GRID_SIZE = 8;
-  // Tighter range for indoor/human subject visualization
-  const MIN_TEMP = 18; // Celsius
-  const MAX_TEMP = 40; // Celsius
+  const MIN_TEMP = 18;
+  const MAX_TEMP = 40;
+
+  useEffect(() => {
+    SENSOR_CONFIG.CONNECTION_MODE = connectionMode;
+  }, [connectionMode]);
 
   useEffect(() => {
     connectWebSocket();
@@ -38,21 +61,26 @@ export default function Sensors() {
       if (wsRef.current) {
         wsRef.current.close();
       }
-      // Clean up demo interval
       if ((window as any).demoInterval) {
         clearInterval((window as any).demoInterval);
         (window as any).demoInterval = null;
       }
     };
-  }, []);
+  }, [connectionMode]);
 
   const connectWebSocket = () => {
     try {
       setIsLoading(true);
       setError(null);
-      
-      // Try WebSocket first
-      const wsUrl = `ws://${SENSOR_CONFIG.RASPBERRY_PI_IP}:${SENSOR_CONFIG.WEBSOCKET_PORT}`;
+      wsRef.current = null;
+
+      if (!isPiTcpConnection()) {
+        setConnectionStatus("Bluetooth (polling)");
+        startHttpPolling();
+        return;
+      }
+
+      const wsUrl = `ws://${getPiHost()}:${SENSOR_CONFIG.WEBSOCKET_PORT}`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
@@ -61,7 +89,7 @@ export default function Sensors() {
         setConnectionStatus("Connected");
         setError(null);
         setIsLoading(false);
-        console.log("WebSocket connected to port 8091");
+        console.log("WebSocket connected:", wsUrl);
       };
 
       ws.onmessage = (event) => {
@@ -83,14 +111,11 @@ export default function Sensors() {
         console.log("WebSocket disconnected");
       };
 
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
+      ws.onerror = () => {
+        console.warn("WebSocket connection failed:", wsUrl);
         setError("Failed to connect via WebSocket. Trying HTTP fallback...");
-        
-        // Fallback to HTTP polling
         startHttpPolling();
       };
-
     } catch (err) {
       console.error("Connection error:", err);
       setError("Connection failed. Trying HTTP fallback...");
@@ -170,8 +195,10 @@ export default function Sensors() {
     setIsLoading(true);
     const pollData = async () => {
       try {
-        const query = `?ip=${encodeURIComponent(SENSOR_CONFIG.RASPBERRY_PI_IP)}&port=${SENSOR_CONFIG.HTTP_PORT}`;
-        const response = await fetch(`/api/thermal${query}`, { cache: "no-store" });
+        const url = isPiTcpConnection()
+          ? `/api/thermal?ip=${encodeURIComponent(getPiHost())}&port=${SENSOR_CONFIG.HTTP_PORT}`
+          : "/api/thermal";
+        const response = await fetch(url, { cache: "no-store" });
         if (response.ok) {
           const data = await response.json();
           const grid: number[][] = data?.thermal_data || data?.data;
@@ -179,18 +206,30 @@ export default function Sensors() {
           if (grid && Array.isArray(grid)) {
             setThermalData({ timestamp: ts, data: grid });
             setIsConnected(true);
-            setConnectionStatus("Connected (HTTP)");
+            setConnectionStatus(isPiTcpConnection() ? "Connected (HTTP)" : "Connected (Bluetooth)");
             setError(null);
           } else {
-            throw new Error("Invalid thermal data shape");
+            setIsConnected(false);
+            setConnectionStatus("Disconnected");
+            if (!isPiTcpConnection()) {
+              setError("No Bluetooth data yet. Run a bridge that POSTs thermal data to /api/thermal/bt.");
+            } else {
+              setError("No thermal data received from the sensor.");
+            }
           }
         } else {
           throw new Error(`HTTP ${response.status}`);
         }
       } catch (err) {
-        setError(
-          `Failed to connect to thermal sensor. Ensure Pi HTTP ${SENSOR_CONFIG.HTTP_PORT} and WS ${SENSOR_CONFIG.WEBSOCKET_PORT} are reachable at ${SENSOR_CONFIG.RASPBERRY_PI_IP}.`
-        );
+        if (isPiTcpConnection()) {
+          setError(
+            `Failed to connect. Ensure Pi HTTP ${SENSOR_CONFIG.HTTP_PORT} at ${getPiHost()}.`
+          );
+        } else {
+          setError(
+            "No Bluetooth data yet. Run a bridge that POSTs thermal data to /api/thermal/bt."
+          );
+        }
         setIsConnected(false);
         setConnectionStatus("Connection Failed");
       } finally {
@@ -198,10 +237,8 @@ export default function Sensors() {
       }
     };
 
-    // Poll every 2 seconds
     pollData();
-    const interval = setInterval(pollData, 2000);
-    
+    const interval = setInterval(pollData, SENSOR_CONFIG.HTTP_POLLING_INTERVAL);
     return () => clearInterval(interval);
   };
 
@@ -321,6 +358,20 @@ export default function Sensors() {
     return "🔴";
   };
 
+  const getConnectionMethodLabel = (): string => {
+    if (isConnected && connectionStatus === "Demo Mode") return "Demo";
+    if (connectionMode === "wifi") return "Wi‑Fi";
+    if (connectionMode === "usb") return "USB";
+    return "Bluetooth";
+  };
+
+  const getConnectionMethodIcon = (): string => {
+    if (isConnected && connectionStatus === "Demo Mode") return "🎮";
+    if (connectionMode === "wifi") return "📶";
+    if (connectionMode === "usb") return "🔌";
+    return "📡";
+  };
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
       {/* Background gradients */}
@@ -356,13 +407,33 @@ export default function Sensors() {
           </p>
           
           {/* Connection Status */}
-          <div className="inline-flex items-center space-x-3 px-4 py-2 rounded-lg bg-white/10 backdrop-blur border border-white/20">
-            <span className="text-2xl">{getStatusIcon()}</span>
-            <span className={`font-medium ${getStatusColor()}`}>
-              {connectionStatus}
-            </span>
-            {isLoading && (
-              <div className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+          <div className="inline-flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+            <div className="inline-flex items-center space-x-3 px-4 py-2 rounded-lg bg-white/10 backdrop-blur border border-white/20">
+              <span className="text-2xl">{getStatusIcon()}</span>
+              <span className={`font-medium ${getStatusColor()}`}>
+                {isConnected
+                  ? connectionStatus === "Demo Mode"
+                    ? "Demo Mode"
+                    : `Connected via ${getConnectionMethodLabel()}`
+                  : connectionStatus}
+              </span>
+              {isLoading && (
+                <div className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+              )}
+            </div>
+            {connectionMode === "bluetooth" && !isConnected && (
+              <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300">
+                Bluetooth mode active — waiting for data from <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code>.
+              </div>
+            )}
+            {!isConnected && (
+              <div
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300"
+                title={`Connection method: ${getConnectionMethodLabel()}`}
+              >
+                <span className="opacity-80">{getConnectionMethodIcon()}</span>
+                <span>Via {getConnectionMethodLabel()}</span>
+              </div>
             )}
           </div>
         </div>
@@ -507,6 +578,32 @@ export default function Sensors() {
                   Controls
                 </h3>
                 <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Connection</label>
+                    <div className="flex rounded-lg overflow-hidden border border-white/10">
+                      {(["wifi", "usb", "bluetooth"] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            setConnectionMode(mode);
+                            connectWebSocket();
+                          }}
+                          className={`flex-1 py-2 px-3 text-sm font-medium capitalize transition-colors ${
+                            connectionMode === mode
+                              ? "bg-cyan-600 text-white"
+                              : "bg-white/5 text-gray-400 hover:bg-white/10"
+                          }`}
+                        >
+                          {mode === "wifi" ? "Wi‑Fi" : mode === "usb" ? "USB" : "Bluetooth"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {connectionMode === "usb" && "Pi over USB cable (same server, no Pi code change)."}
+                      {connectionMode === "bluetooth" && "Data from bridge posting to /api/thermal/bt (no Pi in loop)."}
+                    </p>
+                  </div>
                   <button
                     onClick={connectWebSocket}
                     disabled={isLoading}
@@ -536,7 +633,7 @@ export default function Sensors() {
                   
                   <div className="text-xs text-gray-400 text-center pt-2 border-t border-white/10">
                     <p className="mb-1">Demo Mode: Test the interface without hardware</p>
-                    <p>Real Sensor: Pi HTTP {SENSOR_CONFIG.HTTP_PORT}, WS {SENSOR_CONFIG.WEBSOCKET_PORT}</p>
+                    <p>Real Sensor: {connectionMode === "bluetooth" ? "Bluetooth bridge → /api/thermal/bt" : `Pi HTTP ${SENSOR_CONFIG.HTTP_PORT}, WS ${SENSOR_CONFIG.WEBSOCKET_PORT} at ${getPiHost()}`}</p>
                   </div>
                 </div>
               </div>

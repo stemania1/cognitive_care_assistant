@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { SENSOR_CONFIG, getWebSocketUrl, getThermalDataUrl, findRaspberryPi } from '../config/sensor-config';
+import { SENSOR_CONFIG, getWebSocketUrl, getThermalDataUrl, findRaspberryPi, getPiHost, isPiTcpConnection } from '../config/sensor-config';
+
+const BLUETOOTH_SENTINEL = '__bluetooth__';
 
 interface ThermalData {
   type: string;
@@ -152,43 +154,52 @@ export default function ThermalVisualization({
   }, [connectionStatus, onConnectionStatusChange]);
 
   // Auto-discover Raspberry Pi when component becomes active
+  // Set connection target: Bluetooth (poll /api/thermal), USB (use getPiHost()), or Wi‑Fi (discover)
   useEffect(() => {
-    if (!isActive) return;
-
+    if (!isActive) {
+      setDiscoveredIP(null);
+      return;
+    }
+    if (!isPiTcpConnection()) {
+      setDiscoveredIP(BLUETOOTH_SENTINEL);
+      setConnectionStatus('connecting');
+      return;
+    }
+    if (SENSOR_CONFIG.CONNECTION_MODE === 'usb') {
+      setDiscoveredIP(getPiHost());
+      setConnectionStatus('connecting');
+      return;
+    }
     const discoverPi = async () => {
       setConnectionStatus('discovering');
       const foundIP = await findRaspberryPi();
-      
       if (foundIP) {
         setDiscoveredIP(foundIP);
         setConnectionStatus('connecting');
-        // Update the config temporarily for this session
         SENSOR_CONFIG.RASPBERRY_PI_IP = foundIP;
       } else {
-        // Fallback to configured IP if discovery fails
         setDiscoveredIP(SENSOR_CONFIG.RASPBERRY_PI_IP);
         setConnectionStatus('connecting');
       }
     };
-
     discoverPi();
   }, [isActive]);
 
-  // WebSocket connection
+  // WebSocket connection (skip when Bluetooth — we only poll)
   useEffect(() => {
-    if (!isActive || !discoveredIP) {
+    if (!isActive || !discoveredIP || discoveredIP === BLUETOOTH_SENTINEL) {
       if (websocketRef.current) {
         websocketRef.current.close();
         websocketRef.current = null;
       }
-      setConnectionStatus('disconnected');
+      if (!isActive || !discoveredIP) {
+        setConnectionStatus('disconnected');
+      }
       return;
     }
 
     const connectWebSocket = () => {
       setConnectionStatus('connecting');
-      
-      // Use discovered IP for WebSocket URL
       const wsUrl = `ws://${discoveredIP}:${SENSOR_CONFIG.WEBSOCKET_PORT}`;
       
       try {
@@ -442,47 +453,49 @@ export default function ThermalVisualization({
     };
   }, [thermalData]);
 
-  // Fallback to HTTP polling via Next.js API proxy (avoids CORS/mixed content)
-  // Only poll if WebSocket is not connected
+  // Fallback to HTTP polling (or Bluetooth: poll /api/thermal with no query).
+  // Keep polling even when 'connected' so data keeps updating (no early return on connectionStatus).
   useEffect(() => {
-    if (!isActive || connectionStatus === 'connected' || !discoveredIP) return;
+    if (!isActive || !discoveredIP) return;
 
     const pollData = async () => {
-      // Prevent concurrent polling requests
-      if (isPollingRef.current) {
-        console.log('⏭️ Skipping thermal poll - previous request still in progress');
-        return;
-      }
-      
+      if (isPollingRef.current) return;
       isPollingRef.current = true;
-      
-      // Create abort controller with timeout to prevent hanging
+
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 second timeout (slightly longer than API's 5s)
-      
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const isBluetooth = discoveredIP === BLUETOOTH_SENTINEL;
+      const query = isBluetooth ? '' : `?ip=${encodeURIComponent(discoveredIP)}&port=${SENSOR_CONFIG.HTTP_PORT}`;
+
       try {
-        const query = discoveredIP ? `?ip=${encodeURIComponent(discoveredIP)}&port=${SENSOR_CONFIG.HTTP_PORT}` : "";
-        const response = await fetch(`/api/thermal${query}`, { 
+        const response = await fetch(`/api/thermal${query}`, {
           cache: 'no-store',
           signal: controller.signal
         });
         clearTimeout(timeoutId);
         
         if (response.ok) {
-          const data: ThermalData = await response.json();
-          const calibrated = applyCalibration(data.thermal_data);
+          const data = await response.json();
+          const grid = data?.thermal_data ?? data?.data;
+          if (!grid || !Array.isArray(grid)) {
+            if (lastConnectionStatus.current !== 'disconnected') {
+              lastConnectionStatus.current = 'disconnected';
+              setConnectionStatus('disconnected');
+            }
+            isPollingRef.current = false;
+            return;
+          }
+          // Set connected as soon as we have valid data so UI shows "Connected via Wi‑Fi" (or USB/Bluetooth)
+          lastConnectionStatus.current = 'connected';
+          setConnectionStatus('connected');
+          const calibrated = applyCalibration(grid);
           const denoised = denoiseFrame(calibrated);
           const smoothedData = smoothThermalData(denoised);
           setThermalData(smoothedData);
-          setSensorInfo(data.sensor_info);
+          setSensorInfo(data?.sensor_info ?? null);
           setLastUpdate(new Date());
-          onDataReceivedRef.current(data);
-          
-          // Update connection status to connected when we successfully receive data
-          if (lastConnectionStatus.current !== 'connected') {
-            lastConnectionStatus.current = 'connected';
-            setConnectionStatus('connected');
-          }
+          onDataReceivedRef.current({ ...data, thermal_data: grid, type: data?.type ?? 'thermal_data' } as ThermalData);
         } else {
           // Update connection status to disconnected if response is not ok
           if (lastConnectionStatus.current !== 'disconnected') {
@@ -517,7 +530,7 @@ export default function ThermalVisualization({
     // Poll every 100ms (10 FPS) for fast updates when WebSocket is not available
     const interval = setInterval(pollData, 100); // Poll every 100ms (10 FPS)
     return () => clearInterval(interval);
-  }, [isActive, discoveredIP, connectionStatus]);
+  }, [isActive, discoveredIP]);
 
   const getStatusColor = () => {
     switch (connectionStatus) {
@@ -529,10 +542,17 @@ export default function ThermalVisualization({
     }
   };
 
+  const connectionMethodLabel =
+    SENSOR_CONFIG.CONNECTION_MODE === 'usb' ? 'USB' :
+    SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? 'Bluetooth' : 'Wi‑Fi';
+  const connectionMethodIcon =
+    SENSOR_CONFIG.CONNECTION_MODE === 'usb' ? '🔌' :
+    SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? '📡' : '📶';
+
   const getStatusText = () => {
     switch (connectionStatus) {
-      case 'connected': return 'Connected';
-      case 'connecting': return 'Connecting...';
+      case 'connected': return `Connected via ${connectionMethodLabel}`;
+      case 'connecting': return `Connecting via ${connectionMethodLabel}...`;
       case 'disconnected': return 'Disconnected';
       case 'discovering': return 'Discovering Pi...';
       default: return 'Unknown';
@@ -542,12 +562,18 @@ export default function ThermalVisualization({
   return (
     <div className="space-y-4">
       {/* Connection Status */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${getStatusColor()} animate-pulse`} />
           <span className="text-sm text-gray-300">
             {getStatusText()}
           </span>
+          {connectionStatus !== 'connected' && (
+            <span className="text-xs text-gray-500 flex items-center gap-1" title={`Connection method: ${connectionMethodLabel}`}>
+              <span>{connectionMethodIcon}</span>
+              <span>Via {connectionMethodLabel}</span>
+            </span>
+          )}
         </div>
         {lastUpdate && (
           <span className="text-xs text-gray-400">
@@ -555,6 +581,11 @@ export default function ThermalVisualization({
           </span>
         )}
       </div>
+      {SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' && connectionStatus !== 'connected' && (
+        <div className="text-xs text-gray-400 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+          Bluetooth mode active — waiting for data from <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code>.
+        </div>
+      )}
 
       {/* Thermal Visualization */}
       <div className="relative w-full h-full flex items-center justify-center">

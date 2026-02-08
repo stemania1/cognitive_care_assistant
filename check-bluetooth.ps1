@@ -97,3 +97,23 @@ Write-Host "  6. Try manually: node bluetooth-receiver.js COM8 (replace COM8)" -
 Write-Host ""
 Write-Host "💡 The auto-detection will try all ports if Bluetooth name is not found" -ForegroundColor Yellow
 Write-Host ""
+
+# Start Bluetooth Service Command
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Start Bluetooth Service" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Starting Bluetooth service..." -ForegroundColor Yellow
+try {
+    Start-Service -Name bthserv -ErrorAction Stop
+    Write-Host "✅ Bluetooth service started successfully!" -ForegroundColor Green
+    Write-Host ""
+    # Verify it's running
+    Start-Sleep -Seconds 1
+    $btService = Get-Service -Name bthserv
+    Write-Host "Service Status: $($btService.Status)" -ForegroundColor Cyan
+} catch {
+    Write-Host "❌ Failed to start Bluetooth service: $_" -ForegroundColor Red
+    Write-Host "💡 You may need to run PowerShell as Administrator" -ForegroundColor Yellow
+}
+Write-Host ""
