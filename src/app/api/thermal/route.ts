@@ -47,99 +47,100 @@ export async function GET(request: Request) {
   }
 
   // Fallback to WiFi/USB HTTP connection to Raspberry Pi (only when client sent ip/port)
-  let host = ipParam ?? process.env.PI_HOST ?? getPiHost();
-  let port = portParam ?? process.env.PI_PORT ?? String(SENSOR_CONFIG.HTTP_PORT);
+  const port = portParam ?? process.env.PI_PORT ?? String(SENSOR_CONFIG.HTTP_PORT);
+  const primaryHost = ipParam ?? process.env.PI_HOST ?? getPiHost();
+  const backupHost = SENSOR_CONFIG.RASPBERRY_PI_IP_BACKUP?.trim() || null;
+  const hostsToTry = backupHost && backupHost !== primaryHost ? [primaryHost, backupHost] : [primaryHost];
 
-  try {
+  for (let i = 0; i < hostsToTry.length; i++) {
+    const host = hostsToTry[i];
+    const isBackup = i === 1;
     const url = `http://${host}:${port}/thermal-data`;
-    
-    // Add timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-    
+
     try {
-      const res = await fetch(url, { 
-        cache: "no-store",
-        signal: controller.signal,
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          if (isBackup) {
+            console.error(`[API Thermal] Backup ${host} returned ${res.status}, giving up.`);
+          }
+          console.error(`[API Thermal] Upstream error: ${res.status} ${res.statusText} from ${url}`);
+          return NextResponse.json(
+            { error: `Upstream error: ${res.status} ${res.statusText}`, status: res.status },
+            { status: 502 }
+          );
+        }
+
+        const data = await res.json();
+        if (isBackup) {
+          console.log(`[API Thermal] Primary unreachable; using backup Pi at ${host}`);
+        }
+        return NextResponse.json({
+          ...data,
+          _connection: { host, isBackup },
+        }, { status: 200 });
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (isBackup) {
+          console.error(`[API Thermal] Backup ${host} failed:`, fetchError?.message);
+          throw fetchError;
+        }
+        if (hostsToTry.length > 1) {
+          console.log(`[API Thermal] Primary ${host} failed, trying backup ${backupHost}...`);
+        } else {
+          throw fetchError;
+        }
+      }
+    } catch (error: any) {
+      if (i < hostsToTry.length - 1) continue;
+
+      console.error(`[API Thermal] Proxy request failed:`, {
+        message: error?.message,
+        code: error?.code,
+        host,
       });
-      clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        console.error(`[API Thermal] Upstream error: ${res.status} ${res.statusText} from ${url}`);
+      const errorMessage = error?.message || "Proxy request failed";
+      const errorCode = error?.code || error?.cause?.code;
+
+      if (errorCode === 'ECONNREFUSED') {
         return NextResponse.json(
-          { error: `Upstream error: ${res.status} ${res.statusText}`, status: res.status },
-          { status: 502 }
+          {
+            error: `Connection refused: Raspberry Pi at ${host}:${port} is not reachable. Is the service running?`,
+            details: 'The service may not be running on the Raspberry Pi. Check with: sudo systemctl status amg883-headless.service'
+          },
+          { status: 503 }
+        );
+      }
+      if (errorCode === 'AbortError' || errorCode === 'ETIMEDOUT' || errorCode === 'EHOSTUNREACH' || errorCode === 'ENETUNREACH') {
+        return NextResponse.json(
+          {
+            error: `Network error: Cannot reach Raspberry Pi at ${host}:${port}. Check network connection.`,
+            details: `Try: ping ${host} or curl http://${host}:${port}/thermal-data`
+          },
+          { status: 503 }
+        );
+      }
+      if (errorCode === 'ENOTFOUND' || errorCode === 'EAI_AGAIN') {
+        return NextResponse.json(
+          { error: `DNS/Hostname error: Cannot resolve ${host}`, details: 'Check if the IP address is correct' },
+          { status: 503 }
         );
       }
 
-      const data = await res.json();
-      return NextResponse.json(data, { status: 200 });
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      
-      if (fetchError.name === 'AbortError') {
-        console.error(`[API Thermal] Request timeout to ${url}`);
-        return NextResponse.json(
-          { error: `Request timeout: Raspberry Pi at ${host}:${port} did not respond within 5 seconds` },
-          { status: 504 }
-        );
-      }
-      throw fetchError; // Re-throw to be caught by outer catch
-    }
-  } catch (error: any) {
-    // Log full error details for debugging
-    console.error(`[API Thermal] Proxy request failed:`, {
-      message: error?.message,
-      code: error?.code,
-      cause: error?.cause,
-      errno: error?.errno,
-      syscall: error?.syscall,
-      address: error?.address,
-      port: error?.port,
-      stack: error?.stack,
-    });
-    
-    const errorMessage = error?.message || "Proxy request failed";
-    const errorCode = error?.code || error?.cause?.code;
-    
-    // Provide more helpful error messages based on error codes
-    if (errorCode === 'ECONNREFUSED') {
       return NextResponse.json(
-        { 
-          error: `Connection refused: Raspberry Pi at ${host}:${port} is not reachable. Is the service running?`,
-          details: 'The service may not be running on the Raspberry Pi. Check with: sudo systemctl status amg883-headless.service'
-        },
-        { status: 503 }
+        { error: errorMessage, code: errorCode || 'UNKNOWN', details: `Troubleshooting: curl http://${host}:${port}/thermal-data` },
+        { status: 500 }
       );
     }
-    if (errorCode === 'ETIMEDOUT' || errorCode === 'EHOSTUNREACH' || errorCode === 'ENETUNREACH') {
-      return NextResponse.json(
-        { 
-          error: `Network error: Cannot reach Raspberry Pi at ${host}:${port}. Check network connection.`,
-          details: `Try: ping ${host} or curl http://${host}:${port}/thermal-data`
-        },
-        { status: 503 }
-      );
-    }
-    if (errorCode === 'ENOTFOUND' || errorCode === 'EAI_AGAIN') {
-      return NextResponse.json(
-        { 
-          error: `DNS/Hostname error: Cannot resolve ${host}`,
-          details: 'Check if the IP address is correct'
-        },
-        { status: 503 }
-      );
-    }
-    
-    return NextResponse.json(
-      { 
-        error: errorMessage,
-        code: errorCode || 'UNKNOWN',
-        details: `Troubleshooting: 1) Check service status on Pi: sudo systemctl status amg883-headless.service 2) Test connection: curl http://${host}:${port}/thermal-data 3) Verify Pi is on network: ping ${host}`
-      },
-      { status: 500 }
-    );
   }
+
+  return NextResponse.json({ error: 'No Pi host to try' }, { status: 500 });
 }
 
 

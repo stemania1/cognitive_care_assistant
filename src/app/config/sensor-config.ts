@@ -7,8 +7,11 @@ export const SENSOR_CONFIG = {
   // Connection: 'wifi' = Pi on network, 'usb' = Pi over USB ethernet (no Pi code change), 'bluetooth' = bridge posts to /api/thermal/bt
   CONNECTION_MODE: 'wifi' as ConnectionMode,
 
-  // Raspberry Pi IP address on your local network (static for headless deployment)
-  RASPBERRY_PI_IP: '192.168.254.200',
+  // Primary: Pi on laptop hotspot (Windows Mobile hotspot often uses 192.168.137.x)
+  RASPBERRY_PI_IP: '192.168.137.2',
+
+  // Backup: Pi on local WiFi when hotspot is unreachable. Set to '' to disable.
+  RASPBERRY_PI_IP_BACKUP: '192.168.254.200',
 
   // Pi over USB (RNDIS / USB gadget: enable on Pi, same server—no Pi code change)
   RASPBERRY_PI_IP_USB: '192.168.7.2',
@@ -17,6 +20,8 @@ export const SENSOR_CONFIG = {
   COMMON_IPS: [
     '192.168.254.200', // Headless Raspberry Pi static IP
     '192.168.254.16',
+    '192.168.137.2',   // Pi on Windows Mobile hotspot
+    '192.168.137.3',
     '192.168.7.2',     // USB gadget
     '192.168.1.100',
     '192.168.0.100',

@@ -113,59 +113,63 @@ def main():
     logger.info("📡 Waiting for connection from computer...")
     logger.info("   (Make sure to pair with this device from your computer)")
 
-    client_sock = None
-    address = None
-
     try:
-        # Accept connection
-        client_sock, address = server_sock.accept()
-        logger.info(f"✅ Connected to {address}")
-        logger.info("📤 Sending thermal data...")
-
-        last_log_time = time.time()
-        frame_count = 0
-
         while True:
+            # Wait for a connection (or reconnection)
+            client_sock, address = server_sock.accept()
+            logger.info(f"✅ Connected to {address}")
+            logger.info("📤 Sending thermal data...")
+
+            last_log_time = time.time()
+            frame_count = 0
+
             try:
-                # Read thermal frame
-                frame = read_sensor_frame()
-                
-                # Build payload
-                payload = build_payload(frame)
-                
-                # Convert to JSON string with newline delimiter
-                message = json.dumps(payload) + "\n"
-                
-                # Send via Bluetooth
-                client_sock.send(message.encode('utf-8'))
-                
-                frame_count += 1
-                
-                # Log every 5 seconds to avoid spam
-                current_time = time.time()
-                if current_time - last_log_time >= 5.0:
-                    avg_temp = sum(sum(row) for row in frame) / (GRID_WIDTH * GRID_HEIGHT)
-                    logger.info(f"📤 Sent frame #{frame_count} - Avg temp: {avg_temp:.2f}°C")
-                    last_log_time = current_time
-                
-                # Wait before next frame
-                time.sleep(UPDATE_INTERVAL)
-                
-            except bluetooth.BluetoothError as e:
-                logger.error(f"❌ Bluetooth error: {e}")
-                logger.info("🔄 Attempting to reconnect...")
-                break
-            except Exception as e:
-                logger.error(f"❌ Error: {e}")
-                time.sleep(1)
+                while True:
+                    try:
+                        # Read thermal frame
+                        frame = read_sensor_frame()
+                        
+                        # Build payload
+                        payload = build_payload(frame)
+                        
+                        # Convert to JSON string with newline delimiter
+                        message = json.dumps(payload) + "\n"
+                        
+                        # Send via Bluetooth
+                        client_sock.send(message.encode('utf-8'))
+                        
+                        frame_count += 1
+                        
+                        # Log every 5 seconds to avoid spam
+                        current_time = time.time()
+                        if current_time - last_log_time >= 5.0:
+                            avg_temp = sum(sum(row) for row in frame) / (GRID_WIDTH * GRID_HEIGHT)
+                            logger.info(f"📤 Sent frame #{frame_count} - Avg temp: {avg_temp:.2f}°C")
+                            last_log_time = current_time
+                        
+                        # Wait before next frame
+                        time.sleep(UPDATE_INTERVAL)
+                        
+                    except bluetooth.BluetoothError as e:
+                        logger.error(f"❌ Bluetooth error: {e}")
+                        raise
+                    except Exception as e:
+                        logger.error(f"❌ Error: {e}")
+                        time.sleep(1)
+            except bluetooth.BluetoothError:
+                pass  # Fall through to close client and accept again
+            finally:
+                try:
+                    client_sock.close()
+                except Exception:
+                    pass
+                logger.info("📡 Disconnected. Waiting for reconnection...")
 
     except KeyboardInterrupt:
         logger.info("\n🛑 Stopping...")
     finally:
-        if client_sock:
-            client_sock.close()
         server_sock.close()
-        logger.info("✅ Bluetooth connection closed")
+        logger.info("✅ Bluetooth server closed")
 
 
 if __name__ == "__main__":

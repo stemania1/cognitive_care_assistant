@@ -17,6 +17,22 @@ const { ReadlineParser } = require('@serialport/parser-readline');
 // Configuration
 const NEXTJS_API_URL = process.env.NEXTJS_API_URL || 'http://localhost:3000/api/thermal/bt';
 let SERIAL_PORT = process.argv[2] || process.env.THERMAL_BLUETOOTH_PORT;
+const DEFAULT_BAUD = parseInt(process.env.THERMAL_SERIAL_BAUD || '115200', 10) || 115200;
+
+// Options that work better with USB serial (e.g. Pi USB gadget); some drivers fail with flow control
+function serialPortOptions(baudRate) {
+  return {
+    path: SERIAL_PORT,
+    baudRate: baudRate || DEFAULT_BAUD,
+    dataBits: 8,
+    stopBits: 1,
+    parity: 'none',
+    rtscts: false,
+    xon: false,
+    xoff: false,
+    autoOpen: false
+  };
+}
 
 /**
  * Auto-detect Raspberry Pi Bluetooth port by scanning all available ports
@@ -115,9 +131,8 @@ async function autoDetectPort() {
 function testPort(portName) {
   return new Promise((resolve) => {
     const testPort = new SerialPort({
-      path: portName,
-      baudRate: 115200,
-      autoOpen: false
+      ...serialPortOptions(115200),
+      path: portName
     });
     
     const parser = testPort.pipe(new ReadlineParser({ delimiter: '\n' }));
@@ -174,136 +189,121 @@ function testPort(portName) {
   console.log('==========================================');
   console.log(`📡 Serial Port: ${SERIAL_PORT}`);
   console.log(`🌐 Forwarding to: ${NEXTJS_API_URL}`);
-  console.log('');
+  console.log('💡 Connection will auto-reconnect if Bluetooth drops.\n');
+  console.log('   Press Ctrl+C to stop\n');
 
-  // Create serial port connection
-  const port = new SerialPort({
-    path: SERIAL_PORT,
-    baudRate: 115200,
-    autoOpen: true
-  });
+  let port;
+  let exiting = false;
+  const RECONNECT_DELAY_MS = 5000;
 
-// Create parser for reading line-delimited JSON
-const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
+  let forwardStats = {
+    success: 0,
+    failures: 0,
+    lastError: null,
+    lastSuccess: null
+  };
 
-let forwardStats = {
-  success: 0,
-  failures: 0,
-  lastError: null,
-  lastSuccess: null
-};
+  let lastLog = 0;
 
-let lastLog = 0; // Track last log time to avoid spam
-
-port.on('open', () => {
-  console.log('✅ Bluetooth Serial port opened successfully!');
-  console.log('📥 Waiting for thermal data from Raspberry Pi...\n');
-});
-
-port.on('error', (err) => {
-  console.error('❌ Serial port error:', err.message);
-  console.error('   Make sure:');
-  console.error('   1. Raspberry Pi is paired and connected');
-  console.error('   2. The correct COM port is specified');
-  console.error('   3. No other program is using this port');
-  console.error('   4. bluetooth-thermal-sender.py is running on Raspberry Pi');
-});
-
-parser.on('data', async (line) => {
-  try {
-    // Parse JSON data from Raspberry Pi
-    const data = JSON.parse(line.trim());
-    
-    // Log received data (not too frequently)
-    if (data.type === 'thermal_data') {
-      const now = Date.now();
-      if (now - lastLog > 5000) { // Log every 5 seconds
-        const avgTemp = data.thermal_data 
-          ? (data.thermal_data.flat().reduce((a, b) => a + b, 0) / data.thermal_data.flat().length).toFixed(1)
-          : 'N/A';
-        console.log('📥 Received thermal data:', {
-          avgTemp: `${avgTemp}°C`,
-          gridSize: data.grid_size,
-          timestamp: data.timestamp
-        });
-        lastLog = now;
-      }
-      
-      // Forward to Next.js API
-      try {
+  function handleLine(line) {
+    try {
+      const data = JSON.parse(line.trim());
+      if (data.type === 'thermal_data') {
+        const now = Date.now();
+        if (now - lastLog > 5000) {
+          const avgTemp = data.thermal_data
+            ? (data.thermal_data.flat().reduce((a, b) => a + b, 0) / data.thermal_data.flat().length).toFixed(1)
+            : 'N/A';
+          console.log('📥 Received thermal data:', { avgTemp: `${avgTemp}°C`, gridSize: data.grid_size, timestamp: data.timestamp });
+          lastLog = now;
+        }
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        const response = await fetch(NEXTJS_API_URL, {
+        fetch(NEXTJS_API_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
           signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          forwardStats.success++;
-          forwardStats.lastSuccess = new Date().toISOString();
-          
-          // Log success every 10th frame
-          if (forwardStats.success % 10 === 0) {
-            console.log('✅ Forwarded to Next.js API (every 10th):', {
-              successCount: forwardStats.success,
-              status: response.status
-            });
+        }).then(res => {
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            forwardStats.success++;
+            forwardStats.lastSuccess = new Date().toISOString();
+            if (forwardStats.success % 10 === 0) console.log('✅ Forwarded to Next.js API (every 10th):', { successCount: forwardStats.success, status: res.status });
+          } else {
+            forwardStats.failures++;
+            forwardStats.lastError = { status: res.status, statusText: res.statusText, timestamp: new Date().toISOString() };
+            console.error('❌ API returned error:', res.status, res.statusText);
           }
-        } else {
+        }).catch(fetchError => {
+          clearTimeout(timeoutId);
           forwardStats.failures++;
-          forwardStats.lastError = {
-            status: response.status,
-            statusText: response.statusText,
-            timestamp: new Date().toISOString()
-          };
-          console.error('❌ API returned error:', response.status, response.statusText);
-        }
-      } catch (fetchError) {
-        forwardStats.failures++;
-        forwardStats.lastError = {
-          message: fetchError.message,
-          timestamp: new Date().toISOString()
-        };
-        if (fetchError.name !== 'AbortError') {
-          console.error('❌ Error forwarding to API:', fetchError.message);
-        }
+          forwardStats.lastError = { message: fetchError.message, timestamp: new Date().toISOString() };
+          if (fetchError.name !== 'AbortError') console.error('❌ Error forwarding to API:', fetchError.message);
+        });
+      } else {
+        console.log('📥 Received:', data.type, data);
       }
+    } catch (e) {
+      if (line.trim().length > 0 && !line.trim().startsWith('✅') && !line.trim().startsWith('📡')) {
+        console.log('📄 Non-JSON data:', line.trim().substring(0, 100));
+      }
+    }
+  }
+
+  function connect(baudToTry = DEFAULT_BAUD) {
+    const opts = serialPortOptions(baudToTry);
+    opts.autoOpen = true;
+    port = new SerialPort(opts);
+    const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
+
+    port.on('open', () => {
+      if (baudToTry !== DEFAULT_BAUD) {
+        console.log(`✅ Serial port opened at ${baudToTry} baud (fallback; 115200 failed on this device).\n`);
+      } else {
+        console.log('✅ Bluetooth Serial port opened. Waiting for thermal data from Raspberry Pi...\n');
+      }
+    });
+
+    port.on('error', (err) => {
+      const isError31 = /error code 31|Error 31|GEN_FAILURE/i.test(err.message);
+      if (isError31 && baudToTry === 115200) {
+        console.error('❌ Serial port error (31): USB serial driver rejected 115200. Retrying with 9600...');
+        if (port && port.isOpen) port.close(() => connect(9600));
+        else setTimeout(() => connect(9600), 300);
+        return;
+      }
+      if (isError31 && baudToTry === 9600) {
+        console.error('❌ Serial port error (31): Open failed at 9600 too. Close any other app using COM3 (PuTTY, Arduino, etc.) or try another USB port.');
+      } else {
+        console.error('❌ Serial port error:', err.message);
+      }
+    });
+
+    port.on('close', () => {
+      if (exiting) return;
+      console.log('🔄 Connection lost. Reconnecting in 5 seconds... (re-pair in Settings → Bluetooth if needed)\n');
+      setTimeout(connect, RECONNECT_DELAY_MS);
+    });
+
+    parser.on('data', handleLine);
+  }
+
+  connect();
+
+  process.on('SIGINT', () => {
+    exiting = true;
+    console.log('\n\n📊 Statistics:');
+    console.log(`   Success: ${forwardStats.success}`);
+    console.log(`   Failures: ${forwardStats.failures}`);
+    if (forwardStats.lastError) console.log('   Last Error:', forwardStats.lastError);
+    if (forwardStats.lastSuccess) console.log('   Last Success:', forwardStats.lastSuccess);
+    console.log('\n👋 Closing Bluetooth connection...');
+    if (port && port.isOpen) {
+      port.close(() => { console.log('✅ Port closed. Goodbye!'); process.exit(0); });
     } else {
-      console.log('📥 Received:', data.type, data);
+      process.exit(0);
     }
-  } catch (parseError) {
-    // If it's not JSON, just log it (might be debug output from Raspberry Pi)
-    if (line.trim().length > 0 && !line.trim().startsWith('✅') && !line.trim().startsWith('📡')) {
-      console.log('📄 Non-JSON data:', line.trim().substring(0, 100));
-    }
-  }
-});
-
-// Handle cleanup on exit
-process.on('SIGINT', () => {
-  console.log('\n\n📊 Statistics:');
-  console.log(`   Success: ${forwardStats.success}`);
-  console.log(`   Failures: ${forwardStats.failures}`);
-  if (forwardStats.lastError) {
-    console.log('   Last Error:', forwardStats.lastError);
-  }
-  if (forwardStats.lastSuccess) {
-    console.log('   Last Success:', forwardStats.lastSuccess);
-  }
-  console.log('\n👋 Closing Bluetooth connection...');
-  port.close(() => {
-    console.log('✅ Port closed. Goodbye!');
-    process.exit(0);
   });
-});
-
-  console.log('💡 Press Ctrl+C to stop\n');
 })();
 

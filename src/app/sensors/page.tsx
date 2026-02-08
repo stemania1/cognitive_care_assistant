@@ -213,28 +213,43 @@ export default function Sensors() {
           if (grid && Array.isArray(grid)) {
             setThermalData({ timestamp: ts, data: grid });
             setIsConnected(true);
-            setConnectionStatus(isPiTcpConnection() ? "Connected (HTTP)" : "Connected (Bluetooth)");
+            if (!isPiTcpConnection()) {
+              setConnectionStatus("Connected (Bluetooth)");
+            } else if (data._connection) {
+              const { host, isBackup } = data._connection;
+              setConnectionStatus(
+                isBackup
+                  ? `Connected (Local Wi‑Fi backup · ${host})`
+                  : `Connected (Hotspot · ${host})`
+              );
+            } else {
+              setConnectionStatus("Connected (HTTP)");
+            }
             setError(null);
           } else {
             setIsConnected(false);
             setConnectionStatus("Disconnected");
             if (!isPiTcpConnection()) {
-              setError("No Bluetooth data yet. Run a bridge that POSTs thermal data to /api/thermal/bt.");
+              setError("Bluetooth: Start the bridge (node bluetooth-thermal-receiver.js COMx) and Pi sender (python3 bluetooth-thermal-sender.py).");
             } else {
-              setError("No thermal data received from the sensor.");
+              setError("No thermal data received. On Pi run: python3 raspberry_pi_thermal_server.py");
             }
           }
         } else {
           throw new Error(`HTTP ${response.status}`);
         }
       } catch (err) {
-        if (isPiTcpConnection()) {
+        if (!isPiTcpConnection()) {
           setError(
-            `Failed to connect. Ensure Pi HTTP ${SENSOR_CONFIG.HTTP_PORT} at ${getPiHost()}.`
+            "Bluetooth: Run on PC — node bluetooth-thermal-receiver.js COMx (add Outgoing COM port in Devices and Printers → raspberrypi). On Pi — python3 bluetooth-thermal-sender.py."
+          );
+        } else if (connectionMode === "usb") {
+          setError(
+            `USB: 1) Pi connected via USB cable (data port). 2) Windows: set USB Ethernet adapter to 192.168.7.1. 3) On Pi run: python3 raspberry_pi_thermal_server.py`
           );
         } else {
           setError(
-            "No Bluetooth data yet. Run a bridge that POSTs thermal data to /api/thermal/bt."
+            `Failed to connect. Ensure Pi HTTP ${SENSOR_CONFIG.HTTP_PORT} at ${getPiHost()}.`
           );
         }
         setIsConnected(false);

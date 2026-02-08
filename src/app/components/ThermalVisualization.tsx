@@ -41,6 +41,7 @@ export default function ThermalVisualization({
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'discovering'>('disconnected');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [discoveredIP, setDiscoveredIP] = useState<string | null>(null);
+  const [connectionSource, setConnectionSource] = useState<{ host: string; isBackup: boolean } | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastConnectionStatus = useRef<string>('disconnected');
@@ -482,13 +483,18 @@ export default function ThermalVisualization({
             if (lastConnectionStatus.current !== 'disconnected') {
               lastConnectionStatus.current = 'disconnected';
               setConnectionStatus('disconnected');
+              setConnectionSource(null);
             }
             isPollingRef.current = false;
             return;
           }
-          // Set connected as soon as we have valid data so UI shows "Connected via Wi‑Fi" (or USB/Bluetooth)
           lastConnectionStatus.current = 'connected';
           setConnectionStatus('connected');
+          if (data._connection) {
+            setConnectionSource({ host: data._connection.host, isBackup: data._connection.isBackup });
+          } else {
+            setConnectionSource(null);
+          }
           const calibrated = applyCalibration(grid);
           const denoised = denoiseFrame(calibrated);
           const smoothedData = smoothThermalData(denoised);
@@ -497,10 +503,10 @@ export default function ThermalVisualization({
           setLastUpdate(new Date());
           onDataReceivedRef.current({ ...data, thermal_data: grid, type: data?.type ?? 'thermal_data' } as ThermalData);
         } else {
-          // Update connection status to disconnected if response is not ok
           if (lastConnectionStatus.current !== 'disconnected') {
             lastConnectionStatus.current = 'disconnected';
             setConnectionStatus('disconnected');
+            setConnectionSource(null);
           }
         }
         } catch (error: any) {
@@ -512,13 +518,14 @@ export default function ThermalVisualization({
           if (lastConnectionStatus.current !== 'disconnected') {
             lastConnectionStatus.current = 'disconnected';
             setConnectionStatus('disconnected');
+            setConnectionSource(null);
           }
         } else {
-          // Update connection status to disconnected on error
           console.error('❌ Thermal sensor polling error:', error);
           if (lastConnectionStatus.current !== 'disconnected') {
             lastConnectionStatus.current = 'disconnected';
             setConnectionStatus('disconnected');
+            setConnectionSource(null);
           }
         }
       } finally {
@@ -576,7 +583,13 @@ export default function ThermalVisualization({
           )}
           {connectionStatus === 'connected' && SENSOR_CONFIG.CONNECTION_MODE !== 'bluetooth' && (
             <span className="text-xs text-gray-400">
-              Pi: <code className="bg-black/20 px-1 rounded font-mono">{getPiHost()}</code>
+              {connectionSource ? (
+                <>
+                  {connectionSource.isBackup ? 'Local Wi‑Fi backup' : 'Hotspot'}: <code className="bg-black/20 px-1 rounded font-mono">{connectionSource.host}</code>
+                </>
+              ) : (
+                <>Pi: <code className="bg-black/20 px-1 rounded font-mono">{getPiHost()}</code></>
+              )}
             </span>
           )}
         </div>

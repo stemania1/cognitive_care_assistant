@@ -7,7 +7,7 @@ echo "🔵 Setting up Raspberry Pi Bluetooth for auto-start..."
 echo ""
 
 # Create a systemd service that makes Bluetooth discoverable on boot
-# All commands in one bluetoothctl session so state (discoverable/pairable) persists
+# (agent on/default-agent omitted - they can hang oneshot; use "bluetoothctl" manually if pairing needs it)
 sudo tee /etc/systemd/system/bluetooth-auto-discoverable.service > /dev/null <<'EOF'
 [Unit]
 Description=Make Bluetooth Discoverable on Boot
@@ -16,7 +16,7 @@ Requires=bluetooth.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c '/usr/bin/bluetoothctl -- power on; sleep 2; /usr/bin/bluetoothctl -- discoverable on; /usr/bin/bluetoothctl -- pairable on; /usr/bin/bluetoothctl -- agent on; /usr/bin/bluetoothctl -- default-agent'
+ExecStart=/bin/sh -c 'sleep 3; /usr/bin/bluetoothctl -- power on; sleep 2; /usr/bin/bluetoothctl -- discoverable on; /usr/bin/bluetoothctl -- pairable on'
 RemainAfterExit=yes
 
 [Install]

@@ -76,7 +76,7 @@ On the Pi: `chmod +x bluetooth-thermal-sender.py`
 On the PC where the app runs:
 
 ```bash
-cd c:\Users\bobby\cognitive_care_assistant
+cd <your-project-dir>
 npm install serialport @serialport/parser-readline
 ```
 
@@ -87,7 +87,7 @@ npm install serialport @serialport/parser-readline
 ### Step 1: Start the app locally
 
 ```powershell
-cd c:\Users\bobby\cognitive_care_assistant
+cd <your-project-dir>
 npm run dev
 ```
 
@@ -122,7 +122,7 @@ You should see something like: “Bluetooth server started… Waiting for connec
 In a **second** terminal on the PC (app still running in the first):
 
 ```powershell
-cd c:\Users\bobby\cognitive_care_assistant
+cd <your-project-dir>
 node bluetooth-thermal-receiver.js COM9
 ```
 
@@ -139,6 +139,76 @@ You should see: “Bluetooth Serial port opened… Waiting for thermal data…�
 4. Click **Start Sensor** (on Sleep Behaviors) or **Connect to Sensor** (on Sensors).
 
 Thermal data should appear with **no Wi‑Fi**: Pi → Bluetooth → bridge → local app.
+
+---
+
+## Receiving thermal data over USB (COM port)
+
+You can get thermal data over the **USB cable** using the same app and bridge. When the Pi is connected by USB, it can show up as **USB Serial Device (COM3)** on the PC. Use that COM port for thermal instead of (or in addition to) Wi‑Fi or Bluetooth.
+
+**Data path:** **AMG8833 → Pi (Python) → USB serial → PC (same bridge) → `localhost:3000/api/thermal/bt` → app**
+
+### One-time (Pi)
+
+1. Copy the USB serial sender to the Pi (e.g. over Wi‑Fi):
+   ```bash
+   scp "sensor code/thermal_sensor/usb-serial-thermal-sender.py" pi@<PI_IP>:/home/pi/
+   ```
+2. On the Pi: `chmod +x usb-serial-thermal-sender.py`  
+   No Bluetooth packages are required for this path; the Pi only needs the AMG8833 libraries.
+
+### Every time (USB thermal)
+
+1. **PC:** Start the app: `npm run dev` → open **http://localhost:3000**.
+2. **Connect** the Pi to the PC with the **USB data cable**. In Device Manager → **Ports (COM & LPT)** note the port (e.g. **COM3** or **COM4** — try the one that opens successfully).
+3. **Pi:** Run the USB serial sender:
+   ```bash
+   python3 usb-serial-thermal-sender.py
+   ```
+   It waits for `/dev/ttyGS0` to appear (it appears when the PC has the COM port open or the link is ready).
+4. **PC** (second terminal): run the bridge with the USB COM port:
+   ```powershell
+   node bluetooth-thermal-receiver.js COM3
+   ```
+   If you get **"Unknown error code 31"** (common with the Pi’s USB serial on Windows), use the **Python bridge** instead:
+   ```powershell
+   pip install pyserial
+   python usb-thermal-receiver.py COM3
+   ```
+   Use your actual COM port number. Both bridges POST to the same API (`/api/thermal/bt`).
+5. In the app, set connection to **Bluetooth** and **Start Sensor** / **Connect to Sensor**. Thermal data will come from the USB serial stream.
+
+You can use **either** Bluetooth **or** USB serial (or Wi‑Fi) for thermal; the app doesn’t care which physical link the bridge uses.
+
+### USB only (no Wi‑Fi, no Bluetooth)
+
+When Wi‑Fi and Bluetooth aren’t available, use **USB serial only**:
+
+1. **Pi must be in serial gadget mode (g_serial).** The boot config should have `modules-load=dwc2,g_serial` in `/boot/firmware/cmdline.txt`. (If you see “USB device not recognized” or no COM port, avoid `g_multi`; use `g_serial` for serial only.)
+2. **Connect the Pi to the PC** with the USB data cable. In Device Manager → **Ports (COM & LPT)** you should see **USB Serial Device (COMx)**. Note the COM number.
+3. **On the PC:** Start the app (`npm run dev`), then run the bridge (use the Python one if Node gives error 31):
+   ```powershell
+   python usb-thermal-receiver.py COM3
+   ```
+   Use the COM port that works (often COM3 or COM4).
+4. **On the Pi:** The thermal sender must be running. If you can’t SSH (no Wi‑Fi), set it to start at boot once (see **USB thermal sender at boot** below).
+
+**USB thermal sender at boot (no SSH needed later)**  
+Do this once while you have SSH (e.g. over Wi‑Fi):
+
+```bash
+# From your PC (replace with your Pi’s IP if needed)
+scp scripts/usb-thermal-sender.service pi@192.168.254.200:/home/pi/
+
+# On the Pi
+ssh pi@192.168.254.200
+sudo cp /home/pi/usb-thermal-sender.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable usb-thermal-sender.service
+sudo systemctl start usb-thermal-sender.service
+```
+
+After that, whenever the Pi boots and is connected via USB, the sender will start and wait for the PC to open the COM port; then thermal data will flow.
 
 ---
 
@@ -184,6 +254,47 @@ $env:NEXTJS_API_URL="http://localhost:3001/api/thermal/bt"; node bluetooth-therm
 | “No Bluetooth data yet” in app | Bridge running? Pi sender running? COM port correct? App set to **Bluetooth**? |
 | “Cannot open serial port” | Pi paired and connected in Bluetooth settings; correct COM port; no other app using that port. |
 | Pi “Waiting for connection” forever | Start **bluetooth-thermal-receiver.js** on the PC so the Pi’s Bluetooth serial client can connect. |
-| App freezes when Wi‑Fi is off | Ensure connection is set to **Bluetooth** (no `ip` in request). See in-app note: “Bluetooth mode. Use a bridge that POSTs…” |
+| App freezes when Wi‑Fi is off | Ensure connection is set to **Bluetooth** (no `ip` in request). See in-app note: “Bluetooth mode. Use a bridge that POSTs…” |  
+| Windows shows “USB Serial Device (COMx)” but no USB Ethernet | Pi is in **serial gadget** mode only. Enable USB Ethernet: see **Enabling USB Ethernet on the Pi** below. |
+| Node or Python: **error 31** / **Cannot configure port** on COM3 | The **Windows driver** for the Pi’s USB serial device is failing. See **USB serial error 31 (Windows driver)** below. Meanwhile use **Wi‑Fi** or **Bluetooth** for thermal. |
+
+### USB serial error 31 (Windows driver)
+
+If both the Node and Python bridges fail with “Unknown error code 31” or “Cannot configure port” (PermissionError 31), the Windows driver for the Pi’s **USB Serial Device** is not accepting serial settings. Try:
+
+1. **Change the driver**  
+   - Open **Device Manager** → **Ports (COM & LPT)** → right‑click **USB Serial Device (COM3)**.  
+   - **Update driver** → **Browse my computer** → **Let me pick from a list**.  
+   - Try **USB Serial Device** or **Communications Port** or **Standard COM port** if listed.  
+   - Apply and test the bridge again.
+
+2. **Unplug/replug and retry**  
+   Use a different USB port and a data‑capable cable; then run the bridge again.
+
+3. **Use Wi‑Fi or Bluetooth instead**  
+   Thermal over **Wi‑Fi** (Pi’s thermal server + app connection) or over **Bluetooth** (pair Pi, run `bluetooth-thermal-sender.py` on Pi and `node bluetooth-thermal-receiver.js COM9` on PC with the Bluetooth COM port) avoids the USB serial driver entirely.
+
+### Enabling USB Ethernet on the Pi
+
+If the Pi appears only as a COM port (no network adapter), switch the USB gadget to Ethernet. **Over SSH** (e.g. `ssh pi@192.168.254.200`):
+
+1. **Enable the USB device controller and ethernet gadget** in `/boot/config.txt`:
+   ```bash
+   echo "dtoverlay=dwc2" | sudo tee -a /boot/config.txt
+   ```
+   (If that line is already there, skip.)
+
+2. **Load the ethernet gadget** in `/boot/cmdline.txt`:  
+   Open the file: `sudo nano /boot/cmdline.txt`.  
+   Find `rootwait` and insert **`modules-load=dwc2,g_ether`** right after it (same line, space-separated).  
+   Example before: `... rootwait quiet ...`  
+   Example after: `... rootwait modules-load=dwc2,g_ether quiet ...`  
+   Save (Ctrl+O, Enter, Ctrl+X).
+
+3. **Reboot**: `sudo reboot`. Unplug and replug the Pi’s USB cable to the PC.
+
+4. **On Windows:** In Device Manager, check for a new device under **Other devices**; if it appears, install the **Remote NDIS Compatible** driver (see main doc). Then set the new adapter’s IPv4 to **192.168.7.1**, subnet **255.255.255.0**. You can then SSH to the Pi at **192.168.7.2** when Wi‑Fi is not available.
+
+**Note:** Using `g_ether` replaces the serial gadget, so the COM port may disappear. To have both serial and Ethernet, use `g_multi` instead of `g_ether` (and add `g_multi` to `modules-load=...`); Windows may then show both a COM port and an RNDIS adapter.
 
 More detail: **THERMAL_BLUETOOTH_SETUP.md** (full Bluetooth thermal setup), **SETUP_PI_BLUETOOTH_NO_WIFI.md** (making Pi discoverable without Wi‑Fi).

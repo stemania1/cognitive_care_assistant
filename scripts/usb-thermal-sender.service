@@ -1,0 +1,17 @@
+[Unit]
+Description=USB serial thermal sender (AMG8833 to COM port)
+After=local-fs.target
+# No network required; for use when Pi is connected via USB only
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi
+ExecStart=/usr/bin/python3 /home/pi/usb-serial-thermal-sender.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/usb-thermal-sender.log
+StandardError=append:/var/log/usb-thermal-sender.log
+
+[Install]
+WantedBy=multi-user.target
