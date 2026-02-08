@@ -25,14 +25,21 @@ export default function Sensors() {
   const [connectionStatus, setConnectionStatus] = useState("Disconnected");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [connectionMode, setConnectionModeState] = useState<ConnectionMode>(() => {
-    if (typeof window === "undefined") return SENSOR_CONFIG.CONNECTION_MODE;
-    const saved = localStorage.getItem(CONNECTION_MODE_KEY) as ConnectionMode | null;
-    if (saved === "wifi" || saved === "usb" || saved === "bluetooth") return saved;
-    return SENSOR_CONFIG.CONNECTION_MODE;
-  });
+  // Initial state must match server (no localStorage) to avoid hydration mismatch
+  const [connectionMode, setConnectionModeState] = useState<ConnectionMode>(
+    SENSOR_CONFIG.CONNECTION_MODE
+  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Apply saved preference after mount (client-only)
+  useEffect(() => {
+    const saved = localStorage.getItem(CONNECTION_MODE_KEY) as ConnectionMode | null;
+    if (saved === "wifi" || saved === "usb" || saved === "bluetooth") {
+      setConnectionModeState(saved);
+      SENSOR_CONFIG.CONNECTION_MODE = saved;
+    }
+  }, []);
 
   const setConnectionMode = (mode: ConnectionMode) => {
     SENSOR_CONFIG.CONNECTION_MODE = mode;
@@ -436,6 +443,16 @@ export default function Sensors() {
               </div>
             )}
           </div>
+          {(connectionMode === "wifi" || connectionMode === "usb") && (
+            <p className="text-sm text-gray-400 mt-2">
+              Raspberry Pi: <code className="bg-white/10 px-1.5 py-0.5 rounded font-mono text-cyan-300/90">{getPiHost()}</code>
+            </p>
+          )}
+          {connectionMode === "bluetooth" && (
+            <p className="text-sm text-gray-400 mt-2">
+              Raspberry Pi: <span className="text-gray-500">— (data via Bluetooth bridge)</span>
+            </p>
+          )}
         </div>
 
         {/* Error Display */}

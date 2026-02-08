@@ -78,11 +78,15 @@ def build_payload(frame):
     }
 
 
+# Use channel 1 so Windows "Standard Serial over Bluetooth" can connect (SPP expects channel 1)
+RFCOMM_CHANNEL = 1
+
+
 def main():
     """Main function to run Bluetooth server and send thermal data."""
-    # Create Bluetooth server socket
+    # Create Bluetooth server socket on fixed channel 1 (Windows SPP default)
     server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-    server_sock.bind(("", bluetooth.PORT_ANY))
+    server_sock.bind(("", RFCOMM_CHANNEL))
     server_sock.listen(1)
 
     port = server_sock.getsockname()[1]

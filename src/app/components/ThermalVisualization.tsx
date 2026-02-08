@@ -563,7 +563,7 @@ export default function ThermalVisualization({
     <div className="space-y-4">
       {/* Connection Status */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${getStatusColor()} animate-pulse`} />
           <span className="text-sm text-gray-300">
             {getStatusText()}
@@ -572,6 +572,11 @@ export default function ThermalVisualization({
             <span className="text-xs text-gray-500 flex items-center gap-1" title={`Connection method: ${connectionMethodLabel}`}>
               <span>{connectionMethodIcon}</span>
               <span>Via {connectionMethodLabel}</span>
+            </span>
+          )}
+          {connectionStatus === 'connected' && SENSOR_CONFIG.CONNECTION_MODE !== 'bluetooth' && (
+            <span className="text-xs text-gray-400">
+              Pi: <code className="bg-black/20 px-1 rounded font-mono">{getPiHost()}</code>
             </span>
           )}
         </div>
@@ -623,15 +628,20 @@ export default function ThermalVisualization({
       {/* Connection Instructions */}
       {connectionStatus === 'disconnected' && (
         <div className="text-xs text-yellow-400 bg-yellow-400/10 p-3 rounded-lg">
-          <strong>Setup Required:</strong> 
-          {discoveredIP ? (
+          {discoveredIP === BLUETOOTH_SENTINEL ? (
             <>
+              <strong>Bluetooth mode.</strong> Use a bridge that POSTs thermal data to <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code> — no Pi or IP needed.
+            </>
+          ) : discoveredIP ? (
+            <>
+              <strong>Setup Required:</strong>{' '}
               Raspberry Pi found at: <code className="bg-black/20 px-1 rounded">{discoveredIP}</code>
               <br />
               Update <code className="bg-black/20 px-1 rounded">src/app/config/sensor-config.ts</code> with this IP address.
             </>
           ) : (
             <>
+              <strong>Setup Required:</strong>{' '}
               Update the IP address in <code className="bg-black/20 px-1 rounded">src/app/config/sensor-config.ts</code> to match your Raspberry Pi's IP address.
               <br />
               Current: <code className="bg-black/20 px-1 rounded">{SENSOR_CONFIG.RASPBERRY_PI_IP}</code>

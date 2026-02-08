@@ -125,13 +125,40 @@ The thermal server on the Pi listens on `0.0.0.0:8091` (HTTP) and `0.0.0.0:8092`
 
 ---
 
+## 5. Using Bluetooth instead of USB
+
+The in-app "Configure Pi over USB" utility has been removed (USB often doesn’t provide enough power for the Pi). To connect the app (running locally) to the Pi via **Bluetooth** and get sensor data into the app, see **[PI_BLUETOOTH_NO_WIFI_LOCAL_APP.md](PI_BLUETOOTH_NO_WIFI_LOCAL_APP.md)**.
+
+---
+
 ## Troubleshooting
+
+### Windows: "I don't see a USB Ethernet adapter"
+
+Two things must be true: **the Pi is in USB gadget mode**, and **Windows is using a driver that exposes it as a network adapter**.
+
+**Step 1 — Check Device Manager when the Pi is plugged in**
+
+1. Plug the Pi into your PC (Pi 4: use the **USB-C power port**; use a **data-capable** cable).
+2. Open **Device Manager** (Win + X → Device Manager).
+3. Look for **any** new or changed device: **Other devices** → "Unknown device" (yellow mark), or **Network adapters** → "USB Ethernet" / "RNDIS". If you see an unknown device but nothing under Network adapters, Windows is using the wrong driver.
+
+**Step 2 — Enable USB gadget on the Pi (if you haven't)**  
+The Pi must be configured and rebooted first. If you have Wi‑Fi or SSH to the Pi, run `scripts/enable-pi-usb-gadget.sh` on the Pi and reboot. Then unplug/replug the Pi and check Device Manager again.
+
+**Step 3 — Install or assign the RNDIS driver on Windows**  
+In Device Manager, find the new device when the Pi is plugged in → Right‑click → **Update driver** → **Browse my computer** → **Let me pick** → **Network adapters** → choose **Remote NDIS Compatible Device** if listed. If not, search for "Raspberry Pi USB RNDIS driver Windows" and install a compatible driver, then set the new adapter's IP to **192.168.7.1**.
+
+**Step 4 — Cable and port**  
+Pi 4: only the **USB‑C power port** supports gadget mode. Use a **data** USB cable.
+
+---
 
 | Issue | What to try |
 |-------|-------------|
 | No `usb0` after reboot | Confirm `dtoverlay=dwc2` and `modules-load=dwc2,g_ether` are correct and that you used the correct USB port (Pi 4: USB-C data port). |
 | Cannot ping 192.168.7.2 | Set the host adapter to `192.168.7.1/24` and ensure the Pi has rebooted after editing `dhcpcd.conf`. |
-| Windows doesn’t see a new adapter | Install the RNDIS/CDC driver for the Pi (search for "Raspberry Pi USB RNDIS driver Windows"). |
+| Windows doesn’t see a new adapter | See **Windows: "I don't see a USB Ethernet adapter"** above (Device Manager + RNDIS). |
 | App still can’t connect | Ensure you selected **USB** in the app and that `RASPBERRY_PI_IP_USB` is `192.168.7.2` (or the IP you set in `dhcpcd.conf`). |
 
 ---

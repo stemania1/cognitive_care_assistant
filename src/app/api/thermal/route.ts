@@ -25,8 +25,13 @@ export async function GET(request: Request) {
     });
   }
   
-  // If user selected Bluetooth, do not fall back to Pi over WiFi/USB
-  if (SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth') {
+  // Client requests "Bluetooth only" by not sending ip/port — never fall back to Pi (server doesn't know client's connection mode)
+  const { searchParams } = new URL(request.url);
+  const ipParam = searchParams.get("ip");
+  const portParam = searchParams.get("port");
+  const wantsBluetoothOnly = ipParam == null && portParam == null;
+
+  if (wantsBluetoothOnly) {
     return NextResponse.json({
       status: 'no_data',
       isConnected: false,
@@ -41,17 +46,11 @@ export async function GET(request: Request) {
     });
   }
 
-  // Fallback to WiFi/USB HTTP connection to Raspberry Pi
-  let host = getPiHost();
-  let port = String(SENSOR_CONFIG.HTTP_PORT);
+  // Fallback to WiFi/USB HTTP connection to Raspberry Pi (only when client sent ip/port)
+  let host = ipParam ?? process.env.PI_HOST ?? getPiHost();
+  let port = portParam ?? process.env.PI_PORT ?? String(SENSOR_CONFIG.HTTP_PORT);
 
   try {
-    const { searchParams } = new URL(request.url);
-    const ipParam = searchParams.get("ip");
-    const portParam = searchParams.get("port");
-
-    host = ipParam || process.env.PI_HOST || getPiHost();
-    port = portParam || process.env.PI_PORT || String(SENSOR_CONFIG.HTTP_PORT);
     const url = `http://${host}:${port}/thermal-data`;
     
     // Add timeout to prevent hanging requests

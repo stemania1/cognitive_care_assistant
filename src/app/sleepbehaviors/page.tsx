@@ -288,16 +288,23 @@ export default function SleepBehaviors() {
   const [moveEventCount, setMoveEventCount] = useState(0);
   const [moveButtonPressed, setMoveButtonPressed] = useState(false);
   const [chartUpdateTrigger, setChartUpdateTrigger] = useState(0);
-  const [thermalConnectionMode, setThermalConnectionMode] = useState<ConnectionMode>(() => {
-    if (typeof window === "undefined") return SENSOR_CONFIG.CONNECTION_MODE;
-    const saved = localStorage.getItem(THERMAL_CONNECTION_MODE_KEY) as ConnectionMode | null;
-    if (saved === "wifi" || saved === "usb" || saved === "bluetooth") return saved;
-    return SENSOR_CONFIG.CONNECTION_MODE;
-  });
+  // Initial state must match server (no localStorage) to avoid hydration mismatch
+  const [thermalConnectionMode, setThermalConnectionMode] = useState<ConnectionMode>(
+    SENSOR_CONFIG.CONNECTION_MODE
+  );
 
   useEffect(() => {
     SENSOR_CONFIG.CONNECTION_MODE = thermalConnectionMode;
   }, [thermalConnectionMode]);
+
+  // Apply saved preference after mount (client-only)
+  useEffect(() => {
+    const saved = localStorage.getItem(THERMAL_CONNECTION_MODE_KEY) as ConnectionMode | null;
+    if (saved === "wifi" || saved === "usb" || saved === "bluetooth") {
+      setThermalConnectionMode(saved);
+      SENSOR_CONFIG.CONNECTION_MODE = saved;
+    }
+  }, []);
 
   const frameStatsRef = useRef<
     Array<{ timestamp: number; average: number; min: number; max: number; range: number; variance: number }>
