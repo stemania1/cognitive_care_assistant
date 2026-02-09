@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Start Thermal Sender (Bluetooth)
+Comment=Run Bluetooth thermal sender for demo
+Exec=lxterminal -e "/home/pi/thermal-sender-desktop.sh bluetooth"
+Icon=utilities-terminal
+Categories=Utility;

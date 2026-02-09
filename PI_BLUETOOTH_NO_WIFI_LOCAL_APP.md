@@ -71,7 +71,91 @@ scp "sensor code/thermal_sensor/bluetooth-thermal-sender.py" pi@<PI_IP>:/home/pi
 
 On the Pi: `chmod +x bluetooth-thermal-sender.py`
 
-### 4. Install the bridge on your PC (once)
+### 4. Make Bluetooth thermal sender start at boot (for demos without SSH)
+
+Do this **once** while you have SSH (e.g. over Wi‑Fi). After this, when you power the Pi at the demo, the Bluetooth sender will start automatically — no need to SSH in.
+
+**On your PC:**
+
+```bash
+# Copy the Bluetooth sender script and the systemd service to the Pi
+scp "sensor code/thermal_sensor/bluetooth-thermal-sender.py" pi@<PI_IP>:/home/pi/
+scp scripts/bluetooth-thermal-sender.service pi@<PI_IP>:/home/pi/
+```
+
+**On the Pi (SSH in):**
+
+```bash
+sudo cp /home/pi/bluetooth-thermal-sender.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable bluetooth-thermal-sender.service
+sudo systemctl start bluetooth-thermal-sender.service
+```
+
+Also ensure Bluetooth is discoverable on boot (run **setup-pi-bluetooth-autostart.sh** once if you haven’t). Then at the demo: power the Pi → wait ~10 seconds → pair from the PC if needed → run the bridge with the Bluetooth COM port. The sender will already be running.
+
+### 5. Demo without keyboard or monitor
+
+You do **not** need a keyboard or monitor on the Pi at the demo. Do the **one-time setup** below while you have SSH (Wi‑Fi). After that, at the demo you only:
+
+- **Power the Pi** (and connect the **USB cable** if using USB thermal).
+- On the PC: **pair over Bluetooth** (if using Bluetooth), then run the **bridge** with the correct COM port.
+
+**One-time setup (over SSH, while you have Wi‑Fi):**
+
+1. **Bluetooth thermal at boot**  
+   Copy and enable the Bluetooth sender service (section 4 above). Run **setup-pi-bluetooth-autostart.sh** once so the Pi is discoverable on boot.
+
+2. **USB thermal at boot** (optional, if you want USB as well)  
+   Copy `usb-serial-thermal-sender.py` and `scripts/usb-thermal-sender.service` to the Pi. On the Pi:
+   ```bash
+   sudo cp /home/pi/usb-thermal-sender.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable usb-thermal-sender.service
+   ```
+
+3. **Reboot the Pi once** so both services are active: `sudo reboot`.
+
+At the demo: no SSH, no keyboard, no monitor — just power (and USB cable if using USB). The senders start automatically.
+
+### 6. Desktop UI and shortcuts (optional — only if you want keyboard + monitor)
+
+If you prefer to use a **keyboard and monitor** on the Pi at the demo, you can install the desktop and add double‑click shortcuts to start the thermal sender.
+
+**Install the desktop (only if you have Raspberry Pi OS Lite):**
+
+```bash
+# On the Pi (over SSH)
+sudo apt update
+sudo apt install -y raspberrypi-ui-mods
+sudo raspi-config
+# → System Options → Boot / Auto Login → Desktop Autologin (or Desktop)
+sudo reboot
+```
+
+**Add desktop shortcuts to start the sender:**
+
+From your PC (project folder), copy the launcher and shortcuts to the Pi:
+
+```bash
+scp scripts/thermal-sender-desktop.sh pi@<PI_IP>:/home/pi/
+scp scripts/Start-Thermal-Sender-USB.desktop pi@<PI_IP>:/home/pi/
+scp scripts/Start-Thermal-Sender-Bluetooth.desktop pi@<PI_IP>:/home/pi/
+```
+
+On the Pi (SSH):
+
+```bash
+chmod +x /home/pi/thermal-sender-desktop.sh
+mkdir -p /home/pi/Desktop
+cp /home/pi/Start-Thermal-Sender-USB.desktop /home/pi/Desktop/
+cp /home/pi/Start-Thermal-Sender-Bluetooth.desktop /home/pi/Desktop/
+chmod +x /home/pi/Desktop/*.desktop
+```
+
+Ensure the sender scripts are on the Pi: `bluetooth-thermal-sender.py` and `usb-serial-thermal-sender.py` in `/home/pi/` (see sections 3 and “Receiving thermal data over USB”). At the demo: plug in keyboard and monitor, boot to desktop, double‑click **Start Thermal Sender (USB)** or **Start Thermal Sender (Bluetooth)**. A terminal will open and run the sender; leave it open.
+
+### 7. Install the bridge on your PC (once)
 
 On the PC where the app runs:
 
@@ -84,14 +168,20 @@ npm install serialport @serialport/parser-readline
 
 ## Every time you use it (no Wi‑Fi, app local)
 
-### Step 1: Start the app locally
+### Step 1: Start the app and bridge
 
 ```powershell
 cd <your-project-dir>
 npm run dev
 ```
 
-Leave this running. The app will be at **http://localhost:3000**.
+This starts **both** the Next.js app and the thermal bridge. The app will be at **http://localhost:3000**; the bridge will try to auto-detect the Pi’s COM port (Bluetooth or USB). To use a specific port (e.g. COM9 for Bluetooth or COM4 for USB), set it in `.env.local`:
+
+```text
+THERMAL_BLUETOOTH_PORT=COM9
+```
+
+Leave the terminal running. To run only the app without the bridge, use `npm run dev:next`.
 
 ### Step 2: Power the Pi and pair over Bluetooth (if not already paired)
 
@@ -102,13 +192,9 @@ Leave this running. The app will be at **http://localhost:3000**.
 
 ### Step 3: Run the Bluetooth sender on the Pi
 
-You need a way to run a command on the Pi without Wi‑Fi:
+**If you set up the service in section 4 (Bluetooth sender at boot), the sender is already running — skip to Step 4.**
 
-- **Serial console** (USB‑to‑serial cable to Pi’s UART), or  
-- **Keyboard + monitor**, or  
-- **Already paired and have SSH over Bluetooth** (advanced). See **[SSH_OVER_BLUETOOTH.md](SSH_OVER_BLUETOOTH.md)** for PAN (real SSH) or RFCOMM (serial console).
-
-Then on the Pi:
+Otherwise you need a way to run a command on the Pi without Wi‑Fi (serial console, keyboard + monitor, or SSH over Bluetooth). On the Pi:
 
 ```bash
 cd /home/pi
@@ -117,17 +203,15 @@ python3 bluetooth-thermal-sender.py
 
 You should see something like: “Bluetooth server started… Waiting for connection from computer…”. Leave it running.
 
-### Step 4: Run the bridge on your PC
+### Step 4: Bridge (already running with `npm run dev`)
 
-In a **second** terminal on the PC (app still running in the first):
+If you started the app with `npm run dev`, the thermal bridge is already running in the same terminal. It will auto-detect the COM port or use `THERMAL_BLUETOOTH_PORT` from `.env.local`. To run the bridge in a separate terminal instead, use:
 
 ```powershell
-cd <your-project-dir>
 node bluetooth-thermal-receiver.js COM9
 ```
 
-Replace **COM9** with the COM port from Step 2.  
-The bridge forwards Bluetooth serial data to **http://localhost:3000/api/thermal/bt**.
+Replace **COM9** with the COM port from Step 2. The bridge forwards serial data to **http://localhost:3000/api/thermal/bt**.
 
 You should see: “Bluetooth Serial port opened… Waiting for thermal data…” and then “Forwarded to Next.js API” when data flows.
 

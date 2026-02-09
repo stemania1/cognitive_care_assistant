@@ -1,0 +1,21 @@
+[Unit]
+Description=Bluetooth thermal sender (AMG8833 to serial over Bluetooth)
+After=bluetooth.service
+Wants=bluetooth.service
+# Start after discoverable service if present
+After=bluetooth-auto-discoverable.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi
+# Give Bluetooth time to be discoverable before starting sender
+ExecStartPre=/bin/sleep 5
+ExecStart=/usr/bin/python3 /home/pi/bluetooth-thermal-sender.py
+Restart=on-failure
+RestartSec=15
+StandardOutput=append:/var/log/bluetooth-thermal-sender.log
+StandardError=append:/var/log/bluetooth-thermal-sender.log
+
+[Install]
+WantedBy=multi-user.target

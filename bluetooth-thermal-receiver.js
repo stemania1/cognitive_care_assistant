@@ -173,6 +173,24 @@ function testPort(portName) {
   });
 }
 
+/** Wait for Next.js API to be ready (avoids "fetch failed" when started with npm run dev). */
+async function waitForApi() {
+  const baseUrl = NEXTJS_API_URL.replace(/\/api\/thermal\/bt.*$/, '') || 'http://localhost:3000';
+  const maxWait = 30000;
+  const interval = 500;
+  const start = Date.now();
+  while (Date.now() - start < maxWait) {
+    try {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 2000);
+      const r = await fetch(baseUrl, { method: 'GET', signal: c.signal });
+      clearTimeout(t);
+      if (r.status < 500) return;
+    } catch (_) {}
+    await new Promise((r) => setTimeout(r, interval));
+  }
+}
+
 // Main execution
 (async () => {
   // If no port specified, try to auto-detect
@@ -191,6 +209,11 @@ function testPort(portName) {
   console.log(`🌐 Forwarding to: ${NEXTJS_API_URL}`);
   console.log('💡 Connection will auto-reconnect if Bluetooth drops.\n');
   console.log('   Press Ctrl+C to stop\n');
+
+  // When run with npm run dev, Next.js may not be ready yet; wait so first POSTs don't fail
+  try {
+    await waitForApi();
+  } catch (_) {}
 
   let port;
   let exiting = false;

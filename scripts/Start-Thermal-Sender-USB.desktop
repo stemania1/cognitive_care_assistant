@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Start Thermal Sender (USB)
+Comment=Run USB serial thermal sender for demo
+Exec=lxterminal -e "/home/pi/thermal-sender-desktop.sh usb"
+Icon=utilities-terminal
+Categories=Utility;

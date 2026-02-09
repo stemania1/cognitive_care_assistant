@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack -p 3000",
+    "dev": "concurrently --names \"NEXT,THERMAL\" --prefix-colors \"blue,green\" \"next dev --turbopack -p 3000\" \"node bluetooth-thermal-receiver.js\"",
+    "dev:next": "next dev --turbopack -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

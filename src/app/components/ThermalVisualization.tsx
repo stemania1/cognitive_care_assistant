@@ -643,7 +643,7 @@ export default function ThermalVisualization({
         <div className="text-xs text-yellow-400 bg-yellow-400/10 p-3 rounded-lg">
           {discoveredIP === BLUETOOTH_SENTINEL ? (
             <>
-              <strong>Bluetooth mode.</strong> Use a bridge that POSTs thermal data to <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code> — no Pi or IP needed.
+              <strong>Bluetooth or USB mode.</strong> Use a bridge that POSTs thermal data to <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code> — no Pi IP needed.
             </>
           ) : discoveredIP ? (
             <>
