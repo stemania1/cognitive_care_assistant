@@ -119,7 +119,9 @@ export async function fetchThermalSessions(
       let errorMessage = `Failed to fetch sessions (${response.status})`;
       try {
         const errorResult = await response.json();
-        errorMessage = errorResult.error || errorResult.details || errorMessage;
+        const main = errorResult.error || errorMessage;
+        const details = errorResult.details;
+        errorMessage = details ? `${main}: ${details}` : main;
       } catch {
         // If JSON parsing fails, use status text
         errorMessage = response.statusText || errorMessage;
@@ -132,16 +134,19 @@ export async function fetchThermalSessions(
     if (result.data) {
       return { data: result.data, error: null };
     } else {
-      return { 
-        data: null, 
-        error: result.error || result.details || 'Failed to fetch thermal sessions' 
+      const main = result.error || 'Failed to fetch thermal sessions';
+      const details = result.details;
+      return {
+        data: null,
+        error: details ? `${main}: ${details}` : main
       };
     }
   } catch (error) {
     console.error('Error in fetchThermalSessions:', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error fetching thermal sessions';
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Unknown error fetching thermal sessions'
+      error: msg === 'Failed to fetch' ? 'Network error: could not reach the server. Check that the app is running and you are signed in.' : msg
     };
   }
 }
@@ -158,17 +163,33 @@ export async function fetchDailyChecks(
     if (options?.date) params.append('date', options.date);
 
     const response = await fetch(`/api/daily-checks?${params.toString()}`);
-    const result = await response.json();
+
+    let result: { data?: DailyCheck[]; error?: string; details?: string } = {};
+    try {
+      const text = await response.text();
+      if (text?.trim()) result = JSON.parse(text);
+    } catch {
+      result = {};
+    }
 
     if (response.ok && result.data) {
       return { data: result.data, error: null };
-    } else {
-      return { data: null, error: result.error || 'Failed to fetch daily checks' };
     }
+    const main = result.error || 'Failed to fetch daily checks';
+    let details = result.details;
+    if (details && (details.includes('fetch failed') || details.includes('TypeError: fetch failed'))) {
+      details = 'Cannot reach the database. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local and that the app can reach Supabase.';
+    }
+    const errorMsg = details ? `${main}: ${details}` : (response.ok ? main : `${main} (${response.status})`);
+    return { data: null, error: errorMsg };
   } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error fetching daily checks';
+    const isNetworkError = msg === 'Failed to fetch' || msg.includes('fetch failed') || msg.includes('TypeError: fetch failed');
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Unknown error fetching daily checks'
+      error: isNetworkError
+        ? 'Network error: could not reach the server. Check that the app is running and you are signed in.'
+        : msg
     };
   }
 }

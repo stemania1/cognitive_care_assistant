@@ -1,4 +1,4 @@
-#!/bin/bash
+  #!/bin/bash
 # Headless deployment helper for AMG883 + Raspberry Pi
 # This does not run automatically—copy to your local machine and execute
 # against the Pi once you've reviewed the paths/IP address.

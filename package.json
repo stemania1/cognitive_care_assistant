@@ -11,7 +11,8 @@
     "emg-server": "node emg-server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run emg-server\"",
     "start:emg": "concurrently --names \"NEXT,EMG,BT\" --prefix-colors \"blue,yellow,green\" \"npm run dev\" \"npm run emg-server\" \"node bluetooth-receiver.js\"",
-    "start:thermal": "concurrently --names \"NEXT,THERMAL\" --prefix-colors \"blue,green\" \"npm run dev\" \"node bluetooth-thermal-receiver.js\""
+    "start:thermal": "concurrently --names \"NEXT,THERMAL\" --prefix-colors \"blue,green\" \"npm run dev\" \"node bluetooth-thermal-receiver.js\"",
+    "code-pdf": "node scripts/generate-code-pdf.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.7",
@@ -37,6 +38,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "^9.2.1",
+    "pdfkit": "^0.17.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

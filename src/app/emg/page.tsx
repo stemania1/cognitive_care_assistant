@@ -1867,8 +1867,21 @@ export default function EMGPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+      {/* Background gradients (match dashboard) */}
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.2),transparent)]" />
+      <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/40 via-purple-500/35 to-cyan-500/40 blur-3xl -z-10" />
       <div className="container mx-auto px-4 py-4 max-w-7xl">
+        {/* Return to Dashboard - top */}
+        <div className="mb-4">
+          <Link
+            href="/dashboard"
+            className="group inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 backdrop-blur px-4 py-2.5 hover:bg-white/10 transition-all duration-200 text-sm font-medium"
+          >
+            <span className="opacity-80">←</span>
+            <span>Return to Dashboard</span>
+          </Link>
+        </div>
         {/* Header */}
         <div className="mb-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">

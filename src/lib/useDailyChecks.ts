@@ -68,12 +68,23 @@ export function useDailyChecks(userId: string | null) {
         console.log('Fetching daily checks from API:', `/api/daily-checks?${params}`);
         const response = await fetch(`/api/daily-checks?${params}`);
         console.log('API response status:', response.status);
-        
-        const result = await response.json();
+
+        let result: { data?: unknown; error?: string; details?: string; message?: string } = {};
+        try {
+          const text = await response.text();
+          if (text && text.trim()) {
+            result = JSON.parse(text);
+          }
+        } catch {
+          // Non-JSON or empty body
+          result = {};
+        }
         console.log('API response data:', result);
 
         if (!response.ok) {
-          const errorMessage = result.error || result.details || result.message || 'Failed to fetch daily checks';
+          const statusSuffix = ` [${response.status}${response.statusText ? ` ${response.statusText}` : ''}]`;
+          const fromBody = result.error || result.details || result.message;
+          const errorMessage = (fromBody || 'Failed to fetch daily checks') + statusSuffix;
           console.error('API Error:', errorMessage, 'Response:', result);
           throw new Error(errorMessage);
         }

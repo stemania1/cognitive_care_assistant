@@ -47,7 +47,6 @@ export async function isAuthenticated(): Promise<boolean> {
   }
 }
 
-
 /**
  * Validate that the provided userId matches the authenticated Clerk user
  * Returns the authenticated user ID if valid, throws error if not

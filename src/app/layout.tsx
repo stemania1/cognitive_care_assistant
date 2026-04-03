@@ -22,7 +22,8 @@ export const metadata: Metadata = {
     default: "Cognitive Care Assistant | Health Monitoring for Dementia Patients | 2025 Congressional App Challenge Winner",
     template: "%s | Cognitive Care Assistant"
   },
-  description: "Cognitive Care Assistant - Winner of the 2025 Congressional App Challenge. A comprehensive health-monitoring platform designed to improve daily life for dementia patients and caregivers. Features EMG sensors, thermal monitoring, daily assessments, medication reminders, and more.",
+  description:
+    "Cognitive Care Assistant by Corbin Craig — Winner of the 2025 Congressional App Challenge (Florida District 17). A health-monitoring platform for dementia patients and caregivers: EMG and thermal sensors, daily assessments, medication reminders, and more.",
   keywords: [
     "cognitive care assistant",
     "Cognitive Care Assistant",
@@ -38,6 +39,7 @@ export const metadata: Metadata = {
     "Congressional App Challenge winner",
     "Florida District 17",
     "Corbin Craig",
+    "Corbin Craig Cognitive Care Assistant",
     "Connor Craig",
     "Pine View School",
     "dementia patient care",
@@ -58,7 +60,8 @@ export const metadata: Metadata = {
     url: "/",
     siteName: "Cognitive Care Assistant",
     title: "Cognitive Care Assistant | Health Monitoring for Dementia Patients | 2025 Congressional App Challenge Winner",
-    description: "Cognitive Care Assistant - Winner of the 2025 Congressional App Challenge. A comprehensive health-monitoring platform designed to improve daily life for dementia patients and caregivers.",
+    description:
+      "Cognitive Care Assistant by Corbin Craig — Congressional App Challenge winner. Health monitoring for dementia patients and caregivers.",
     images: [
       {
         url: "/digital_brain.png",
@@ -71,7 +74,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Cognitive Care Assistant | Health Monitoring for Dementia Patients | 2025 Congressional App Challenge Winner",
-    description: "Cognitive Care Assistant - Winner of the 2025 Congressional App Challenge. A comprehensive health-monitoring platform for dementia patients and caregivers.",
+    description:
+      "Cognitive Care Assistant by Corbin Craig — Congressional App Challenge winner. Health monitoring for dementia patients and caregivers.",
     images: ["/digital_brain.png"],
     creator: "@CognitiveCare",
   },
@@ -101,15 +105,35 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cognitive-care-assistant.vercel.app";
+  const websiteStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Cognitive Care Assistant",
+    alternateName: "Corbin Craig Cognitive Care Assistant",
+    url: siteUrl,
+    description:
+      "Health monitoring web app for dementia patients and caregivers, created by Corbin Craig.",
+    author: {
+      "@type": "Person",
+      name: "Corbin Craig",
+      url: `${siteUrl}/corbin-craig`,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Cognitive Care Assistant",
+    },
+  };
+
   const organizationStructuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Cognitive Care Assistant",
-    "alternateName": "Cognitive Care Assistant App",
+    "alternateName": ["Cognitive Care Assistant App", "Corbin Craig Cognitive Care Assistant"],
     "description": "Cognitive Care Assistant - A comprehensive health-monitoring platform designed to improve daily life for dementia patients and caregivers. Winner of the 2025 Congressional App Challenge for Florida's District 17.",
     "applicationCategory": "HealthApplication",
     "operatingSystem": "Web",
-    "url": process.env.NEXT_PUBLIC_APP_URL || "https://cognitive-care-assistant.vercel.app",
+    "url": siteUrl,
     "aggregateRating": {
       "@type": "AggregateRating",
       "ratingValue": "5",
@@ -157,6 +181,12 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(websiteStructuredData),
+            }}
+          />
           <StructuredData data={organizationStructuredData} />
           <AlertProvider>
             {children}
