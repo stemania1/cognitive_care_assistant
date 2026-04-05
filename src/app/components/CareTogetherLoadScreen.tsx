@@ -1,7 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import {
+  markCareIntroCompleted,
+  shouldSkipCareIntro,
+} from "@/lib/careIntroSession";
 
 const ANIM_MS = 3200;
 const FADE_MS = 850;
@@ -15,8 +19,23 @@ type LoadPhase = "intro" | "welcome";
 
 /**
  * Full-screen intro: “Let’s Care Together” with calm word + progress animation, then a bold welcome line, then fades away.
+ * Runs once per browser tab session (see careIntroSession); not again on client-side navigation (e.g. dashboard ↔ AI synopsis).
+ * Flag is cleared on sign-out so the next sign-in can show the intro again.
  */
 export function CareTogetherLoadScreen() {
+  const [playIntro, setPlayIntro] = useState<boolean | null>(null);
+
+  useLayoutEffect(() => {
+    setPlayIntro(!shouldSkipCareIntro());
+  }, []);
+
+  if (playIntro === null) return null;
+  if (!playIntro) return null;
+
+  return <CareIntroSequence />;
+}
+
+function CareIntroSequence() {
   const [visible, setVisible] = useState(true);
   const [phase, setPhase] = useState<LoadPhase>("intro");
   const [exiting, setExiting] = useState(false);
@@ -36,6 +55,7 @@ export function CareTogetherLoadScreen() {
     const toWelcome = window.setTimeout(() => setPhase("welcome"), holdIntro);
     const startFade = window.setTimeout(() => setExiting(true), holdIntro + holdWelcome);
     const remove = window.setTimeout(() => {
+      markCareIntroCompleted();
       setVisible(false);
       document.body.style.overflow = "";
     }, holdIntro + holdWelcome + fade);

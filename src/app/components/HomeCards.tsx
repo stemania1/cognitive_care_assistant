@@ -23,7 +23,8 @@ function getTodayKey(): string {
 
 export default function HomeCards() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+    <div className="flex flex-col gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
       {/* Row 1: Daily Questions + Medication */}
       <LinkCard
         href="/daily-questions"
@@ -74,6 +75,36 @@ export default function HomeCards() {
         accent="from-green-500 to-emerald-500"
         emoji="🧠"
       />
+      </div>
+
+      <Link href="/ai-synopsis" className="block">
+        <CardShell accent="from-violet-500 to-indigo-600">
+          <div className="flex min-h-[5rem] flex-col justify-between gap-3 sm:min-h-0 sm:flex-row sm:items-center">
+            <div className="flex items-center justify-between gap-2 sm:justify-start">
+              <div className="flex min-w-0 items-center gap-2">
+                <EmojiIcon symbol="✨" />
+                <div className="min-w-0 leading-tight">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 dark:text-slate-100 sm:text-base">
+                    AI SYNOPSIS
+                  </h2>
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 sm:text-sm">
+                    (Last 90 Days)
+                  </p>
+                </div>
+              </div>
+              <span className="text-base opacity-60 transition-transform group-hover:translate-x-0.5 sm:hidden">
+                →
+              </span>
+            </div>
+            <p className="text-sm opacity-70 sm:max-w-xl sm:flex-1 sm:pl-4">
+              CCA 2.0 provider view · risk score, multimodal metrics, biomarkers
+            </p>
+            <span className="hidden text-base opacity-60 transition-transform group-hover:translate-x-0.5 sm:block sm:shrink-0">
+              →
+            </span>
+          </div>
+        </CardShell>
+      </Link>
     </div>
   );
 }
