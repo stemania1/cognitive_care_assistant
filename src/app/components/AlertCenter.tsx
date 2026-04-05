@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useCallback, useMemo, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 
@@ -19,6 +27,8 @@ interface AlertCenterContextValue {
   acknowledgeAlert: (id: string) => void;
   clearAlert: (id: string) => void;
   clearAllAlerts: () => void;
+  alertsPanelOpen: boolean;
+  setAlertsPanelOpen: Dispatch<SetStateAction<boolean>>;
 }
 
 const AlertCenterContext = createContext<AlertCenterContextValue | undefined>(undefined);
@@ -27,6 +37,7 @@ const generateId = () => crypto.randomUUID();
 
 export function AlertProvider({ children }: { children: React.ReactNode }) {
   const [alerts, setAlerts] = useState<AppAlert[]>([]);
+  const [alertsPanelOpen, setAlertsPanelOpen] = useState(false);
 
   const addAlert = useCallback(
     (alert: Omit<AppAlert, "id" | "timestamp" | "acknowledged"> & { id?: string }) => {
@@ -91,8 +102,10 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
       acknowledgeAlert,
       clearAlert,
       clearAllAlerts,
+      alertsPanelOpen,
+      setAlertsPanelOpen,
     }),
-    [alerts, addAlert, acknowledgeAlert, clearAlert, clearAllAlerts]
+    [alerts, addAlert, acknowledgeAlert, clearAlert, clearAllAlerts, alertsPanelOpen]
   );
 
   return (

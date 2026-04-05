@@ -80,7 +80,7 @@ export default function HomeCards() {
 
 function CardShell({ accent, children }: { accent: string; children: React.ReactNode }) {
   return (
-    <div className="group relative block rounded-xl border border-white/15 bg-white/5 backdrop-blur px-5 py-6">
+    <div className="light-ui-frame group relative block rounded-xl border border-slate-200/90 bg-white/75 shadow-sm backdrop-blur px-5 py-6 dark:border-white/15 dark:bg-white/5 dark:shadow-none">
       <div className={`pointer-events-none absolute -inset-px rounded-xl bg-gradient-to-r ${accent} opacity-0 group-hover:opacity-30 transition-opacity`} />
       <div className="relative flex flex-col gap-3">{children}</div>
     </div>
@@ -91,7 +91,7 @@ function EmojiIcon({ symbol }: { symbol: string }) {
   return (
     <span
       aria-hidden="true"
-      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-base"
+      className="light-ui-frame inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200/90 text-base dark:bg-white/10"
     >
       {symbol}
     </span>
@@ -238,7 +238,7 @@ function DailyQuestionCard() {
 					<button
 						type="button"
 						onClick={prevThree}
-						className="rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-xs hover:bg-white/15"
+						className="rounded-md border border-slate-200/90 bg-white/90 px-2.5 py-1 text-xs hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/15"
 						aria-label="Show previous three questions"
 					>
 						Prev 3
@@ -246,7 +246,7 @@ function DailyQuestionCard() {
 					<button
 						type="button"
 						onClick={nextThree}
-						className="rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-xs hover:bg-white/15"
+						className="rounded-md border border-slate-200/90 bg-white/90 px-2.5 py-1 text-xs hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/15"
 						aria-label="Show next three questions"
 					>
 						Next 3
@@ -260,7 +260,7 @@ function DailyQuestionCard() {
 			</div>
 			<div className="flex flex-col gap-3">
 				{todaysQuestions.map((q) => (
-					<div key={q.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+					<div key={q.id} className="light-ui-frame rounded-lg border border-slate-200/80 bg-slate-50/90 p-3 dark:border-white/10 dark:bg-white/5">
 						<p className="text-sm mb-2">{q.text}</p>
 						{q.choices ? (
 							<div className="flex gap-2 flex-wrap">
@@ -269,7 +269,7 @@ function DailyQuestionCard() {
 										key={choice}
 										onClick={() => setAnswer(q.id, choice)}
 										className={`px-3 py-1 rounded-full text-xs transition-colors ${
-											answers[q.id] === choice ? "bg-emerald-500 text-black" : "bg-white/10 hover:bg-white/15"
+											answers[q.id] === choice ? "bg-emerald-500 text-black" : "bg-slate-200/80 hover:bg-slate-300/80 dark:bg-white/10 dark:hover:bg-white/15"
 										}`}
 										type="button"
 									>
@@ -283,7 +283,7 @@ function DailyQuestionCard() {
 								value={answers[q.id] ?? ""}
 								onChange={(e) => setAnswer(q.id, e.target.value)}
 								placeholder="Type your answer"
-								className="w-full rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none placeholder-white/40"
+								className="w-full rounded-md border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder-white/40 dark:outline-none"
 							/>
 						)}
 					</div>
@@ -291,7 +291,7 @@ function DailyQuestionCard() {
 				<div className="flex items-center justify-end">
 					<Link
 						href="/questions/history"
-						className="mt-1 px-3 py-1 rounded-md border border-white/15 bg-white/10 text-xs hover:bg-white/15"
+						className="mt-1 inline-flex items-center rounded-md border border-slate-200/90 bg-white/90 px-3 py-1 text-xs hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/15"
 					>
 						View saved answers
 					</Link>
@@ -375,7 +375,7 @@ function RemindersCard() {
         <ToggleRow label="Drink water" checked={state.drinkWater} onChange={(v) => update("drinkWater", v)} />
         <ToggleRow label="Take medicine" checked={state.takeMedicine} onChange={(v) => update("takeMedicine", v)} />
         {state.takeMedicine && (
-          <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+          <div className="light-ui-frame rounded-lg border border-slate-200/80 bg-slate-50/90 p-3 dark:border-white/10 dark:bg-white/5">
             <div className="mb-3">
               <label className="block text-xs opacity-80 mb-1">Dosage</label>
               <input
@@ -383,7 +383,7 @@ function RemindersCard() {
                 value={state.medicineDosage}
                 onChange={(e) => updateDosage(e.target.value)}
                 placeholder="e.g., 1 pill, 5 mL, 2 tablets"
-                className="w-full rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none placeholder-white/40"
+                className="w-full rounded-md border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder-white/40 dark:outline-none"
               />
             </div>
             <div>
@@ -393,12 +393,12 @@ function RemindersCard() {
                   type="time"
                   value={timeInput}
                   onChange={(e) => setTimeInput(e.target.value)}
-                  className="rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm outline-none"
+                  className="rounded-md border border-slate-200/80 bg-white px-3 py-2 text-sm text-slate-900 dark:border-white/10 dark:bg-white/10 dark:text-white dark:outline-none"
                 />
                 <button
                   type="button"
                   onClick={addTime}
-                  className="rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm hover:bg-white/15"
+                  className="rounded-md border border-slate-200/90 bg-white/90 px-3 py-2 text-sm hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/15"
                 >
                   Add
                 </button>
@@ -406,12 +406,12 @@ function RemindersCard() {
               {state.medicineTimes.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {state.medicineTimes.map((t) => (
-                    <span key={t} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-xs">
+                    <span key={t} className="light-ui-frame inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-xs dark:border-white/10 dark:bg-white/10">
                       {t}
                       <button
                         type="button"
                         onClick={() => removeTime(t)}
-                        className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 hover:bg-white/30"
+                        className="ml-1 rounded-full bg-slate-200 px-1.5 py-0.5 hover:bg-slate-300 dark:bg-white/20 dark:hover:bg-white/30"
                         aria-label={`Remove time ${t}`}
                       >
                         ×
@@ -433,13 +433,13 @@ function RemindersCard() {
 
 function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+    <div className="light-ui-frame flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50/90 px-3 py-2 dark:border-white/10 dark:bg-white/5">
       <span className="text-sm">{label}</span>
       <button
         type="button"
         aria-pressed={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full transition-colors ${checked ? "bg-amber-400" : "bg-white/15"}`}
+        className={`relative h-6 w-11 rounded-full transition-colors ${checked ? "bg-amber-400" : "bg-slate-300 dark:bg-white/15"}`}
       >
         <span className={`absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white transition-all ${checked ? "right-1" : "left-1"}`} />
         <span className="sr-only">Toggle {label}</span>

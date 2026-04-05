@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -10,13 +17,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
@@ -28,17 +28,31 @@ body {
 /* Animated gradient text utility */
 .gradient-text {
   background: linear-gradient(90deg,
-    #ffffff 0%,      /* white */
-    #f1f5f9 20%,     /* very light */
-    #e0f2fe 45%,     /* sky-100 */
-    #bae6fd 70%,     /* sky-200 */
-    #93c5fd 100%     /* sky-300 */
+    #4c1d95 0%,
+    #5b21b6 18%,
+    #2563eb 45%,
+    #0891b2 72%,
+    #0e7490 100%
   );
   background-size: 260% 200%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   animation: gradientFlowX 7s ease-in-out infinite alternate;
+}
+
+.dark .gradient-text {
+  background: linear-gradient(90deg,
+    #ffffff 0%,
+    #f1f5f9 20%,
+    #e0f2fe 45%,
+    #bae6fd 70%,
+    #93c5fd 100%
+  );
+  background-size: 260% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 @keyframes gradientFlowX {
@@ -57,4 +71,196 @@ body {
 
 .animate-scroll-banner {
   animation: scrollBanner 20s linear infinite;
+}
+
+/* Light mode: visible outlines (outline avoids clobbering Tailwind box-shadow) */
+html:not(.dark) button:not([aria-hidden="true"]):not(.light-ui-frame) {
+  outline: 1px solid rgb(148 163 184 / 0.95);
+  outline-offset: 1px;
+}
+
+html:not(.dark) [role="switch"] {
+  outline: 1px solid rgb(148 163 184 / 0.95);
+  outline-offset: 1px;
+}
+
+html:not(.dark) input:not([type="hidden"]),
+html:not(.dark) textarea,
+html:not(.dark) select {
+  outline: 1px solid rgb(148 163 184 / 0.95);
+  outline-offset: 0;
+}
+
+html:not(.dark) a[href].inline-flex:not(.light-ui-frame):not(.animate-scroll-banner),
+html:not(.dark) a[href].flex:not(.light-ui-frame):not(.animate-scroll-banner) {
+  outline: 1px solid rgb(148 163 184 / 0.9);
+  outline-offset: 1px;
+}
+
+/* Card / panel frame */
+html:not(.dark) .light-ui-frame {
+  outline: 1px solid rgb(148 163 184 / 0.95);
+  outline-offset: 0;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+}
+
+html:not(.dark) button:focus-visible,
+html:not(.dark) [role="switch"]:focus-visible,
+html:not(.dark) input:focus-visible,
+html:not(.dark) textarea:focus-visible,
+html:not(.dark) select:focus-visible,
+html:not(.dark) a[href]:focus-visible {
+  outline: 2px solid rgb(37 99 235 / 0.75);
+  outline-offset: 2px;
+}
+
+/* Sign-in (Clerk): mail + lock icons inside identifier / email / password fields */
+.cca-signin-clerk input[name="identifier"],
+.cca-signin-clerk input[name="username"],
+.cca-signin-clerk input[type="email"] {
+  padding-left: 2.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.875rem 50%;
+  background-size: 1.25rem 1.25rem;
+}
+
+.cca-signin-clerk input[type="password"]:not([name="code"]) {
+  padding-left: 2.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.875rem 50%;
+  background-size: 1.25rem 1.25rem;
+}
+
+/* Sign-in page: subtle animated background + floating login card (respects reduced motion) */
+.cca-signin-page-bg {
+  background: linear-gradient(
+    165deg,
+    #0f1f3d 0%,
+    #152a52 32%,
+    #1a3668 58%,
+    #132a50 82%,
+    #0f1f3d 100%
+  );
+}
+
+.dark .cca-signin-page-bg {
+  background: linear-gradient(
+    165deg,
+    #0a1528 0%,
+    #0f2442 35%,
+    #153056 65%,
+    #0c1a32 100%
+  );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cca-signin-page-bg {
+    background-size: 200% 200%;
+    animation: cca-signin-bg-drift 28s ease-in-out infinite alternate;
+  }
+
+  .dark .cca-signin-page-bg {
+    background-size: 200% 200%;
+    animation: cca-signin-bg-drift 28s ease-in-out infinite alternate;
+  }
+
+  .cca-signin-login-card {
+    animation: cca-signin-card-float 8s ease-in-out infinite;
+    will-change: transform;
+  }
+}
+
+@keyframes cca-signin-bg-drift {
+  0% {
+    background-position: 8% 15%;
+  }
+  100% {
+    background-position: 92% 85%;
+  }
+}
+
+@keyframes cca-signin-card-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cca-signin-page-bg,
+  .dark .cca-signin-page-bg {
+    background-size: 100% 100%;
+    background-position: center;
+    animation: none;
+  }
+
+  .cca-signin-login-card {
+    animation: none;
+    will-change: auto;
+  }
+}
+
+/* Initial load: “Together” + progress bar (calm, med-tech tone) */
+.cca-care-together-loader .cca-care-prefix {
+  color: rgb(226 232 240 / 0.9);
+  font-weight: 600;
+}
+
+.cca-care-together-loader .cca-care-together {
+  color: rgb(203 213 225);
+  animation: ccaCareTogetherColor 3.2s cubic-bezier(0.42, 0, 0.22, 1) forwards;
+}
+
+.cca-care-together-loader .cca-care-loader-bar {
+  width: 0%;
+  animation: ccaCareLoaderBar 3.2s cubic-bezier(0.42, 0, 0.22, 1) forwards;
+}
+
+@keyframes ccaCareTogetherColor {
+  0%,
+  16% {
+    color: rgb(203 213 225);
+    text-shadow: none;
+  }
+  100% {
+    color: #3b82f6;
+    text-shadow:
+      0 0 28px rgba(59, 130, 246, 0.2),
+      0 0 56px rgba(37, 99, 235, 0.1);
+  }
+}
+
+@keyframes ccaCareLoaderBar {
+  0% {
+    width: 0%;
+    opacity: 0.88;
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.2);
+  }
+  100% {
+    width: 100%;
+    opacity: 1;
+    box-shadow:
+      0 0 14px rgba(59, 130, 246, 0.45),
+      0 0 28px rgba(37, 99, 235, 0.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cca-care-together-loader .cca-care-together {
+    animation: none;
+    color: #3b82f6;
+    text-shadow: 0 0 20px rgba(59, 130, 246, 0.18);
+  }
+
+  .cca-care-together-loader .cca-care-loader-bar {
+    animation: none;
+    width: 100%;
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+  }
 }

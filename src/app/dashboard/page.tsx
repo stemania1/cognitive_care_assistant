@@ -1,19 +1,19 @@
 'use client';
 
 import { useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import HomeCards from "../components/HomeCards";
 import { GuestIndicator } from "../components/GuestIndicator";
 import DementiaStagesButton from "../components/DementiaStagesButton";
 import { CongressionalAppChallengeButton } from "../components/CongressionalAppChallengeButton";
 import { UserProfileTopLeft } from "../components/UserProfileTopLeft";
+import { DashboardSettingsMenu } from "../components/DashboardSettingsMenu";
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50 to-sky-100 text-slate-900 dark:from-black dark:via-[#0b0520] dark:to-[#0b1a3a] dark:text-white">
       {/* Guest Account Indicator */}
       <GuestIndicator />
       
@@ -24,8 +24,8 @@ export default function Dashboard() {
       <CongressionalAppChallengeButton />
       
       {/* Background gradients (slightly brighter) */}
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.2),transparent)]" />
-      <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/40 via-purple-500/35 to-cyan-500/40 blur-3xl -z-10" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.14),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.12),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.1),transparent)] dark:bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.2),transparent)]" />
+      <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/20 via-purple-500/18 to-cyan-500/20 blur-3xl -z-10 dark:from-fuchsia-500/40 dark:via-purple-500/35 dark:to-cyan-500/40" />
 
       <main className="relative mx-auto max-w-5xl px-6 sm:px-10 py-8 sm:py-12">
         {/* Hero */}
@@ -37,7 +37,7 @@ export default function Dashboard() {
             aria-label="Learn about Cognitive Care"
           >
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/40 via-purple-500/30 to-cyan-500/40 blur-xl group-hover:bg-white/20 group-hover:blur-2xl transition-all duration-300" />
-            <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-4 group-hover:border-white/30 group-hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all duration-300">
+            <div className="light-ui-frame relative rounded-2xl border border-slate-200/90 bg-white/80 p-4 shadow-sm backdrop-blur transition-all duration-300 group-hover:border-violet-300/80 group-hover:shadow-lg dark:border-black/[.08] dark:bg-white/5 dark:shadow-none dark:group-hover:border-white/30 dark:group-hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]">
               <Image
                 src="/digital_brain.png"
                 alt="Cognitive Care Assistant logo"
@@ -64,39 +64,21 @@ export default function Dashboard() {
         <HomeCards />
       </main>
 
-      {/* Floating Action Buttons */}
-      <div className="fixed bottom-6 left-6 sm:bottom-8 sm:left-8 flex flex-col gap-4">
-        {/* Sign Out Button */}
-        <Link href="/signout" className="group">
-          <span className="absolute -inset-2 rounded-full bg-gradient-to-r from-red-500/40 via-pink-500/35 to-rose-500/40 blur-xl opacity-70 group-hover:opacity-90 transition-opacity" />
-          <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[.08] dark:border-white/[.12] bg-white/10 backdrop-blur shadow-lg transition-transform duration-200 group-hover:scale-105">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="h-5 w-5 opacity-90"
-              aria-hidden="true"
-            >
-              <path d="M16.5 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM21 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM15.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM9.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM3.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25z" />
-            </svg>
-            <span className="sr-only">Sign Out</span>
-          </span>
-        </Link>
-      </div>
+      <DashboardSettingsMenu />
 
       {/* Development Info Modal */}
       {isModalOpen && (
         <>
           <div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm dark:bg-black/60"
             onClick={() => setIsModalOpen(false)}
             aria-hidden="true"
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="relative w-full max-w-2xl rounded-2xl border border-white/20 bg-gradient-to-br from-cyan-950/95 to-blue-950/95 shadow-2xl p-6 sm:p-8 backdrop-blur">
+            <div className="light-ui-frame relative w-full max-w-2xl rounded-2xl border border-slate-200/90 bg-white/95 p-6 shadow-2xl backdrop-blur sm:p-8 dark:border-white/20 dark:bg-gradient-to-br dark:from-cyan-950/95 dark:to-blue-950/95 dark:shadow-2xl">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
+                className="absolute top-4 right-4 text-slate-500 hover:text-slate-800 transition-colors dark:text-white/70 dark:hover:text-white"
                 aria-label="Close modal"
               >
                 <svg
@@ -110,14 +92,14 @@ export default function Dashboard() {
                 </svg>
               </button>
               
-              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6 pr-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-6 pr-8 dark:text-white">
                 About Cognitive Care Assistant
               </h2>
               
-              <div className="text-gray-200 text-base leading-relaxed space-y-6">
+              <div className="text-slate-700 text-base leading-relaxed space-y-6 dark:text-gray-200">
                 <div className="relative">
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-fuchsia-500/15 via-purple-500/10 to-cyan-500/15 blur-xl" />
-                  <div className="relative rounded-xl border border-white/10 bg-white/5 backdrop-blur p-5 sm:p-6">
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-fuchsia-500/10 via-purple-500/8 to-cyan-500/10 blur-xl dark:from-fuchsia-500/15 dark:via-purple-500/10 dark:to-cyan-500/15" />
+                  <div className="light-ui-frame relative rounded-xl border border-slate-200/80 bg-slate-50/80 p-5 backdrop-blur sm:p-6 dark:border-white/10 dark:bg-white/5">
                     <p>
                       We created the Cognitive Care Assistant because dementia has touched our own families, and we've seen firsthand the challenges it brings. Today, nearly 1 in 10 people over the age of 65 live with dementia, and the number is only rising each year. It is now the fifth leading cause of death, not because of the disease itself, but because those affected lose the ability to remember or manage vital daily functions. Watching a loved one struggle in this way is heartbreaking, and we knew something had to be done. With the Cognitive Care Assistant, our goal is to create a safe, supportive space that helps people hold on to their independence, stay healthy, and feel cared for. More than just a tool, it's a promise of comfort and dignity for those living with dementia—and peace of mind for the families who love them.
                     </p>

@@ -58,7 +58,7 @@ export default function CorbinCraigPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
       />
-      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50 to-sky-100 text-slate-900 dark:from-black dark:via-[#0b0520] dark:to-[#0b1a3a] dark:text-white">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent)]" />
         <main className="relative mx-auto max-w-2xl px-6 py-12 sm:py-16">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Corbin Craig</h1>

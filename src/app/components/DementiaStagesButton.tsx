@@ -88,7 +88,7 @@ export default function DementiaStagesButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-cyan-100 shadow-lg backdrop-blur transition-all hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+        className="light-ui-frame inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white/90 px-4 py-2 text-sm font-medium text-cyan-800 shadow-md backdrop-blur transition-all hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 dark:border-white/15 dark:bg-white/10 dark:text-cyan-100 dark:shadow-lg dark:hover:bg-white/15 dark:focus-visible:ring-cyan-300/70"
       >
         <span className="text-base">🧠</span>
         <span>7 Stages of Dementia &amp; Care Tips</span>

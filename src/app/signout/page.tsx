@@ -2,7 +2,7 @@
 
 import { useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -10,32 +10,23 @@ export default function SignOut() {
   const { signOut } = useClerk();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false);
-
-  // Auto-redirect if not confirmed after component mounts
-  useEffect(() => {
-    if (!isConfirmed && !isLoading) {
-      // If user is already here, they probably want to sign out
-      // Automatically trigger sign out after a brief moment
-      const timer = setTimeout(() => {
-        handleSignOut();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, []);
 
   const handleSignOut = async () => {
     setIsLoading(true);
-    
+
+    // If Clerk never completes (network / API quirk), still leave the app
+    const safetyRedirect = window.setTimeout(() => {
+      window.location.assign("/signin");
+    }, 5000);
+
     try {
-      // Sign out and redirect immediately
-      await signOut(() => {
-        router.push("/signin");
-      });
+      // Clerk v5+ expects options, not a callback — callback form can hang forever
+      await signOut({ redirectUrl: "/signin" });
     } catch (err) {
       console.error("Error signing out:", err);
-      // Even on error, redirect to sign in
-      router.push("/signin");
+      window.location.assign("/signin");
+    } finally {
+      window.clearTimeout(safetyRedirect);
     }
   };
 
@@ -45,7 +36,7 @@ export default function SignOut() {
 
   if (isLoading) {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50 to-sky-100 text-slate-900 dark:from-black dark:via-[#0b0520] dark:to-[#0b1a3a] dark:text-white">
         {/* Background gradients */}
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
         <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
@@ -60,46 +51,8 @@ export default function SignOut() {
     );
   }
 
-  if (isConfirmed) {
-    return (
-      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
-        {/* Background gradients */}
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
-        <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
-
-        <main className="relative mx-auto max-w-md px-6 sm:px-8 py-12 sm:py-20">
-          {/* Logo and Title */}
-          <div className="flex flex-col items-center text-center gap-6 mb-10">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/30 via-purple-500/20 to-cyan-500/30 blur-xl" />
-              <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-4">
-                <Image
-                  src="/digital_brain.png"
-                  alt="Cognitive Care Assistant logo"
-                  width={96}
-                  height={96}
-                  priority
-                  className="h-16 w-16 sm:h-20 sm:w-20 object-contain drop-shadow"
-                />
-              </div>
-            </div>
-
-            <div className="text-center">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
-                Signed Out Successfully
-              </h1>
-              <p className="text-gray-300 text-sm">
-                Redirecting you to the sign in page...
-              </p>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50 to-sky-100 text-slate-900 dark:from-black dark:via-[#0b0520] dark:to-[#0b1a3a] dark:text-white">
       {/* Background gradients */}
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
       <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />

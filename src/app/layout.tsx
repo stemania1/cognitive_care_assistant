@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
+import { CareTogetherLoadScreen } from "./components/CareTogetherLoadScreen";
+import { ClerkProviderWithPathLocalization } from "./components/ClerkProviderWithPathLocalization";
 import { AlertProvider } from "./components/AlertCenter";
 import { GlobalAlertButton } from "./components/GlobalAlertButton";
+import { AlertsPanelLayer } from "./components/AlertsPanelLayer";
 import { StructuredData } from "./components/StructuredData";
 
 const geistSans = Geist({
@@ -176,8 +178,15 @@ export default function RootLayout({
   };
 
   return (
-    <ClerkProvider>
-      <html lang="en">
+    <ClerkProviderWithPathLocalization>
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `!function(){try{var t=localStorage.getItem("cca-theme");if(t==="light")document.documentElement.classList.remove("dark");else document.documentElement.classList.add("dark");}catch(e){document.documentElement.classList.add("dark");}}();`,
+            }}
+          />
+        </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
@@ -188,12 +197,14 @@ export default function RootLayout({
             }}
           />
           <StructuredData data={organizationStructuredData} />
+          <CareTogetherLoadScreen />
           <AlertProvider>
             {children}
             <GlobalAlertButton />
+            <AlertsPanelLayer />
           </AlertProvider>
         </body>
       </html>
-    </ClerkProvider>
+    </ClerkProviderWithPathLocalization>
   );
 }

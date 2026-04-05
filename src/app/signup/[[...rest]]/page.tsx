@@ -6,7 +6,7 @@ import Link from "next/link";
 
 export default function SignUpPage() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50 to-sky-100 text-slate-900 dark:from-black dark:via-[#0b0520] dark:to-[#0b1a3a] dark:text-white">
       {/* Background gradients */}
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.25),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.18),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.12),transparent)]" />
       <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/25 via-purple-500/20 to-cyan-500/25 blur-3xl -z-10" />
@@ -16,7 +16,7 @@ export default function SignUpPage() {
         <div className="flex flex-col items-center text-center gap-6 mb-10">
           <div className="relative">
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/30 via-purple-500/20 to-cyan-500/30 blur-xl" />
-            <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-4">
+            <div className="light-ui-frame relative rounded-2xl border border-black/[.08] bg-white/80 p-4 backdrop-blur dark:border-white/[.12] dark:bg-white/5">
               <Image
                 src="/digital_brain.png"
                 alt="Cognitive Care Assistant logo"
@@ -28,10 +28,10 @@ export default function SignUpPage() {
             </div>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
             Create Account
           </h1>
-          <p className="text-gray-300 text-sm">
+          <p className="text-slate-600 text-sm dark:text-gray-300">
             Sign up to get started with Cognitive Care Assistant
           </p>
         </div>
@@ -40,9 +40,12 @@ export default function SignUpPage() {
         <div className="flex justify-center">
           <div className="relative">
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/10 via-purple-500/5 to-cyan-500/10 blur-xl" />
-            <div className="relative rounded-2xl border border-black/[.08] dark:border-white/[.12] bg-white/5 dark:bg-white/5 backdrop-blur p-6 sm:p-8">
+            <div className="light-ui-frame relative rounded-2xl border border-black/[.08] bg-white/80 p-6 backdrop-blur dark:border-white/[.12] dark:bg-white/5 sm:p-8">
               <SignUp
                 appearance={{
+                  layout: {
+                    logoPlacement: "none",
+                  },
                   elements: {
                     rootBox: "mx-auto",
                     card: "bg-transparent shadow-none",

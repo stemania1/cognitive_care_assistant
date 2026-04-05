@@ -1867,7 +1867,7 @@ export default function EMGPage() {
   }, []);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-[#0b0520] to-[#0b1a3a] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50 to-sky-100 text-slate-900 dark:from-black dark:via-[#0b0520] dark:to-[#0b1a3a] dark:text-white">
       {/* Background gradients (match dashboard) */}
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.2),transparent)]" />
       <div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/40 via-purple-500/35 to-cyan-500/40 blur-3xl -z-10" />
@@ -1887,7 +1887,7 @@ export default function EMGPage() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
             <div>
               <div className="flex items-center gap-4 mb-2">
-                <h1 className="text-3xl lg:text-4xl font-bold text-white">EMG Workout</h1>
+                <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white">EMG Workout</h1>
                 <Link 
                   href="/emg-history" 
                   className="text-sm px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 rounded-lg text-cyan-300 hover:text-cyan-200 transition-all"
@@ -2359,10 +2359,10 @@ export default function EMGPage() {
 
                   {currentWorkout && (
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-white">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-white">
                         {formatTime(workoutTime)} / {formatTime(currentWorkout.duration)}
                       </div>
-                      <div className="text-sm text-gray-300">{currentWorkout.name}</div>
+                      <div className="text-sm text-slate-600 dark:text-gray-300">{currentWorkout.name}</div>
                     </div>
                   )}
                 </div>
