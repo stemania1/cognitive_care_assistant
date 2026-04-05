@@ -8,6 +8,9 @@ import { readThemeIsDark, setThemeIsDark } from "@/lib/themePreference";
 const PROFESSIONALS_LABEL =
   "What dementia professionals say about Cognitive Care Assistant";
 
+const CONGRESSIONAL_CAC_URL =
+  "https://www.congressionalappchallenge.us/25-FL17/";
+
 const navButtonClass =
   "inline-flex min-h-9 max-w-[11rem] shrink-0 items-center justify-center rounded-md border border-white/25 bg-white/10 px-2 py-1.5 text-center text-[10px] font-medium leading-tight text-white transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 sm:min-h-10 sm:max-w-[13rem] sm:px-2.5 sm:text-xs md:max-w-[16rem] lg:max-w-[20rem] lg:text-sm xl:max-w-[24rem]";
 
@@ -71,15 +74,8 @@ export function SignInTopBar() {
 
           <nav
             className="flex min-w-0 flex-1 items-center justify-start gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden"
-            aria-label="Sign-in page sections"
+            aria-label="Sign-in page navigation"
           >
-            <Link
-              href="/signin#how-it-works"
-              onClick={(e) => scrollToSection("how-it-works", e)}
-              className={navButtonClass}
-            >
-              How it works
-            </Link>
             <Link
               href="/signin#what-professionals-say"
               title={PROFESSIONALS_LABEL}
@@ -88,6 +84,17 @@ export function SignInTopBar() {
             >
               <span className="line-clamp-3 xl:line-clamp-2">{PROFESSIONALS_LABEL}</span>
             </Link>
+            <a
+              href={CONGRESSIONAL_CAC_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Opens the Congressional App Challenge announcement in a new tab"
+              className={navButtonClass}
+            >
+              <span className="line-clamp-3 sm:line-clamp-2">
+                Cognitive Care Assistant in Congress
+              </span>
+            </a>
           </nav>
         </div>
 
