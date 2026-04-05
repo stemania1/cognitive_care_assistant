@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { clearCareIntroSessionFlag } from "@/lib/careIntroSession";
 
 export default function SignOut() {
   const { signOut } = useClerk();
@@ -17,17 +16,14 @@ export default function SignOut() {
 
     // If Clerk never completes (network / API quirk), still leave the app
     const safetyRedirect = window.setTimeout(() => {
-      clearCareIntroSessionFlag();
       window.location.assign("/signin");
     }, 5000);
 
     try {
-      clearCareIntroSessionFlag();
       // Clerk v5+ expects options, not a callback — callback form can hang forever
       await signOut({ redirectUrl: "/signin" });
     } catch (err) {
       console.error("Error signing out:", err);
-      clearCareIntroSessionFlag();
       window.location.assign("/signin");
     } finally {
       window.clearTimeout(safetyRedirect);

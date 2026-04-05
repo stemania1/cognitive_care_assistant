@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useDailyChecks } from "@/lib/useDailyChecks";
@@ -14,6 +15,7 @@ import { QuestionNavigation } from "@/app/components/daily-questions/QuestionNav
 import { RecentAnswersTable } from "@/app/components/daily-questions/RecentAnswersTable";
 
 export default function DailyQuestionsPage() {
+  const router = useRouter();
   const today = useMemo(() => getTodayKey(), []);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
@@ -364,9 +366,8 @@ export default function DailyQuestionsPage() {
     
     // Reset questionnaire state before leaving
     resetQuestionnaireState();
-    
-    // Navigate to dashboard
-    window.location.href = '/dashboard';
+
+    router.push("/dashboard");
   };
 
   const handleCloseCompletionModal = () => {
@@ -376,9 +377,8 @@ export default function DailyQuestionsPage() {
     // Reset questionnaire state before redirecting
     resetQuestionnaireState();
     
-    // Redirect to home page after a short delay
     setTimeout(() => {
-      window.location.href = '/dashboard';
+      router.push("/dashboard");
     }, 500);
   };
 
