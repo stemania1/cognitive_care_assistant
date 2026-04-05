@@ -14,6 +14,10 @@ const CONGRESSIONAL_CAC_URL =
 const navButtonClass =
   "inline-flex min-h-9 max-w-[11rem] shrink-0 items-center justify-center rounded-md border border-white/25 bg-white/10 px-2 py-1.5 text-center text-[10px] font-medium leading-tight text-white transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 sm:min-h-10 sm:max-w-[13rem] sm:px-2.5 sm:text-xs md:max-w-[16rem] lg:max-w-[20rem] lg:text-sm xl:max-w-[24rem]";
 
+/** Wider nav control: CAC wordmark + label (white logo on blue bar). */
+const congressionalNavButtonClass =
+  "inline-flex min-h-9 max-w-[min(92vw,21rem)] shrink-0 items-center justify-start gap-2 rounded-md border border-white/25 bg-white/10 px-2 py-1.5 text-left text-[10px] font-medium leading-tight text-white transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 sm:min-h-10 sm:max-w-[min(92vw,26rem)] sm:gap-2.5 sm:px-2.5 sm:text-xs md:max-w-[min(92vw,30rem)] lg:max-w-[34rem] lg:gap-3 lg:text-sm xl:max-w-[38rem]";
+
 function scrollToSection(id: string, e: React.MouseEvent<HTMLAnchorElement>) {
   const el = document.getElementById(id);
   if (el) {
@@ -89,10 +93,20 @@ export function SignInTopBar() {
               target="_blank"
               rel="noopener noreferrer"
               title="Opens the Congressional App Challenge announcement in a new tab"
-              className={navButtonClass}
+              className={congressionalNavButtonClass}
             >
-              <span className="line-clamp-3 sm:line-clamp-2">
-                Cognitive Care Assistant in Congress
+              <Image
+                src="/images/CAClogo-white-letters-only.png"
+                alt=""
+                width={112}
+                height={40}
+                className="h-7 w-auto shrink-0 object-contain object-left opacity-95 sm:h-8"
+                aria-hidden
+              />
+              <span className="min-w-0 leading-snug">
+                <span className="line-clamp-3 sm:line-clamp-2">
+                  Cognitive Care Assistant in Congress
+                </span>
               </span>
             </a>
           </nav>
