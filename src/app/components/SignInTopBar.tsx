@@ -1,15 +1,18 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { readThemeIsDark, setThemeIsDark } from "@/lib/themePreference";
 
 const PROFESSIONALS_LABEL =
   "What dementia professionals say about Cognitive Care Assistant";
 
 const CONGRESSIONAL_CAC_URL =
   "https://www.congressionalappchallenge.us/25-FL17/";
+
+const INSTAGRAM_URL = "https://www.instagram.com/cognitivecareassistant/";
+
+const YOUTUBE_URL = "https://www.youtube.com/@CognitiveCareAssistant";
 
 const navButtonClass =
   "inline-flex min-h-9 max-w-[11rem] shrink-0 items-center justify-center rounded-md border border-white/25 bg-white/10 px-2 py-1.5 text-center text-[10px] font-medium leading-tight text-white transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 sm:min-h-10 sm:max-w-[13rem] sm:px-2.5 sm:text-xs md:max-w-[16rem] lg:max-w-[20rem] lg:text-sm xl:max-w-[24rem]";
@@ -18,7 +21,10 @@ const navButtonClass =
 const congressionalNavButtonClass =
   "inline-flex min-h-9 max-w-[min(92vw,21rem)] shrink-0 items-center justify-start gap-2 rounded-md border border-white/25 bg-white/10 px-2 py-1.5 text-left text-[10px] font-medium leading-tight text-white transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 sm:min-h-10 sm:max-w-[min(92vw,26rem)] sm:gap-2.5 sm:px-2.5 sm:text-xs md:max-w-[min(92vw,30rem)] lg:max-w-[34rem] lg:gap-3 lg:text-sm xl:max-w-[38rem]";
 
-function scrollToSection(id: string, e: React.MouseEvent<HTMLAnchorElement>) {
+const socialIconClass =
+  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/30 bg-blue-900/35 text-white transition-colors hover:border-white/50 hover:bg-blue-900/55 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/80 sm:h-11 sm:w-11";
+
+function scrollToSection(id: string, e: MouseEvent<HTMLAnchorElement>) {
   const el = document.getElementById(id);
   if (el) {
     e.preventDefault();
@@ -27,32 +33,35 @@ function scrollToSection(id: string, e: React.MouseEvent<HTMLAnchorElement>) {
   }
 }
 
+function InstagramIcon({ className = "h-5 w-5 sm:h-[1.35rem] sm:w-[1.35rem]" }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 11-2.881.001 1.44 1.44 0 012.881-.001z" />
+    </svg>
+  );
+}
+
+function YouTubeIcon({ className = "h-5 w-5 sm:h-[1.35rem] sm:w-[1.35rem]" }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+    </svg>
+  );
+}
+
 export function SignInTopBar() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [isDark, setIsDark] = useState(true);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    setIsDark(readThemeIsDark());
-  }, [menuOpen]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [menuOpen]);
-
-  const toggleDarkMode = useCallback(() => {
-    const next = !readThemeIsDark();
-    setThemeIsDark(next);
-    setIsDark(next);
-  }, []);
-
   return (
     <header
       className="fixed top-0 right-0 left-0 z-[80] border-b border-blue-700/40 bg-gradient-to-r from-[#1d4ed8] via-[#2563EB] to-[#3b82f6] shadow-md dark:border-blue-900/50 dark:from-[#1e3a8a] dark:via-[#1d4ed8] dark:to-[#2563EB]"
@@ -112,57 +121,27 @@ export function SignInTopBar() {
           </nav>
         </div>
 
-        <div ref={rootRef} className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setMenuOpen((o) => !o)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-blue-400/30 bg-blue-900/40 text-blue-100 transition-colors hover:bg-blue-800/50 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 sm:h-11 sm:w-11"
-            aria-expanded={menuOpen}
-            aria-haspopup="true"
-            aria-label="Settings"
-            title="Settings"
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={socialIconClass}
+            aria-label="Cognitive Care Assistant on Instagram (opens in new tab)"
+            title="Instagram — @cognitivecareassistant"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="h-5 w-5 sm:h-6 sm:w-6"
-              aria-hidden
-            >
-              <path
-                fillRule="evenodd"
-                d="M11.078 2.25c-.917 0-1.699.663-1.85 1.557l-.091.549c-.2.12-.398.245-.587.375l-.554-.16a1.875 1.875 0 00-2.185 2.185l.16.554c-.13.189-.255.387-.375.586l-.548.091A1.875 1.875 0 005.25 12l.091.548c.12.2.245.398.375.586l-.16.554a1.875 1.875 0 002.185 2.185l.554-.16c.189.13.387.255.586.375l.091.548A1.875 1.875 0 0012 18.75l.548-.091c.2-.12.398-.245.586-.375l.554.16a1.875 1.875 0 002.185-2.185l-.16-.554c.13-.189.255-.387.375-.586l.548-.091A1.875 1.875 0 0018.75 12l-.091-.548c-.12-.2-.245-.398-.375-.586l.16-.554a1.875 1.875 0 00-2.185-2.185l-.554.16c-.189-.13-.387-.255-.586-.375l-.091-.548A1.875 1.875 0 0012 5.25l-.548.091c-.2.12-.398.245-.586.375l-.554-.16a1.875 1.875 0 00-2.185 2.185l.16.554c-.13.189-.255.387-.375.586zM12 15a3 3 0 100-6 3 3 0 000 6z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
-
-          {menuOpen && (
-            <div className="absolute top-full right-0 z-[90] mt-2 w-[min(calc(100vw-2rem),16rem)] rounded-xl border border-blue-200/90 bg-white p-3 shadow-xl dark:border-blue-700/50 dark:bg-slate-900">
-              <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Settings
-              </p>
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200/90 bg-slate-50 px-3 py-2.5 dark:border-white/10 dark:bg-white/5">
-                <span className="text-sm font-medium text-slate-800 dark:text-slate-100">Dark mode</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={isDark}
-                  onClick={toggleDarkMode}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${
-                    isDark ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
-                  }`}
-                  aria-label={isDark ? "Dark mode on" : "Dark mode off"}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      isDark ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-          )}
+            <InstagramIcon />
+          </a>
+          <a
+            href={YOUTUBE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={socialIconClass}
+            aria-label="Cognitive Care Assistant on YouTube (opens in new tab)"
+            title="YouTube — @CognitiveCareAssistant"
+          >
+            <YouTubeIcon />
+          </a>
         </div>
       </div>
     </header>
