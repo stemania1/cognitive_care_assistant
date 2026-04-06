@@ -3,7 +3,12 @@
 import { useUser } from '@clerk/nextjs';
 import Image from 'next/image';
 
-export function UserProfileTopLeft() {
+type UserProfileTopLeftProps = {
+  /** Extra horizontal offset (px) so the chip clears a left sidebar. */
+  sidebarInsetPx?: number;
+};
+
+export function UserProfileTopLeft({ sidebarInsetPx = 0 }: UserProfileTopLeftProps) {
   const { user, isLoaded } = useUser();
 
   if (!isLoaded) {
@@ -18,7 +23,10 @@ export function UserProfileTopLeft() {
   const profileImageUrl = user.imageUrl || null;
 
   return (
-    <div className="fixed top-4 left-4 z-50">
+    <div
+      className="fixed top-4 z-50 transition-[left] duration-200 ease-out"
+      style={{ left: `calc(1rem + ${sidebarInsetPx}px)` }}
+    >
       <div className="relative">
         <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-fuchsia-500/20 via-purple-500/15 to-cyan-500/20 blur-lg" />
         <button className="light-ui-frame relative flex cursor-pointer items-center gap-3 rounded-lg border-2 border-slate-200/90 bg-white/90 px-4 py-2.5 text-base text-slate-800 shadow-md backdrop-blur-sm transition-colors hover:bg-white dark:border-white/30 dark:bg-white/15 dark:text-white dark:shadow-lg dark:hover:bg-white/20">

@@ -12,7 +12,8 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run emg-server\"",
     "start:emg": "concurrently --names \"NEXT,EMG,BT\" --prefix-colors \"blue,yellow,green\" \"npm run dev\" \"npm run emg-server\" \"node bluetooth-receiver.js\"",
     "start:thermal": "concurrently --names \"NEXT,THERMAL\" --prefix-colors \"blue,green\" \"npm run dev\" \"node bluetooth-thermal-receiver.js\"",
-    "code-pdf": "node scripts/generate-code-pdf.js"
+    "code-pdf": "node scripts/generate-code-pdf.js",
+    "copyright-deposit": "node scripts/generate-copyright-deposit.js"
   },
   "dependencies": {
     "@clerk/localizations": "^4.3.0",

@@ -4,21 +4,24 @@ import { useState } from "react";
 import Image from "next/image";
 import HomeCards from "../components/HomeCards";
 import { GuestIndicator } from "../components/GuestIndicator";
-import DementiaStagesButton from "../components/DementiaStagesButton";
+import { DementiaCareSidebar } from "../components/DementiaCareSidebar";
 import { CongressionalAppChallengeButton } from "../components/CongressionalAppChallengeButton";
 import { UserProfileTopLeft } from "../components/UserProfileTopLeft";
 import { DashboardSettingsMenu } from "../components/DashboardSettingsMenu";
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  /** Sidebar width for profile chip only (main layout stays full-width; sidebar overlays). */
+  const [sidebarOverlayWidthPx, setSidebarOverlayWidthPx] = useState(0);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50 to-sky-100 text-slate-900 dark:from-black dark:via-[#0b0520] dark:to-[#0b1a3a] dark:text-white">
+      <DementiaCareSidebar onLayoutChange={setSidebarOverlayWidthPx} />
       {/* Guest Account Indicator */}
       <GuestIndicator />
       
       {/* User Profile Top Left */}
-      <UserProfileTopLeft />
+      <UserProfileTopLeft sidebarInsetPx={sidebarOverlayWidthPx} />
       
       {/* Congressional App Challenge Button */}
       <CongressionalAppChallengeButton />
@@ -54,10 +57,6 @@ export default function Dashboard() {
             <span className="block text-lg sm:text-2xl -mt-1 gradient-text">Assistant</span>
           </h1>
 
-        </div>
-
-        <div className="flex justify-center mb-6">
-          <DementiaStagesButton />
         </div>
 
         {/* Options */}

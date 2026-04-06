@@ -1,0 +1,2853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cognitive Care Assistant — Copyright Deposit Copy</title>
+  <style>
+    @page { size: letter; margin: 0.75in; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 9pt;
+      line-height: 1.2;
+      color: #000;
+      background: #fff;
+    }
+    .sheet {
+      page-break-after: always;
+      min-height: 10in;
+      padding: 0;
+    }
+    .sheet.code-sheet:last-of-type { page-break-after: auto; }
+    .cover {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    .cover h1 {
+      font-size: 22pt;
+      margin: 0 0 0.5in 0;
+      font-weight: bold;
+    }
+    .cover .author {
+      font-size: 14pt;
+      margin: 0.25in 0;
+    }
+    .cover .type {
+      font-size: 12pt;
+      margin-top: 0.75in;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .cover .notice {
+      margin-top: 1in;
+      font-size: 10pt;
+      max-width: 5in;
+      font-family: "Courier New", Courier, monospace;
+    }
+    .meta {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 10pt;
+      line-height: 1.35;
+      margin: 0 0 0.25in 0;
+      padding: 0 0.1in;
+    }
+    .meta p { margin: 0.35em 0; }
+    pre.code {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 8.5pt;
+      line-height: 1.15;
+    }
+    .sheet-footer {
+      margin-top: 0.2in;
+      font-size: 8pt;
+      font-family: Georgia, serif;
+      color: #333;
+    }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet cover">
+    <h1>Cognitive Care Assistant</h1>
+    <p class="author"><strong>Authors:</strong> Corbin Craig</p>
+    <p class="type">Copyright Deposit Copy</p>
+    <p class="notice">Copyright © 2026 Corbin Craig. All rights reserved.</p>
+    <div class="sheet-footer" style="margin-top:1.5in;font-family:Georgia,serif">Page 1 of 52</div>
+  </div>
+<div class="sheet code-sheet">
+    <div class="meta">
+      <p><strong>Deposit contents:</strong> Application source code (TypeScript, JavaScript, CSS) and related configuration files from the Cognitive Care Assistant repository.</p>
+      <p><strong>Total source lines represented (full corpus before excerpt):</strong> 27,859</p>
+      <p><strong>Approximate full corpus length:</strong> ~516 printed pages at 54 lines per page.</p>
+      <p><strong>This file:</strong> First 25 pages and last 25 pages of the concatenated listing (25,159 lines omitted from middle).</p>
+      <p><strong>Files included:</strong> 125</p>
+    </div>
+  <pre class="code">
+================================================================================
+FILE PATH: package.json
+FILE NAME: package.json
+================================================================================
+
+{
+  "name": "cognitive_care_assistant",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"NEXT,THERMAL\" --prefix-colors \"blue,green\" \"next dev --turbopack -p 3000\" \"node bluetooth-thermal-receiver.js\"",
+    "dev:next": "next dev --turbopack -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "emg-server": "node emg-server.js",
+    "dev:all": "concurrently \"npm run dev\" \"npm run emg-server\"",
+    "start:emg": "concurrently --names \"NEXT,EMG,BT\" --prefix-colors \"blue,yellow,green\" \"npm run dev\" \"npm run emg-server\" \"node bluetooth-receiver.js\"",
+    "start:thermal": "concurrently --names \"NEXT,THERMAL\" --prefix-colors \"blue,green\" \"npm run dev\" \"node bluetooth-thermal-receiver.js\"",
+    "code-pdf": "node scripts/generate-code-pdf.js"
+  },
+  "dependencies": {
+    "@clerk/localizations": "^4.3.0",
+    "@clerk/nextjs": "^6.36.7",
+    "@hcaptcha/react-hcaptcha": "^1.14.0",
+    "@serialport/parser-readline": "^13.0.0",
+    "@supabase/supabase-js": "^2.58.0",
+    "chart.js": "^4.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "next": "^16.1.1",
+    "node-fetch": "^3.3.2",
+    "react": "^19.2.3",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^19.2.3",
+    "serialport": "^13.0.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "pdfkit": "^0.17.2",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
+
+
+</pre><div class="sheet-footer">Page 2 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">================================================================================
+FILE PATH: tsconfig.json
+FILE NAME: tsconfig.json
+================================================================================
+
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
+
+
+================================================================================
+FILE PATH: next.config.ts
+FILE NAME: next.config.ts
+================================================================================
+
+import type { NextConfig } from "next";
+</pre><div class="sheet-footer">Page 3 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'plus.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.clerk.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.clerk.dev',
+      },
+    ],
+  },
+  webpack: (config, { isServer }) =&gt; {
+    if (isServer) {
+      // Ignore optional resend module during build
+      config.externals = config.externals || [];
+      config.externals.push('resend');
+    }
+    return config;
+  },
+  turbopack: {},
+};
+
+export default nextConfig;
+
+
+================================================================================
+FILE PATH: next-env.d.ts
+FILE NAME: next-env.d.ts
+================================================================================
+
+/// &lt;reference types="next" /&gt;
+/// &lt;reference types="next/image-types/global" /&gt;
+import "./.next/dev/types/routes.d.ts";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+
+</pre><div class="sheet-footer">Page 4 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">================================================================================
+FILE PATH: src/app/about/page.tsx
+FILE NAME: page.tsx
+================================================================================
+
+import Link from "next/link";
+import Image from "next/image";
+import type { Metadata } from "next";
+import { StructuredData } from "../components/StructuredData";
+
+export const metadata: Metadata = {
+  title: "About - Winners of the 2025 Congressional App Challenge",
+  description: "Cognitive Care Assistant won the 2025 Congressional App Challenge for Florida's District 17. Learn about our journey, inspiration, and recognition from Rep. Gregory Steube.",
+  openGraph: {
+    title: "About - Winners of the 2025 Congressional App Challenge",
+    description: "Cognitive Care Assistant won the 2025 Congressional App Challenge for Florida's District 17. Learn about our journey and recognition.",
+    url: "/about",
+    images: [
+      {
+        url: "/images/CAClogo-dome-only-color.png",
+        width: 400,
+        height: 400,
+        alt: "Congressional App Challenge Capitol Dome",
+      },
+    ],
+  },
+  alternates: {
+    canonical: "/about",
+  },
+};
+
+export default function AboutPage() {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "About Cognitive Care Assistant - Winners of the 2025 Congressional App Challenge",
+    "description": "Cognitive Care Assistant won the 2025 Congressional App Challenge for Florida's District 17. Learn about our journey, inspiration, and recognition from Rep. Gregory Steube.",
+    "url": "https://cognitive-care-assistant.vercel.app/about",
+    "mainEntity": {
+      "@type": "SoftwareApplication",
+      "name": "Cognitive Care Assistant",
+      "applicationCategory": "HealthApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "5",
+        "ratingCount": "1"
+      },
+      "award": "Winner of the 2025 Congressional App Challenge - Florida District 17",
+</pre><div class="sheet-footer">Page 5 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      "creator": {
+        "@type": "Organization",
+        "name": "Corbin Craig and Connor Craig",
+        "affiliation": {
+          "@type": "EducationalOrganization",
+          "name": "Pine View School"
+        }
+      }
+    },
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://cognitive-care-assistant.vercel.app"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "About",
+          "item": "https://cognitive-care-assistant.vercel.app/about"
+        }
+      ]
+    }
+  };
+
+  return (
+    &lt;&gt;
+      &lt;StructuredData data={structuredData} /&gt;
+      &lt;div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50 to-sky-100 text-slate-900 dark:from-black dark:via-[#0b0520] dark:to-[#0b1a3a] dark:text-white"&gt;
+      &lt;div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(168,85,247,0.35),transparent),radial-gradient(900px_500px_at_80%_120%,rgba(34,211,238,0.28),transparent),radial-gradient(800px_400px_at_10%_120%,rgba(59,130,246,0.2),transparent)]" /&gt;
+      &lt;div className="pointer-events-none absolute -top-24 right-1/2 h-[420px] w-[420px] translate-x-1/2 rounded-full bg-gradient-to-r from-fuchsia-500/40 via-purple-500/35 to-cyan-500/40 blur-3xl -z-10" /&gt;
+
+      &lt;main className="relative mx-auto max-w-4xl px-6 sm:px-10 py-10 sm:py-14"&gt;
+        &lt;h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-6"&gt;About Cognitive Care&lt;/h1&gt;
+
+        {/* Congressional App Challenge Winners Section */}
+        &lt;div className="relative mb-8"&gt;
+          &lt;div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/20 via-purple-500/15 to-cyan-500/20 blur-xl" /&gt;
+          &lt;div className="relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6 sm:p-8"&gt;
+            &lt;div className="flex flex-col items-center gap-6"&gt;
+              &lt;div className="text-center"&gt;
+                &lt;h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-4"&gt;
+                  Winners of the 2025 Congressional App Challenge
+                &lt;/h2&gt;
+              &lt;/div&gt;
+              &lt;div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-8 w-full"&gt;
+                &lt;div className="flex-1 max-w-sm"&gt;
+                  &lt;Image
+                    src="/images/CAClogo-dome-only-color.png"
+                    alt="Congressional App Challenge Capitol Dome"
+                    width={400}
+</pre><div class="sheet-footer">Page 6 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">                    height={400}
+                    className="w-full h-auto object-contain"
+                  /&gt;
+                &lt;/div&gt;
+                &lt;div className="flex-1 max-w-sm"&gt;
+                  &lt;Image
+                    src="/images/CAClogo-white-letters-only.png"
+                    alt="Congressional App Challenge Logo"
+                    width={400}
+                    height={200}
+                    className="w-full h-auto object-contain"
+                  /&gt;
+                &lt;/div&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div className="relative"&gt;
+          &lt;div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-fuchsia-500/15 via-purple-500/10 to-cyan-500/15 blur-xl" /&gt;
+          &lt;div className="relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5 sm:p-7 text-gray-100 text-base leading-relaxed"&gt;
+            &lt;p&gt;
+              Winning the 2025 Congressional App Challenge for Florida's District 17 was an incredible honor, and I am truly grateful to everyone who supported this journey. A huge thank-you to my parents for providing the constant support, encouragement, and resources I needed throughout the entire process. I am also sincerely thankful to the judges for taking the time to review the submissions and for choosing my app—your recognition means so much to me. A special shout-out to Greg Steube for supporting student innovation and STEM education through the Congressional App Challenge. This experience motivated me to keep learning, building, and using technology to make a real impact.
+            &lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div className="mt-8"&gt;
+          &lt;Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 backdrop-blur px-4 py-2 hover:bg-white/10 transition-colors"
+          &gt;
+            &lt;span&gt;← Back to Home&lt;/span&gt;
+          &lt;/Link&gt;
+        &lt;/div&gt;
+      &lt;/main&gt;
+    &lt;/div&gt;
+    &lt;/&gt;
+  );
+}
+
+
+
+
+================================================================================
+FILE PATH: src/app/ai-synopsis/page.tsx
+FILE NAME: page.tsx
+================================================================================
+
+import { AiSynopsisDashboard } from "../components/ai-synopsis/AiSynopsisDashboard";
+
+export default function AiSynopsisPage() {
+  return &lt;AiSynopsisDashboard /&gt;;
+}
+</pre><div class="sheet-footer">Page 7 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">
+
+================================================================================
+FILE PATH: src/app/api/auth/request-reset/resend.d.ts
+FILE NAME: resend.d.ts
+================================================================================
+
+// Minimal type stub to satisfy Next.js type-checker when 'resend' is not installed in certain envs
+declare module "resend" {
+  export class Resend {
+    constructor(apiKey: string);
+    emails: { send(input: { from: string; to: string | string[]; subject: string; html: string }): Promise&lt;any&gt; };
+  }
+}
+
+
+
+
+================================================================================
+FILE PATH: src/app/api/auth/request-reset/route.ts
+FILE NAME: route.ts
+================================================================================
+
+import { NextResponse } from "next/server";
+import crypto from "crypto";
+
+function base64url(input: Buffer | string): string {
+  const b = Buffer.isBuffer(input) ? input : Buffer.from(input);
+  return b.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+function getSecret(): string {
+  return process.env.RESET_TOKEN_SECRET || "dev-insecure-reset-secret-change-me";
+}
+
+function createResetToken(email: string, ttlMs = 15 * 60 * 1000): string {
+  const payload = { e: email, exp: Date.now() + ttlMs };
+  const json = JSON.stringify(payload);
+  const sig = crypto.createHmac("sha256", getSecret()).update(json).digest();
+  return `${base64url(json)}.${base64url(sig)}`;
+}
+
+function getAppUrl(req: Request): string {
+  const env = process.env.NEXT_PUBLIC_APP_URL;
+  if (env) return env;
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3000";
+  const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+export async function POST(req: Request) {
+  try {
+    const { email } = await req.json();
+    if (!email || typeof email !== "string") {
+</pre><div class="sheet-footer">Page 8 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      return NextResponse.json({ ok: true });
+    }
+
+    const token = createResetToken(email.trim().toLowerCase());
+    const url = `${getAppUrl(req)}/reset-password?token=${encodeURIComponent(token)}&amp;email=${encodeURIComponent(email)}`;
+
+    const apiKey = process.env.RESEND_API_KEY;
+    if (apiKey) {
+      // Lazy import only when API key is present; guard to avoid build/runtime failures when module isn't installed
+      try {
+        // Use require to further avoid type-resolution during build where module may be absent
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { Resend } = require("resend");
+        const resend = new Resend(apiKey as string);
+        await resend.emails.send({
+          from: "Cognitive Care &lt;no-reply@cognitivecare.local&gt;",
+          to: email,
+          subject: "Reset your password",
+          html: `&lt;p&gt;Click the link to reset your password (expires in 15 minutes):&lt;/p&gt;&lt;p&gt;&lt;a href="${url}"&gt;${url}&lt;/a&gt;&lt;/p&gt;`,
+        });
+      } catch {
+        // Ignore errors (missing module, network, etc.)
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // Dev fallback: return URL in response for manual copy
+    return NextResponse.json({ ok: true, resetUrl: url });
+  } catch {
+    return NextResponse.json({ ok: true });
+  }
+}
+
+
+
+
+
+================================================================================
+FILE PATH: src/app/api/auth/reset-password/route.ts
+FILE NAME: route.ts
+================================================================================
+
+import { NextResponse } from "next/server";
+import crypto from "crypto";
+
+function fromBase64url(s: string): Buffer {
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  return Buffer.from(s, "base64");
+}
+
+function getSecret(): string {
+  return process.env.RESET_TOKEN_SECRET || "dev-insecure-reset-secret-change-me";
+}
+</pre><div class="sheet-footer">Page 9 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">
+function verifyToken(token: string): { e: string; exp: number } | null {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const json = fromBase64url(parts[0]);
+  const sig = fromBase64url(parts[1]);
+  const expected = crypto.createHmac("sha256", getSecret()).update(json).digest();
+  if (!crypto.timingSafeEqual(sig, expected)) return null;
+  try {
+    const payload = JSON.parse(json.toString());
+    if (!payload || typeof payload.e !== "string" || typeof payload.exp !== "number") return null;
+    if (Date.now() &gt; payload.exp) return null;
+    return payload as { e: string; exp: number };
+  } catch {
+    return null;
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const { email, token, newPassword } = await req.json();
+    if (!email || !token || !newPassword) return NextResponse.json({ ok: false }, { status: 400 });
+    const payload = verifyToken(token);
+    if (!payload) return NextResponse.json({ ok: false }, { status: 400 });
+    if (payload.e !== String(email).trim().toLowerCase()) return NextResponse.json({ ok: false }, { status: 400 });
+
+    // Update password in localStorage-backed demo store via header flag (dev only)
+    // In a real app, update DB here.
+    // This endpoint runs server-side; we can't access localStorage.
+    // We simply acknowledge success so the client can update its local store for demo.
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ ok: false }, { status: 400 });
+  }
+}
+
+
+
+
+
+================================================================================
+FILE PATH: src/app/api/check-schema/route.ts
+FILE NAME: route.ts
+================================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+
+export async function GET(request: NextRequest) {
+  try {
+    console.log('=== DATABASE SCHEMA CHECK ===');
+    
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+</pre><div class="sheet-footer">Page 10 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      return NextResponse.json({ 
+        error: adminError?.message || 'Missing environment variables',
+        details: adminError?.details
+      }, { status: 500 });
+    }
+
+    // Check daily_checks table schema
+    const { data: dailyChecksSchema, error: dailyChecksError } = await supabaseAdmin
+      .from('information_schema.columns')
+      .select('column_name, data_type, is_nullable')
+      .eq('table_name', 'daily_checks')
+      .eq('column_name', 'user_id');
+
+    // Check daily_check_sessions table schema
+    const { data: sessionsSchema, error: sessionsError } = await supabaseAdmin
+      .from('information_schema.columns')
+      .select('column_name, data_type, is_nullable')
+      .eq('table_name', 'daily_check_sessions')
+      .eq('column_name', 'user_id');
+
+    // Check if there are any sessions in the database
+    const { data: sessions, error: sessionsDataError } = await supabaseAdmin
+      .from('daily_check_sessions')
+      .select('id, user_id, date, created_at')
+      .limit(5);
+
+    // Check if there are any daily checks in the database
+    const { data: dailyChecks, error: dailyChecksDataError } = await supabaseAdmin
+      .from('daily_checks')
+      .select('id, user_id, question_id, date, created_at')
+      .limit(5);
+
+    return NextResponse.json({
+      timestamp: new Date().toISOString(),
+      dailyChecksSchema: {
+        data: dailyChecksSchema,
+        error: dailyChecksError?.message
+      },
+      sessionsSchema: {
+        data: sessionsSchema,
+        error: sessionsError?.message
+      },
+      sampleSessions: {
+        data: sessions,
+        error: sessionsDataError?.message,
+        count: sessions?.length || 0
+      },
+      sampleDailyChecks: {
+        data: dailyChecks,
+        error: dailyChecksDataError?.message,
+        count: dailyChecks?.length || 0
+      },
+      summary: {
+        dailyChecksUserIdType: dailyChecksSchema?.[0]?.data_type || 'unknown',
+</pre><div class="sheet-footer">Page 11 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">        sessionsUserIdType: sessionsSchema?.[0]?.data_type || 'unknown',
+        hasSessions: (sessions?.length || 0) &gt; 0,
+        hasDailyChecks: (dailyChecks?.length || 0) &gt; 0
+      }
+    });
+    
+  } catch (error) {
+    return NextResponse.json({
+      error: 'Schema check failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+
+================================================================================
+FILE PATH: src/app/api/daily-check-sessions/route.ts
+FILE NAME: route.ts
+================================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    const limit = Number(searchParams.get('limit') || '14');
+    if (!userId) return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+
+    // Create a Supabase client with service role key for admin operations
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('daily_check_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) return NextResponse.json({ error: 'Failed to fetch sessions' }, { status: 500 });
+    return NextResponse.json({ data });
+  } catch (e) {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+</pre><div class="sheet-footer">Page 12 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">  try {
+    const body = await request.json();
+    const { userId, date, setStartIndex, durationMs } = body;
+    if (!userId || typeof setStartIndex !== 'number' || typeof durationMs !== 'number') {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Create a Supabase client with service role key for admin operations
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('daily_check_sessions')
+      .insert({
+        user_id: userId,
+        date: date || new Date().toISOString().split('T')[0],
+        set_start_index: setStartIndex,
+        duration_ms: durationMs,
+      })
+      .select();
+
+    if (error) return NextResponse.json({ error: 'Failed to save session' }, { status: 500 });
+    return NextResponse.json({ data: data?.[0] });
+  } catch (e) {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    console.log('=== DELETE SESSION API DEBUG ===');
+    const body = await request.json();
+    console.log('Request body:', body);
+    const { userId, sessionId } = body;
+    console.log('UserId:', userId, 'SessionId:', sessionId);
+    
+    if (!userId || !sessionId) {
+      console.log('Missing required fields');
+      return NextResponse.json({ error: 'User ID and Session ID are required' }, { status: 400 });
+    }
+
+    // Create a Supabase client with service role key for admin operations
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      console.log('Service role key not configured');
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+</pre><div class="sheet-footer">Page 13 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    }
+
+    console.log('Attempting to delete session from database');
+    console.log('Query: DELETE FROM daily_check_sessions WHERE id =', sessionId, 'AND user_id =', userId);
+    
+    const { error } = await supabaseAdmin
+      .from('daily_check_sessions')
+      .delete()
+      .eq('id', sessionId)
+      .eq('user_id', userId);
+
+    console.log('Delete result error:', error);
+    
+    if (error) {
+      console.error('Database delete error:', error);
+      return NextResponse.json({ error: 'Failed to delete session', details: error.message }, { status: 500 });
+    }
+    
+    console.log('Session deleted successfully');
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error('Unexpected error in DELETE:', e);
+    return NextResponse.json({ error: 'Internal server error', details: e instanceof Error ? e.message : 'Unknown error' }, { status: 500 });
+  }
+}
+
+
+
+
+================================================================================
+FILE PATH: src/app/api/daily-checks/route.ts
+FILE NAME: route.ts
+================================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { validateUserId } from '@/lib/clerk-auth';
+
+export async function GET(request: NextRequest) {
+  try {
+    console.log('=== DAILY CHECKS GET REQUEST ===');
+    console.log('Request URL:', request.url);
+    console.log('Request method:', request.method);
+    
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get('date');
+    const userId = searchParams.get('userId');
+
+    console.log('Request params:', { date, userId });
+
+    if (!userId) {
+      console.log('ERROR: Missing userId parameter');
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+</pre><div class="sheet-footer">Page 14 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    }
+
+    // Create a Supabase client with service role key for admin operations
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      console.log('Service role key not configured properly');
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please create .env.local file with SUPABASE_SERVICE_ROLE_KEY. See README for setup instructions.' 
+      }, { status: 500 });
+    }
+
+    console.log('Building query for daily_checks table');
+    const query = supabaseAdmin
+      .from('daily_checks')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (date) {
+      query.eq('date', date);
+    }
+
+    console.log('Executing Supabase query');
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Supabase query error:', error);
+      return NextResponse.json({ 
+        error: 'Failed to fetch daily checks', 
+        details: error.message || 'Database query failed' 
+      }, { status: 500 });
+    }
+
+    console.log('Query successful, returning data:', data?.length || 0, 'records');
+    return NextResponse.json({ data: data || [] });
+  } catch (error) {
+    console.error('Unexpected error in daily checks GET:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // Check if user is authenticated (pass request to auth)
+    const { userId: authenticatedUserId } = await auth();
+    if (!authenticatedUserId) {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
+
+    const body = await request.json();
+</pre><div class="sheet-footer">Page 15 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    const { userId, questionId, questionText, answer, answerType = 'text', date, photoUrl } = body;
+
+    if (!userId || !questionId || !questionText || !answer) {
+      const missing = [];
+      if (!userId) missing.push('userId');
+      if (!questionId) missing.push('questionId');
+      if (!questionText) missing.push('questionText');
+      if (!answer) missing.push('answer');
+      return NextResponse.json({ 
+        error: 'Missing required fields', 
+        details: `Missing: ${missing.join(', ')}` 
+      }, { status: 400 });
+    }
+
+    // Verify the requested userId matches the authenticated user
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    // Create a Supabase client with service role key for admin operations
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    // Check if answer already exists for this user, question, and date
+    const { data: existing } = await supabaseAdmin
+      .from('daily_checks')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('question_id', questionId)
+      .eq('date', date || new Date().toISOString().split('T')[0])
+      .single();
+
+    let result;
+    if (existing) {
+      // Update existing answer
+      const updateData: any = {
+        answer,
+        answer_type: answerType,
+        updated_at: new Date().toISOString()
+      };
+      if (photoUrl !== undefined) {
+        updateData.photo_url = photoUrl;
+      }
+      result = await supabaseAdmin
+        .from('daily_checks')
+        .update(updateData)
+        .eq('id', existing.id)
+        .select();
+    } else {
+</pre><div class="sheet-footer">Page 16 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      // Insert new answer
+      const insertData: any = {
+        user_id: userId,
+        question_id: questionId,
+        question_text: questionText,
+        answer,
+        answer_type: answerType,
+        date: date || new Date().toISOString().split('T')[0]
+      };
+      if (photoUrl) {
+        insertData.photo_url = photoUrl;
+      }
+      result = await supabaseAdmin
+        .from('daily_checks')
+        .insert(insertData)
+        .select();
+    }
+
+    if (result.error) {
+      console.error('Error saving daily check:', result.error);
+      return NextResponse.json({ 
+        error: 'Failed to save daily check', 
+        details: result.error.message || 'Unknown database error' 
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({ data: result.data[0] });
+  } catch (error) {
+    console.error('Error in daily checks POST:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const entryId = searchParams.get('entryId');
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    // Create a Supabase client with service role key for admin operations
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    if (entryId) {
+      // Delete specific entry (for photo deletion)
+</pre><div class="sheet-footer">Page 17 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      const { data: entry, error: fetchError } = await supabaseAdmin
+        .from('daily_checks')
+        .select('photo_url, user_id')
+        .eq('id', entryId)
+        .eq('user_id', userId)
+        .single();
+
+      if (fetchError) {
+        return NextResponse.json({ error: 'Entry not found or access denied' }, { status: 404 });
+      }
+
+      // Delete photo from storage if it exists
+      if (entry.photo_url) {
+        try {
+          // Extract file path from URL
+          const url = new URL(entry.photo_url);
+          const pathParts = url.pathname.split('/');
+          const bucketIndex = pathParts.findIndex(part =&gt; part === 'daily-check-photos');
+          if (bucketIndex !== -1 &amp;&amp; bucketIndex &lt; pathParts.length - 1) {
+            const filePath = pathParts.slice(bucketIndex + 1).join('/');
+            
+            const { error: storageError } = await supabaseAdmin.storage
+              .from('daily-check-photos')
+              .remove([filePath]);
+
+            if (storageError) {
+              console.warn('Failed to delete photo from storage:', storageError);
+              // Continue with database deletion even if storage deletion fails
+            }
+          }
+        } catch (error) {
+          console.warn('Error parsing photo URL for deletion:', error);
+          // Continue with database deletion
+        }
+      }
+
+      // Delete the database entry
+      const { error: deleteError } = await supabaseAdmin
+        .from('daily_checks')
+        .delete()
+        .eq('id', entryId)
+        .eq('user_id', userId);
+
+      if (deleteError) {
+        return NextResponse.json({ error: 'Failed to delete entry' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    } else {
+      // Legacy behavior: delete all entries for a date (keeping for backward compatibility)
+      console.log('=== DELETE DAILY CHECKS API DEBUG ===');
+      const body = await request.json();
+      console.log('Request body:', body);
+      const { date } = body;
+</pre><div class="sheet-footer">Page 18 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      console.log('Date to delete:', date);
+      
+      if (!date) {
+        console.log('Date is required for bulk deletion');
+        return NextResponse.json({ error: 'Date is required for bulk deletion' }, { status: 400 });
+      }
+
+      console.log('Attempting to delete daily checks from database');
+      console.log('Query: DELETE FROM daily_checks WHERE user_id =', userId, 'AND date =', date);
+      
+      const { error } = await supabaseAdmin
+        .from('daily_checks')
+        .delete()
+        .eq('user_id', userId)
+        .eq('date', date);
+
+      console.log('Delete result error:', error);
+      
+      if (error) {
+        console.error('Database delete error:', error);
+        return NextResponse.json({ error: 'Failed to delete daily checks', details: error.message }, { status: 500 });
+      }
+      
+      console.log('Daily checks deleted successfully');
+      return NextResponse.json({ success: true });
+    }
+  } catch (e) {
+    console.error('Error in daily checks DELETE:', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+================================================================================
+FILE PATH: src/app/api/debug-data/route.ts
+FILE NAME: route.ts
+================================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    
+    if (!userId) {
+      return NextResponse.json({ 
+        error: 'User ID is required',
+        usage: 'Add ?userId=YOUR_USER_ID to the URL'
+      }, { status: 400 });
+    }
+    
+    // Test both daily-checks and daily-check-sessions APIs
+    const baseUrl = `http://localhost:${process.env.PORT || 3000}`;
+</pre><div class="sheet-footer">Page 19 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    
+    const [dailyChecksResponse, sessionsResponse] = await Promise.all([
+      fetch(`${baseUrl}/api/daily-checks?userId=${userId}`),
+      fetch(`${baseUrl}/api/daily-check-sessions?userId=${userId}`)
+    ]);
+    
+    const dailyChecksData = await dailyChecksResponse.json();
+    const sessionsData = await sessionsResponse.json();
+    
+    return NextResponse.json({
+      userId,
+      timestamp: new Date().toISOString(),
+      dailyChecks: {
+        status: dailyChecksResponse.status,
+        data: dailyChecksData,
+        count: dailyChecksData.data?.length || 0
+      },
+      sessions: {
+        status: sessionsResponse.status,
+        data: sessionsData,
+        count: sessionsData.data?.length || 0
+      },
+      summary: {
+        totalAnswers: dailyChecksData.data?.length || 0,
+        totalSessions: sessionsData.data?.length || 0,
+        hasData: (dailyChecksData.data?.length || 0) &gt; 0 || (sessionsData.data?.length || 0) &gt; 0
+      }
+    });
+    
+  } catch (error) {
+    return NextResponse.json({
+      error: 'Debug check failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+
+================================================================================
+FILE PATH: src/app/api/emg-sessions/route.ts
+FILE NAME: route.ts
+================================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { getAllUserIdsForQuery } from '@/lib/user-id-mapping';
+
+export async function GET(request: NextRequest) {
+  try {
+    // Check if user is authenticated (pass request to auth)
+    const { userId: authenticatedUserId } = await auth();
+    if (!authenticatedUserId) {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+</pre><div class="sheet-footer">Page 20 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    }
+
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    const limit = Number(searchParams.get('limit') || '50');
+    const debug = searchParams.get('debug') === 'true';
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    // Verify the requested userId matches the authenticated user
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    // Get all user IDs (Clerk ID + mapped Supabase UUID) for querying
+    // Use userId from request (frontend already validates with Clerk's useUser() hook)
+    const allUserIds = await getAllUserIdsForQuery(userId);
+    console.log('🔍 Fetching EMG sessions for user IDs:', allUserIds, 'limit:', limit, 'debug:', debug);
+    
+    // If debug mode, also check total count and recent sessions
+    if (debug) {
+      const { count: totalCount } = await supabaseAdmin
+        .from('emg_sessions')
+        .select('*', { count: 'exact', head: true });
+      
+      const { count: userCount } = await supabaseAdmin
+        .from('emg_sessions')
+        .select('*', { count: 'exact', head: true })
+        .in('user_id', allUserIds);
+        
+      const { data: recentSessions } = await supabaseAdmin
+        .from('emg_sessions')
+        .select('id, user_id, session_name, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      console.log('🔍 Debug info:', {
+        totalSessionsInDB: totalCount,
+        sessionsForThisUser: userCount,
+        recentSessions: recentSessions
+      });
+    }
+    
+    // Query with all user IDs (Clerk ID + mapped Supabase UUID)
+</pre><div class="sheet-footer">Page 21 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    const { data, error } = await supabaseAdmin
+      .from('emg_sessions')
+      .select('*')
+      .in('user_id', allUserIds)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    console.log('📊 Database query result:', {
+      error: error,
+      dataCount: data?.length || 0,
+      firstSession: data?.[0] ? {
+        id: data[0].id,
+        user_id: data[0].user_id,
+        session_name: data[0].session_name,
+        created_at: data[0].created_at,
+        move_markers: data[0].move_markers,
+        move_markers_count: Array.isArray(data[0].move_markers) ? data[0].move_markers.length : 'not an array'
+      } : null
+    });
+
+    if (error) {
+      console.error('❌ Error fetching EMG sessions:', error);
+      return NextResponse.json({ error: 'Failed to fetch sessions', details: error.message }, { status: 500 });
+    }
+    
+    console.log('✅ Returning', data?.length || 0, 'EMG sessions');
+    return NextResponse.json({ data, debug: debug ? { totalCount: data?.length || 0 } : undefined });
+  } catch (e) {
+    console.error('Unexpected error in GET:', e);
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: e instanceof Error ? e.message : 'Unknown error' 
+    }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { 
+      userId, 
+      sessionName, 
+      startedAt, 
+      endedAt, 
+      durationSeconds,
+      readings,
+      moveMarkers,
+      averageVoltage,
+      maxVoltage
+    } = body;
+
+    if (!userId || !sessionName || !startedAt || !endedAt || typeof durationSeconds !== 'number') {
+      return NextResponse.json({ 
+        error: 'Missing required fields',
+</pre><div class="sheet-footer">Page 22 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">        required: ['userId', 'sessionName', 'startedAt', 'endedAt', 'durationSeconds']
+      }, { status: 400 });
+    }
+
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    // Log the data being inserted for debugging
+    console.log('📝 Inserting EMG session:', {
+      userId,
+      sessionName,
+      startedAt,
+      endedAt,
+      durationSeconds,
+      readingsCount: readings?.length || 0,
+      moveMarkersCount: moveMarkers?.length || 0,
+      moveMarkers: moveMarkers,
+      averageVoltage,
+      maxVoltage
+    });
+
+    // Insert the session
+    const { data: sessionData, error: sessionError } = await supabaseAdmin
+      .from('emg_sessions')
+      .insert({
+        user_id: userId,
+        session_name: sessionName,
+        started_at: startedAt,
+        ended_at: endedAt,
+        duration_seconds: durationSeconds,
+        readings: readings || [],
+        move_markers: moveMarkers || [], // Store move markers array
+        average_voltage: averageVoltage ?? null,
+        max_voltage: maxVoltage ?? null,
+      })
+      .select()
+      .single();
+
+    if (sessionError) {
+      console.error('❌ Error inserting EMG session:', {
+        code: sessionError.code,
+        message: sessionError.message,
+        details: sessionError.details,
+        hint: sessionError.hint
+      });
+      return NextResponse.json({ 
+        error: 'Failed to save session', 
+        details: sessionError.message,
+        code: sessionError.code,
+</pre><div class="sheet-footer">Page 23 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">        hint: sessionError.hint
+      }, { status: 500 });
+    }
+
+    console.log('✅ EMG session inserted successfully:', sessionData?.id);
+
+    return NextResponse.json({ data: sessionData });
+  } catch (e) {
+    console.error('Unexpected error in POST:', e);
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: e instanceof Error ? e.message : 'Unknown error' 
+    }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { userId, sessionId, sessionName } = body;
+    
+    if (!userId || !sessionId || !sessionName) {
+      return NextResponse.json({ 
+        error: 'User ID, Session ID, and Session Name are required' 
+      }, { status: 400 });
+    }
+
+    if (typeof sessionName !== 'string' || sessionName.trim().length === 0) {
+      return NextResponse.json({ 
+        error: 'Session Name must be a non-empty string' 
+      }, { status: 400 });
+    }
+
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    // Update the session's session_name
+    const { data: updatedSession, error } = await supabaseAdmin
+      .from('emg_sessions')
+      .update({ session_name: sessionName.trim() })
+      .eq('id', sessionId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating session:', error);
+      return NextResponse.json({ 
+        error: 'Failed to update session', 
+</pre><div class="sheet-footer">Page 24 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">        details: error.message 
+      }, { status: 500 });
+    }
+    
+    return NextResponse.json({ data: updatedSession });
+  } catch (e) {
+    console.error('Unexpected error in PATCH:', e);
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: e instanceof Error ? e.message : 'Unknown error' 
+    }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { userId, sessionId } = body;
+    
+    if (!userId || !sessionId) {
+      return NextResponse.json({ error: 'User ID and Session ID are required' }, { status: 400 });
+    }
+
+    const { client: supabaseAdmin, error: adminError } = getSupabaseAdminClient();
+    if (adminError || !supabaseAdmin) {
+      return NextResponse.json({ 
+        error: adminError?.message || 'Service role key not configured', 
+        details: adminError?.details || 'Please set SUPABASE_SERVICE_ROLE_KEY in .env.local' 
+      }, { status: 500 });
+    }
+
+    // Delete the session
+    const { error } = await supabaseAdmin
+      .from('emg_sessions')
+      .delete()
+      .eq('id', sessionId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error deleting session:', error);
+      return NextResponse.json({ 
+        error: 'Failed to delete session', 
+        details: error.message 
+      }, { status: 500 });
+    }
+    
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error('Unexpected error in DELETE:', e);
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: e instanceof Error ? e.message : 'Unknown error' 
+    }, { status: 500 });
+  }
+</pre><div class="sheet-footer">Page 25 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">}
+
+
+
+================================================================================
+FILE PATH: src/app/api/emg-sessions/verify/route.ts
+FILE NAME: route.ts
+================================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createSupabaseAdminClient } from '@/lib/supabase-admin';
+
+/**
+ * Diagnostic endpoint to verify EMG sessions table setup
+ * GET /api/emg-sessions/verify
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    const diagnostics: any = {
+      timestamp: new Date().toISOString(),
+      environment: {
+        hasServiceRoleKey: !!serviceRoleKey,
+        serviceRoleKeyLength: serviceRoleKey?.length || 0,
+        serviceRoleKeyPreview: serviceRoleKey 
+          ? `${serviceRoleKey.substring(0, 10)}...${serviceRoleKey.substring(serviceRoleKey.length - 10)}`
+          : 'NOT SET',
+        hasSupabaseUrl: !!supabaseUrl,
+        supabaseUrl: supabaseUrl || 'NOT SET',
+      },
+      table: {
+        exists: false,
+        error: null as string | null,
+      },
+      policies: {
+        count: 0,
+        details: [] as any[],
+        error: null as string | null,
+      },
+      testInsert: {
+        success: false,
+        error: null as string | null,
+        insertedId: null as string | null,
+      },
+      testQuery: {
+        success: false,
+        count: 0,
+        error: null as string | null,
+      }
+    };
+
+    // Create admin client
+</pre><div class="sheet-footer">Page 26 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">
+================================================================================
+[ 25159 LINE(S) OMITTED — middle portion excluded per first 25 + last 25 pages deposit rule ]
+================================================================================
+
+/**
+ * Auto-detect Raspberry Pi Bluetooth port by scanning all available ports
+ */
+async function autoDetectPort() {
+  console.log('🔍 Auto-detecting Raspberry Pi Bluetooth port...\n');
+  
+  try {
+    const ports = await SerialPort.list();
+    
+    if (ports.length === 0) {
+      console.error('❌ No serial ports found!');
+      return null;
+    }
+    
+    // Filter for Bluetooth ports (case-insensitive search)
+    const bluetoothPorts = ports.filter(port =&gt; {
+      const desc = (port.manufacturer || '').toLowerCase() + ' ' + (port.pnpId || '').toLowerCase();
+      const path = port.path.toLowerCase();
+      return desc.includes('bluetooth') || desc.includes('bt') || 
+             path.includes('bluetooth') || path.includes('bt');
+    });
+    
+    if (bluetoothPorts.length === 0) {
+      console.error('❌ No Bluetooth ports found by name!');
+      console.log('\n🔍 Will try all available ports instead...');
+      console.log('\nAvailable ports:');
+      ports.forEach(port =&gt; {
+        console.log(`  - ${port.path} (${port.manufacturer || 'Unknown'} ${port.pnpId || ''})`);
+      });
+      console.log('');
+      
+      // Try all ports if no Bluetooth ports found by name
+      for (const portInfo of ports) {
+        const portName = portInfo.path;
+        console.log(`🔌 Testing ${portName}...`);
+        
+        const foundPort = await testPort(portName);
+        if (foundPort) {
+          console.log(`\n✅ Found Raspberry Pi on ${portName}!\n`);
+          return portName;
+        } else {
+          console.log(`   ⚠️  ${portName}: No thermal data received\n`);
+        }
+      }
+      
+      console.error('\n❌ Could not find Raspberry Pi on any port.');
+      console.log('\n💡 Troubleshooting:');
+      console.log('  1. Make sure Raspberry Pi is powered on');
+      console.log('  2. Pair Raspberry Pi in Windows: Settings → Bluetooth &amp; devices');
+</pre><div class="sheet-footer">Page 27 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      console.log('  3. Check connection status: Settings → Bluetooth → Is Raspberry Pi connected?');
+      console.log('  4. Check Device Manager → Ports (COM &amp; LPT) for the COM port number');
+      console.log('  5. Make sure bluetooth-thermal-sender.py is running on Raspberry Pi');
+      console.log('  6. Try manually with COM port: node bluetooth-thermal-receiver.js COM9');
+      return null;
+    }
+    
+    console.log(`📋 Found ${bluetoothPorts.length} Bluetooth port(s):`);
+    bluetoothPorts.forEach(port =&gt; {
+      console.log(`  - ${port.path} (${port.manufacturer || 'Unknown'})`);
+    });
+    console.log('');
+    
+    // Try each Bluetooth port to find the one receiving thermal data
+    for (const portInfo of bluetoothPorts) {
+      const portName = portInfo.path;
+      console.log(`🔌 Testing ${portName} (waiting 5 seconds for data)...`);
+      
+      const foundPort = await testPort(portName);
+      if (foundPort) {
+        console.log(`\n✅ Found Raspberry Pi on ${portName}!\n`);
+        return portName;
+      } else {
+        console.log(`   ⚠️  ${portName}: No thermal data received\n`);
+      }
+    }
+    
+    console.error('\n❌ Could not find Raspberry Pi on any Bluetooth port.');
+    console.log('\n💡 Troubleshooting:');
+    console.log('  1. Make sure Raspberry Pi is powered on');
+    console.log('  2. Pair Raspberry Pi in Windows: Settings → Bluetooth &amp; devices');
+    console.log('  3. Check connection status: Settings → Bluetooth → Is Raspberry Pi connected?');
+    console.log('  4. Check Device Manager → Ports (COM &amp; LPT) for the COM port number');
+    console.log('  5. Make sure bluetooth-thermal-sender.py is running on Raspberry Pi');
+    console.log('  6. Try manually with COM port: node bluetooth-thermal-receiver.js COM9');
+    return null;
+  } catch (error) {
+    console.error('❌ Error scanning ports:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Test a port to see if it's receiving thermal data
+ */
+function testPort(portName) {
+  return new Promise((resolve) =&gt; {
+    const testPort = new SerialPort({
+      ...serialPortOptions(115200),
+      path: portName
+    });
+    
+    const parser = testPort.pipe(new ReadlineParser({ delimiter: '\n' }));
+    let receivedData = false;
+</pre><div class="sheet-footer">Page 28 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    let timeout;
+    
+    parser.on('data', (line) =&gt; {
+      try {
+        const data = JSON.parse(line.trim());
+        if (data.type === 'thermal_data' || data.thermal_data !== undefined) {
+          receivedData = true;
+          clearTimeout(timeout);
+          testPort.close(() =&gt; resolve(true));
+        }
+      } catch (e) {
+        // Not JSON or not thermal data
+      }
+    });
+    
+    testPort.on('error', () =&gt; {
+      clearTimeout(timeout);
+      testPort.close(() =&gt; resolve(false));
+    });
+    
+    testPort.on('open', () =&gt; {
+      timeout = setTimeout(() =&gt; {
+        if (!receivedData) {
+          testPort.close(() =&gt; resolve(false));
+        }
+      }, 5000); // Wait 5 seconds for data
+    });
+    
+    testPort.open((err) =&gt; {
+      if (err) {
+        resolve(false);
+      }
+    });
+  });
+}
+
+/** Wait for Next.js API to be ready (avoids "fetch failed" when started with npm run dev). */
+async function waitForApi() {
+  const baseUrl = NEXTJS_API_URL.replace(/\/api\/thermal\/bt.*$/, '') || 'http://localhost:3000';
+  const maxWait = 30000;
+  const interval = 500;
+  const start = Date.now();
+  while (Date.now() - start &lt; maxWait) {
+    try {
+      const c = new AbortController();
+      const t = setTimeout(() =&gt; c.abort(), 2000);
+      const r = await fetch(baseUrl, { method: 'GET', signal: c.signal });
+      clearTimeout(t);
+      if (r.status &lt; 500) return;
+    } catch (_) {}
+    await new Promise((r) =&gt; setTimeout(r, interval));
+  }
+}
+
+</pre><div class="sheet-footer">Page 29 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">// Main execution
+(async () =&gt; {
+  // If no port specified, try to auto-detect
+  if (!SERIAL_PORT) {
+    SERIAL_PORT = await autoDetectPort();
+    if (!SERIAL_PORT) {
+      console.log('\n💡 You can also specify the port manually:');
+      console.log('   node bluetooth-thermal-receiver.js COM9');
+      process.exit(1);
+    }
+  }
+
+  console.log('🔵 Bluetooth Thermal Receiver for AMG8833');
+  console.log('==========================================');
+  console.log(`📡 Serial Port: ${SERIAL_PORT}`);
+  console.log(`🌐 Forwarding to: ${NEXTJS_API_URL}`);
+  console.log('💡 Connection will auto-reconnect if Bluetooth drops.\n');
+  console.log('   Press Ctrl+C to stop\n');
+
+  // When run with npm run dev, Next.js may not be ready yet; wait so first POSTs don't fail
+  try {
+    await waitForApi();
+  } catch (_) {}
+
+  let port;
+  let exiting = false;
+  const RECONNECT_DELAY_MS = 5000;
+
+  let forwardStats = {
+    success: 0,
+    failures: 0,
+    lastError: null,
+    lastSuccess: null
+  };
+
+  let lastLog = 0;
+
+  function handleLine(line) {
+    try {
+      const data = JSON.parse(line.trim());
+      if (data.type === 'thermal_data') {
+        const now = Date.now();
+        if (now - lastLog &gt; 5000) {
+          const avgTemp = data.thermal_data
+            ? (data.thermal_data.flat().reduce((a, b) =&gt; a + b, 0) / data.thermal_data.flat().length).toFixed(1)
+            : 'N/A';
+          console.log('📥 Received thermal data:', { avgTemp: `${avgTemp}°C`, gridSize: data.grid_size, timestamp: data.timestamp });
+          lastLog = now;
+        }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() =&gt; controller.abort(), 5000);
+        fetch(NEXTJS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+</pre><div class="sheet-footer">Page 30 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">          body: JSON.stringify(data),
+          signal: controller.signal
+        }).then(res =&gt; {
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            forwardStats.success++;
+            forwardStats.lastSuccess = new Date().toISOString();
+            if (forwardStats.success % 10 === 0) console.log('✅ Forwarded to Next.js API (every 10th):', { successCount: forwardStats.success, status: res.status });
+          } else {
+            forwardStats.failures++;
+            forwardStats.lastError = { status: res.status, statusText: res.statusText, timestamp: new Date().toISOString() };
+            console.error('❌ API returned error:', res.status, res.statusText);
+          }
+        }).catch(fetchError =&gt; {
+          clearTimeout(timeoutId);
+          forwardStats.failures++;
+          forwardStats.lastError = { message: fetchError.message, timestamp: new Date().toISOString() };
+          if (fetchError.name !== 'AbortError') console.error('❌ Error forwarding to API:', fetchError.message);
+        });
+      } else {
+        console.log('📥 Received:', data.type, data);
+      }
+    } catch (e) {
+      if (line.trim().length &gt; 0 &amp;&amp; !line.trim().startsWith('✅') &amp;&amp; !line.trim().startsWith('📡')) {
+        console.log('📄 Non-JSON data:', line.trim().substring(0, 100));
+      }
+    }
+  }
+
+  function connect(baudToTry = DEFAULT_BAUD) {
+    const opts = serialPortOptions(baudToTry);
+    opts.autoOpen = true;
+    port = new SerialPort(opts);
+    const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
+
+    port.on('open', () =&gt; {
+      if (baudToTry !== DEFAULT_BAUD) {
+        console.log(`✅ Serial port opened at ${baudToTry} baud (fallback; 115200 failed on this device).\n`);
+      } else {
+        console.log('✅ Bluetooth Serial port opened. Waiting for thermal data from Raspberry Pi...\n');
+      }
+    });
+
+    port.on('error', (err) =&gt; {
+      const isError31 = /error code 31|Error 31|GEN_FAILURE/i.test(err.message);
+      if (isError31 &amp;&amp; baudToTry === 115200) {
+        console.error('❌ Serial port error (31): USB serial driver rejected 115200. Retrying with 9600...');
+        if (port &amp;&amp; port.isOpen) port.close(() =&gt; connect(9600));
+        else setTimeout(() =&gt; connect(9600), 300);
+        return;
+      }
+      if (isError31 &amp;&amp; baudToTry === 9600) {
+        console.error('❌ Serial port error (31): Open failed at 9600 too. Close any other app using COM3 (PuTTY, Arduino, etc.) or try another USB port.');
+      } else {
+</pre><div class="sheet-footer">Page 31 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">        console.error('❌ Serial port error:', err.message);
+      }
+    });
+
+    port.on('close', () =&gt; {
+      if (exiting) return;
+      console.log('🔄 Connection lost. Reconnecting in 5 seconds... (re-pair in Settings → Bluetooth if needed)\n');
+      setTimeout(connect, RECONNECT_DELAY_MS);
+    });
+
+    parser.on('data', handleLine);
+  }
+
+  connect();
+
+  process.on('SIGINT', () =&gt; {
+    exiting = true;
+    console.log('\n\n📊 Statistics:');
+    console.log(`   Success: ${forwardStats.success}`);
+    console.log(`   Failures: ${forwardStats.failures}`);
+    if (forwardStats.lastError) console.log('   Last Error:', forwardStats.lastError);
+    if (forwardStats.lastSuccess) console.log('   Last Success:', forwardStats.lastSuccess);
+    console.log('\n👋 Closing Bluetooth connection...');
+    if (port &amp;&amp; port.isOpen) {
+      port.close(() =&gt; { console.log('✅ Port closed. Goodbye!'); process.exit(0); });
+    } else {
+      process.exit(0);
+    }
+  });
+})();
+
+
+
+================================================================================
+FILE PATH: emg-server.js
+FILE NAME: emg-server.js
+================================================================================
+
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
+
+const app = express();
+const server = http.createServer(app);
+
+// Enable CORS
+app.use(cors());
+app.use(express.json());
+
+// Next.js API endpoint (forward data here)
+const NEXTJS_API_URL = process.env.NEXTJS_API_URL || 'http://localhost:3000/api/emg/ws';
+
+// Track forwarding statistics
+</pre><div class="sheet-footer">Page 32 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">let forwardStats = {
+  success: 0,
+  failures: 0,
+  lastError: null,
+  lastSuccess: null
+};
+
+// Initialize Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Store connected devices
+const connectedDevices = new Map();
+
+// Socket.IO connection handling
+io.on('connection', (socket) =&gt; {
+  console.log('Client connected:', socket.id);
+
+  // Handle MyoWare data
+  socket.on('myoware_data', (data) =&gt; {
+    console.log('Received MyoWare data:', data);
+    // Broadcast to all connected clients
+    socket.broadcast.emit('emg_data', data);
+  });
+
+  // Handle calibration data
+  socket.on('myoware_calibration', (data) =&gt; {
+    console.log('Received calibration data:', data);
+    socket.broadcast.emit('calibration_data', data);
+  });
+
+  // Handle heartbeat
+  socket.on('myoware_heartbeat', (data) =&gt; {
+    console.log('Received heartbeat:', data);
+    socket.emit('heartbeat_ack', { timestamp: Date.now() });
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () =&gt; {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
+// HTTP endpoints for ESP32
+app.post('/api/emg/ws', async (req, res) =&gt; {
+  const requestTime = Date.now();
+  console.log(`📥 [${new Date(requestTime).toISOString()}] Received request from MyoWare device`);
+  console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
+  
+  const { type, ...otherData } = req.body;
+</pre><div class="sheet-footer">Page 33 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">  
+  if (!type) {
+    console.error('❌ ERROR: Request missing "type" field!');
+    console.error('   Full request body:', JSON.stringify(req.body, null, 2));
+    return res.status(400).json({ error: 'Missing "type" field in request' });
+  }
+  
+  console.log('📊 Parsed data - type:', type);
+  
+  // Track when we last received data
+  if (type === 'emg_data') {
+    const lastDataTime = Date.now();
+    console.log('✅ EMG data received at:', new Date(lastDataTime).toISOString());
+  }
+  
+  // Forward to Next.js API route (if available)
+  let nextjsResponse = null;
+  try {
+    // Use built-in fetch (Node.js 18+) or fallback
+    const fetchFn = typeof fetch !== 'undefined' ? fetch : (await import('node-fetch')).default;
+    
+    // Always log forwarding attempts for emg_data to diagnose issues
+    if (type === 'emg_data') {
+      console.log('🔄 Forwarding EMG data to Next.js API:', NEXTJS_API_URL);
+    }
+    
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() =&gt; {
+      console.error('⏱️ Forwarding timeout after 5 seconds');
+      controller.abort();
+    }, 5000); // 5 second timeout
+    
+    const forwardStartTime = Date.now();
+    let forwardResponse;
+    try {
+      forwardResponse = await fetchFn(NEXTJS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(req.body),
+        signal: controller.signal
+      });
+      
+      const forwardDuration = Date.now() - forwardStartTime;
+      clearTimeout(timeoutId);
+      
+      console.log(`📡 Forward response received (${forwardDuration}ms):`, {
+        status: forwardResponse.status,
+        statusText: forwardResponse.statusText,
+        ok: forwardResponse.ok
+      });
+      
+</pre><div class="sheet-footer">Page 34 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      if (!forwardResponse.ok) {
+        forwardStats.failures++;
+        forwardStats.lastError = {
+          status: forwardResponse.status,
+          statusText: forwardResponse.statusText,
+          timestamp: new Date().toISOString()
+        };
+        console.error('❌ Next.js API returned error:', forwardResponse.status, forwardResponse.statusText);
+        const errorText = await forwardResponse.text();
+        console.error('   Error body:', errorText);
+      } else {
+        forwardStats.success++;
+        forwardStats.lastSuccess = new Date().toISOString();
+        
+        // Try to parse JSON response, but handle errors gracefully
+        try {
+          nextjsResponse = await forwardResponse.json();
+          
+          // Log response details for emg_data to diagnose storage issues
+          if (type === 'emg_data') {
+            console.log('✅ Forwarded to Next.js API - Response:', {
+              status: forwardResponse.status,
+              dataCount: nextjsResponse?.dataCount || 'N/A',
+              isConnected: nextjsResponse?.isConnected || 'N/A',
+              timestamp: nextjsResponse?.timestamp || 'N/A',
+              note: nextjsResponse?.dataCount === 0 ? '⚠️ WARNING: Next.js reports dataCount=0 - data may not be storing!' : '✅ Data count &gt; 0'
+            });
+          }
+        } catch (parseError) {
+          console.warn('⚠️ Could not parse Next.js response as JSON:', parseError.message);
+          const textResponse = await forwardResponse.text();
+          console.log('   Raw response:', textResponse.substring(0, 200));
+        }
+        
+        // Log success for every 10th message to reduce spam but still show progress
+        if (type === 'emg_data' &amp;&amp; forwardStats.success % 10 === 0) {
+          console.log('✅ Forwarded to Next.js API successfully (every 10th):', {
+            status: forwardResponse.status,
+            successCount: forwardStats.success,
+            failureCount: forwardStats.failures,
+            duration: forwardDuration + 'ms'
+          });
+        }
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      const forwardDuration = Date.now() - forwardStartTime;
+      console.error(`❌ Fetch error after ${forwardDuration}ms:`, fetchError.message);
+      throw fetchError; // Re-throw to be caught by outer catch
+    }
+  } catch (error) {
+    forwardStats.failures++;
+    forwardStats.lastError = {
+      message: error.message,
+</pre><div class="sheet-footer">Page 35 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      code: error.code,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Always log errors
+    console.error('❌ ERROR forwarding to Next.js API:', error.message);
+    console.error('   Next.js URL:', NEXTJS_API_URL);
+    console.error('   Error code:', error.code);
+    console.error('   Stats: Success:', forwardStats.success, 'Failures:', forwardStats.failures);
+    
+    // If we have many failures, warn the user
+    if (forwardStats.failures &gt; 10 &amp;&amp; forwardStats.failures % 10 === 0) {
+      console.error('⚠️ WARNING: Next.js API appears to be unreachable!');
+      console.error('   Make sure Next.js is running on port 3000');
+      console.error('   Run: npm run dev');
+    }
+    // Continue anyway - this server can work standalone
+  }
+  
+  // Handle different message types
+  if (type === 'emg_data') {
+    const dataSummary = {
+      timestamp: req.body.timestamp,
+      muscleActivity: req.body.muscleActivity,
+      voltage: req.body.voltage,
+      hasData: !!(req.body.muscleActivity || req.body.voltage)
+    };
+    console.log('💪 Received EMG data via HTTP:', dataSummary);
+    
+    // Validate data
+    if (!req.body.muscleActivity &amp;&amp; !req.body.voltage) {
+      console.warn('⚠️ WARNING: EMG data missing both muscleActivity and voltage!');
+    }
+    
+    // Broadcast to all connected Socket.IO clients
+    io.emit('emg_data', req.body);
+    res.json({ 
+      status: 'received', 
+      message: 'EMG data received', 
+      timestamp: Date.now(), 
+      forwarded: nextjsResponse !== null,
+      dataReceived: dataSummary
+    });
+  } else if (type === 'test') {
+    console.log('🧪 Received test message:', req.body);
+    res.json({ status: 'test_received', message: 'Hello from EMG server!', timestamp: Date.now(), forwarded: nextjsResponse !== null });
+  } else if (type === 'calibration_data') {
+    console.log('🔧 Received calibration data:', req.body);
+    io.emit('calibration_data', req.body);
+    res.json({ status: 'calibrated', timestamp: Date.now(), calibration: req.body, forwarded: nextjsResponse !== null });
+  } else if (type === 'heartbeat') {
+    console.log('💓 Received heartbeat:', req.body);
+    res.json({ status: 'alive', timestamp: Date.now(), forwarded: nextjsResponse !== null });
+  } else {
+</pre><div class="sheet-footer">Page 36 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    console.log('❓ Received unknown message type:', type, req.body);
+    res.json({ status: 'received', timestamp: Date.now(), forwarded: nextjsResponse !== null });
+  }
+});
+
+// Diagnostic endpoint to check server status
+app.get('/api/emg/diagnostics', (req, res) =&gt; {
+  const now = Date.now();
+  res.json({
+    status: 'EMG WebSocket server running',
+    timestamp: new Date(now).toISOString(),
+    uptime: process.uptime(),
+    connectedDevices: connectedDevices.size,
+    forwardingStats: {
+      ...forwardStats,
+      lastSuccessAge: forwardStats.lastSuccess ? ((now - new Date(forwardStats.lastSuccess).getTime()) / 1000).toFixed(1) + 's' : 'never',
+      lastErrorAge: forwardStats.lastError?.timestamp ? ((now - new Date(forwardStats.lastError.timestamp).getTime()) / 1000).toFixed(1) + 's' : 'never'
+    },
+    nextjsUrl: NEXTJS_API_URL,
+    health: {
+      receivingData: forwardStats.lastSuccess ? (now - new Date(forwardStats.lastSuccess).getTime()) &lt; 10000 : false, // Data in last 10 seconds
+      forwardingToNextjs: forwardStats.success &gt; 0,
+      hasRecentErrors: forwardStats.lastError &amp;&amp; (now - new Date(forwardStats.lastError.timestamp).getTime()) &lt; 60000 // Error in last minute
+    }
+  });
+});
+
+app.get('/api/emg/ws', (req, res) =&gt; {
+  res.json({ 
+    status: 'EMG WebSocket server running',
+    connectedDevices: connectedDevices.size,
+    timestamp: Date.now(),
+    forwardingStats: {
+      success: forwardStats.success,
+      failures: forwardStats.failures,
+      lastError: forwardStats.lastError,
+      lastSuccess: forwardStats.lastSuccess,
+      nextjsUrl: NEXTJS_API_URL
+    }
+  });
+});
+
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, '0.0.0.0', () =&gt; {
+  console.log(`🚀 EMG Server running on port ${PORT}`);
+  console.log(`📡 WebSocket endpoint: ws://localhost:${PORT}`);
+  console.log(`🌐 HTTP endpoint: http://localhost:${PORT}/api/emg/ws`);
+  console.log(`🔄 Forwarding to Next.js: ${NEXTJS_API_URL}`);
+  console.log(`\n💡 Your MyoWare device should POST to: http://YOUR_COMPUTER_IP:${PORT}/api/emg/ws`);
+  console.log(`   (No Arduino code changes needed!)\n`);
+});
+
+
+================================================================================
+</pre><div class="sheet-footer">Page 37 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">FILE PATH: postcss.config.mjs
+FILE NAME: postcss.config.mjs
+================================================================================
+
+const config = {
+  plugins: ["@tailwindcss/postcss"],
+};
+
+export default config;
+
+
+================================================================================
+FILE PATH: test-bluetooth-connection.js
+FILE NAME: test-bluetooth-connection.js
+================================================================================
+
+/**
+ * Test Bluetooth Connection Script
+ * This script helps diagnose ESP32 Bluetooth connection issues
+ * Run: node test-bluetooth-connection.js [COM_PORT]
+ */
+
+const { SerialPort } = require('serialport');
+const { ReadlineParser } = require('@serialport/parser-readline');
+
+const TEST_PORT = process.argv[2];
+
+console.log('');
+console.log('========================================');
+console.log('ESP32 Bluetooth Connection Test');
+console.log('========================================');
+console.log('');
+
+async function testConnection() {
+  // Step 1: List all ports
+  console.log('📋 Step 1: Scanning for available ports...');
+  console.log('');
+  
+  try {
+    const ports = await SerialPort.list();
+    
+    if (ports.length === 0) {
+      console.error('❌ No serial ports found!');
+      console.log('');
+      console.log('💡 Troubleshooting:');
+      console.log('   1. Make sure ESP32 is powered on');
+      console.log('   2. Connect ESP32 via USB or pair via Bluetooth');
+      console.log('   3. Check Device Manager → Ports (COM &amp; LPT)');
+      return;
+    }
+    
+    console.log(`✅ Found ${ports.length} port(s):`);
+    ports.forEach(port =&gt; {
+      console.log(`   - ${port.path}`);
+</pre><div class="sheet-footer">Page 38 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      console.log(`     Manufacturer: ${port.manufacturer || 'Unknown'}`);
+      console.log(`     Description: ${port.pnpId || 'N/A'}`);
+      console.log('');
+    });
+    
+    // Step 2: If port specified, test it
+    if (TEST_PORT) {
+      console.log(`🔌 Step 2: Testing specified port ${TEST_PORT}...`);
+      console.log('');
+      await testPort(TEST_PORT);
+    } else {
+      // Step 2: Try all ports
+      console.log('🔌 Step 2: Testing all ports for ESP32 data...');
+      console.log('');
+      console.log('💡 This will try to connect to each port for 5 seconds');
+      console.log('   Make sure your ESP32 is powered on and paired!');
+      console.log('');
+      
+      let foundPort = null;
+      for (const portInfo of ports) {
+        const portName = portInfo.path;
+        console.log(`Testing ${portName}...`);
+        
+        const result = await testPort(portName);
+        if (result) {
+          foundPort = portName;
+          break;
+        }
+      }
+      
+      if (!foundPort) {
+        console.log('');
+        console.log('❌ Could not find ESP32 on any port.');
+        console.log('');
+        console.log('💡 Troubleshooting:');
+        console.log('   1. Power on your ESP32');
+        console.log('   2. Pair in Windows: Settings → Bluetooth &amp; devices');
+        console.log('   3. Look for "MyoWare_EMG" and pair it');
+        console.log('   4. Make sure it shows as "Connected" (green checkmark)');
+        console.log('   5. Check Device Manager → Ports (COM &amp; LPT)');
+        console.log('   6. Try: node test-bluetooth-connection.js COM8 (use your COM port)');
+      } else {
+        console.log('');
+        console.log(`✅ SUCCESS! ESP32 found on ${foundPort}`);
+        console.log('');
+        console.log(`💡 To connect, run:`);
+        console.log(`   node bluetooth-receiver.js ${foundPort}`);
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    console.log('');
+    console.log('💡 Make sure serialport is installed: npm install');
+</pre><div class="sheet-footer">Page 39 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">  }
+}
+
+function testPort(portName) {
+  return new Promise((resolve) =&gt; {
+    console.log(`   Attempting to open ${portName}...`);
+    
+    const port = new SerialPort({
+      path: portName,
+      baudRate: 115200,
+      autoOpen: false
+    });
+    
+    const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
+    let receivedData = false;
+    let timeout;
+    let errorOccurred = false;
+    
+    port.on('open', () =&gt; {
+      console.log(`   ✅ Port ${portName} opened successfully`);
+      console.log(`   ⏳ Waiting for data (5 seconds)...`);
+      
+      timeout = setTimeout(() =&gt; {
+        if (!receivedData &amp;&amp; !errorOccurred) {
+          console.log(`   ⚠️  No data received from ${portName}`);
+          console.log(`   (This port might not be the ESP32)`);
+          console.log('');
+          port.close(() =&gt; resolve(false));
+        }
+      }, 5000);
+    });
+    
+    parser.on('data', (line) =&gt; {
+      if (!receivedData) {
+        receivedData = true;
+        clearTimeout(timeout);
+        
+        console.log(`   ✅ RECEIVED DATA from ${portName}!`);
+        console.log(`   📥 First message: ${line.toString().substring(0, 100)}`);
+        
+        // Try to parse as JSON
+        try {
+          const data = JSON.parse(line.trim());
+          if (data.type === 'emg_data' || data.muscleActivity !== undefined) {
+            console.log(`   🎯 THIS IS YOUR ESP32!`);
+            console.log(`   Data type: ${data.type || 'emg_data'}`);
+            console.log(`   Muscle activity: ${data.muscleActivity || 'N/A'}`);
+          }
+        } catch (e) {
+          console.log(`   📄 Data format: ${line.trim().substring(0, 50)}...`);
+        }
+        
+        port.close(() =&gt; resolve(true));
+      }
+</pre><div class="sheet-footer">Page 40 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    });
+    
+    port.on('error', (err) =&gt; {
+      if (!errorOccurred) {
+        errorOccurred = true;
+        clearTimeout(timeout);
+        
+        if (err.message.includes('Access is denied') || err.message.includes('being used')) {
+          console.log(`   ⚠️  Port ${portName} is busy (might be in use by another program)`);
+        } else if (err.message.includes('cannot find') || err.message.includes('does not exist')) {
+          console.log(`   ⚠️  Port ${portName} does not exist`);
+        } else {
+          console.log(`   ❌ Error: ${err.message}`);
+        }
+        console.log('');
+        
+        port.close(() =&gt; resolve(false));
+      }
+    });
+    
+    // Try to open the port
+    port.open((err) =&gt; {
+      if (err &amp;&amp; !errorOccurred) {
+        errorOccurred = true;
+        clearTimeout(timeout);
+        console.log(`   ❌ Cannot open ${portName}: ${err.message}`);
+        console.log('');
+        resolve(false);
+      }
+    });
+  });
+}
+
+// Run the test
+testConnection().catch(err =&gt; {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
+
+
+================================================================================
+FILE PATH: test-bluetooth-ports.js
+FILE NAME: test-bluetooth-ports.js
+================================================================================
+
+/**
+ * Test script to find which COM port is the ESP32
+ * This will try to connect to each Bluetooth port and see which one responds
+ */
+
+const { SerialPort } = require('serialport');
+const { ReadlineParser } = require('@serialport/parser-readline');
+
+// List of Bluetooth COM ports found
+</pre><div class="sheet-footer">Page 41 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">const portsToTest = ['COM4', 'COM5', 'COM8', 'COM9'];
+
+console.log('🔍 Testing Bluetooth COM ports to find ESP32...');
+console.log('==================================================\n');
+
+let testComplete = false;
+let successfulPort = null;
+
+async function testPort(portName) {
+  return new Promise((resolve) =&gt; {
+    console.log(`Testing ${portName}...`);
+    
+    const port = new SerialPort({
+      path: portName,
+      baudRate: 115200,
+      autoOpen: false
+    });
+
+    const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
+    let receivedData = false;
+    let timeout;
+
+    port.on('open', () =&gt; {
+      console.log(`  ✅ ${portName}: Port opened successfully`);
+      console.log(`  ⏳ ${portName}: Waiting for data (5 seconds)...`);
+      
+      timeout = setTimeout(() =&gt; {
+        if (!receivedData) {
+          console.log(`  ⚠️  ${portName}: No data received (port might not be connected or wrong device)\n`);
+          port.close();
+          resolve(false);
+        }
+      }, 5000);
+    });
+
+    parser.on('data', (data) =&gt; {
+      if (!receivedData) {
+        receivedData = true;
+        clearTimeout(timeout);
+        console.log(`  ✅ ${portName}: RECEIVED DATA!`);
+        console.log(`  📥 ${portName}: First message: ${data.toString().substring(0, 100)}...`);
+        console.log(`  🎯 ${portName}: THIS IS YOUR ESP32!\n`);
+        port.close();
+        successfulPort = portName;
+        resolve(true);
+      }
+    });
+
+    port.on('error', (err) =&gt; {
+      clearTimeout(timeout);
+      if (err.message.includes('Access is denied') || err.message.includes('being used')) {
+        console.log(`  ⚠️  ${portName}: Port is busy (might be in use by another program)\n`);
+      } else {
+        console.log(`  ❌ ${portName}: ${err.message}\n`);
+</pre><div class="sheet-footer">Page 42 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      }
+      resolve(false);
+    });
+
+    // Try to open the port
+    port.open((err) =&gt; {
+      if (err) {
+        clearTimeout(timeout);
+        console.log(`  ❌ ${portName}: Cannot open - ${err.message}\n`);
+        resolve(false);
+      }
+    });
+  });
+}
+
+async function testAllPorts() {
+  console.log('📋 Instructions:');
+  console.log('1. Make sure your ESP32 is powered on');
+  console.log('2. Make sure ESP32 Bluetooth is paired and connected in Windows');
+  console.log('3. This script will test each port for 5 seconds');
+  console.log('4. The port that receives data is your ESP32\n');
+  console.log('Starting tests in 3 seconds...\n');
+  
+  await new Promise(resolve =&gt; setTimeout(resolve, 3000));
+
+  for (const port of portsToTest) {
+    if (successfulPort) {
+      console.log(`⏭️  Skipping remaining ports (found ESP32 on ${successfulPort})`);
+      break;
+    }
+    await testPort(port);
+    await new Promise(resolve =&gt; setTimeout(resolve, 500)); // Small delay between tests
+  }
+
+  console.log('\n' + '='.repeat(50));
+  if (successfulPort) {
+    console.log(`\n✅ SUCCESS! Your ESP32 is on: ${successfulPort}`);
+    console.log(`\n💡 Run the Bluetooth receiver with:`);
+    console.log(`   node bluetooth-receiver.js ${successfulPort}`);
+  } else {
+    console.log('\n❌ Could not find ESP32 on any port.');
+    console.log('\n💡 Troubleshooting:');
+    console.log('   1. Make sure ESP32 is powered on');
+    console.log('   2. Check Windows Bluetooth settings - is "MyoWare_EMG" connected?');
+    console.log('   3. Check Device Manager - are any ports showing errors?');
+    console.log('   4. Try unplugging/replugging ESP32 USB cable');
+    console.log('   5. Make sure no other program is using the Bluetooth port');
+  }
+  console.log('');
+
+  process.exit(0);
+}
+
+testAllPorts().catch(err =&gt; {
+</pre><div class="sheet-footer">Page 43 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">  console.error('Error:', err);
+  process.exit(1);
+});
+
+
+
+================================================================================
+FILE PATH: test-raspberry-pi-connection.js
+FILE NAME: test-raspberry-pi-connection.js
+================================================================================
+
+/**
+ * Test Raspberry Pi Connection
+ * 
+ * This script tests the connection to your Raspberry Pi thermal sensor.
+ * Run this from the browser console or as a Node.js script.
+ * 
+ * Usage in browser console:
+ *   - Copy and paste this entire file into the browser console
+ *   - Or import it as a module
+ * 
+ * Usage as Node.js script:
+ *   node test-raspberry-pi-connection.js
+ */
+
+const RASPBERRY_PI_IP = '192.168.254.200';
+const HTTP_PORT = 8091;
+const WEBSOCKET_PORT = 8092;
+
+// Test HTTP connection
+async function testHttpConnection() {
+  console.log(`\n🔍 Testing HTTP connection to ${RASPBERRY_PI_IP}:${HTTP_PORT}...`);
+  
+  try {
+    // In browser, use the API route
+    const apiUrl = typeof window !== 'undefined' 
+      ? `/api/thermal?ip=${encodeURIComponent(RASPBERRY_PI_IP)}&amp;port=${HTTP_PORT}`
+      : `http://${RASPBERRY_PI_IP}:${HTTP_PORT}/thermal-data`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() =&gt; controller.abort(), 5000);
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      cache: 'no-cache',
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data &amp;&amp; (data.thermal_data || data.data) &amp;&amp; !data.error) {
+        console.log('✅ HTTP Connection: SUCCESS');
+</pre><div class="sheet-footer">Page 44 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">        console.log('   - Received thermal data');
+        console.log('   - Timestamp:', data.timestamp || 'N/A');
+        const grid = data.thermal_data || data.data;
+        if (grid &amp;&amp; Array.isArray(grid)) {
+          console.log('   - Grid size:', `${grid.length}x${grid[0]?.length || 0}`);
+          const avgTemp = grid.flat().reduce((a, b) =&gt; a + b, 0) / grid.flat().length;
+          console.log('   - Average temperature:', avgTemp.toFixed(1) + '°C');
+        }
+        return true;
+      } else {
+        console.log('⚠️ HTTP Connection: Connected but invalid data');
+        console.log('   Response:', data);
+        return false;
+      }
+    } else {
+      const errorData = await response.json().catch(() =&gt; ({}));
+      console.log('❌ HTTP Connection: FAILED');
+      console.log('   Status:', response.status, response.statusText);
+      console.log('   Error:', errorData);
+      return false;
+    }
+  } catch (error) {
+    console.log('❌ HTTP Connection: FAILED');
+    if (error.name === 'AbortError') {
+      console.log('   Error: Connection timeout (5 seconds)');
+      console.log('   → Raspberry Pi may be offline or unreachable');
+    } else {
+      console.log('   Error:', error.message);
+    }
+    return false;
+  }
+}
+
+// Test WebSocket connection (browser only)
+async function testWebSocketConnection() {
+  if (typeof window === 'undefined') {
+    console.log('\n⚠️ WebSocket test skipped (Node.js environment)');
+    return false;
+  }
+  
+  console.log(`\n🔍 Testing WebSocket connection to ${RASPBERRY_PI_IP}:${WEBSOCKET_PORT}...`);
+  
+  return new Promise((resolve) =&gt; {
+    const wsUrl = `ws://${RASPBERRY_PI_IP}:${WEBSOCKET_PORT}`;
+    const ws = new WebSocket(wsUrl);
+    
+    const timeout = setTimeout(() =&gt; {
+      ws.close();
+      console.log('❌ WebSocket Connection: FAILED (timeout after 5 seconds)');
+      resolve(false);
+    }, 5000);
+    
+    ws.onopen = () =&gt; {
+      clearTimeout(timeout);
+</pre><div class="sheet-footer">Page 45 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">      console.log('✅ WebSocket Connection: SUCCESS');
+      console.log('   - Connected to', wsUrl);
+      ws.close();
+      resolve(true);
+    };
+    
+    ws.onerror = (error) =&gt; {
+      clearTimeout(timeout);
+      console.log('❌ WebSocket Connection: FAILED');
+      console.log('   Error: WebSocket connection error');
+      console.log('   → Check if WebSocket server is running on Raspberry Pi');
+      resolve(false);
+    };
+    
+    ws.onclose = (event) =&gt; {
+      if (event.code !== 1000) {
+        clearTimeout(timeout);
+        console.log('❌ WebSocket Connection: FAILED');
+        console.log('   Close code:', event.code);
+        console.log('   Reason:', event.reason || 'No reason provided');
+        resolve(false);
+      }
+    };
+  });
+}
+
+// Test network connectivity (ping-like test)
+async function testNetworkConnectivity() {
+  console.log(`\n🔍 Testing network connectivity to ${RASPBERRY_PI_IP}...`);
+  
+  try {
+    // Try to fetch a simple endpoint with a very short timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() =&gt; controller.abort(), 2000);
+    
+    const apiUrl = typeof window !== 'undefined'
+      ? `/api/thermal?ip=${encodeURIComponent(RASPBERRY_PI_IP)}&amp;port=${HTTP_PORT}`
+      : `http://${RASPBERRY_PI_IP}:${HTTP_PORT}/thermal-data`;
+    
+    await fetch(apiUrl, {
+      method: 'GET',
+      cache: 'no-cache',
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    console.log('✅ Network Connectivity: SUCCESS');
+    console.log('   - Raspberry Pi is reachable on the network');
+    return true;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      // Even a timeout means the network route exists
+      console.log('⚠️ Network Connectivity: PARTIAL');
+      console.log('   - Raspberry Pi may be reachable but not responding');
+</pre><div class="sheet-footer">Page 46 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    } else {
+      console.log('❌ Network Connectivity: FAILED');
+      console.log('   Error:', error.message);
+      console.log('   → Check if Raspberry Pi is on the same network');
+      console.log('   → Verify IP address:', RASPBERRY_PI_IP);
+    }
+    return false;
+  }
+}
+
+// Main test function
+async function runAllTests() {
+  console.log('═══════════════════════════════════════════════════════');
+  console.log('  Raspberry Pi Connection Test');
+  console.log('═══════════════════════════════════════════════════════');
+  console.log(`\nConfiguration:`);
+  console.log(`  IP Address: ${RASPBERRY_PI_IP}`);
+  console.log(`  HTTP Port: ${HTTP_PORT}`);
+  console.log(`  WebSocket Port: ${WEBSOCKET_PORT}`);
+  
+  const results = {
+    network: await testNetworkConnectivity(),
+    http: await testHttpConnection(),
+    websocket: await testWebSocketConnection()
+  };
+  
+  console.log('\n═══════════════════════════════════════════════════════');
+  console.log('  Test Summary');
+  console.log('═══════════════════════════════════════════════════════');
+  console.log(`  Network Connectivity: ${results.network ? '✅ PASS' : '❌ FAIL'}`);
+  console.log(`  HTTP Connection:      ${results.http ? '✅ PASS' : '❌ FAIL'}`);
+  console.log(`  WebSocket Connection: ${results.websocket ? '✅ PASS' : '❌ FAIL'}`);
+  
+  if (results.http) {
+    console.log('\n✅ SUCCESS: Raspberry Pi is connected and working!');
+    console.log('   Your app should be able to receive thermal data.');
+  } else if (results.network) {
+    console.log('\n⚠️ PARTIAL: Raspberry Pi is reachable but HTTP service may not be running.');
+    console.log('   Troubleshooting:');
+    console.log('   1. Check if the thermal sensor service is running:');
+    console.log('      sudo systemctl status amg883-headless.service');
+    console.log('   2. Try restarting the service:');
+    console.log('      sudo systemctl restart amg883-headless.service');
+    console.log('   3. Test directly on Raspberry Pi:');
+    console.log(`      curl http://${RASPBERRY_PI_IP}:${HTTP_PORT}/thermal-data`);
+  } else {
+    console.log('\n❌ FAILED: Cannot reach Raspberry Pi.');
+    console.log('   Troubleshooting:');
+    console.log('   1. Verify Raspberry Pi is powered on');
+    console.log('   2. Check if IP address is correct:', RASPBERRY_PI_IP);
+    console.log('   3. Ensure both devices are on the same network');
+    console.log('   4. Try pinging the Raspberry Pi:');
+    console.log(`      ping ${RASPBERRY_PI_IP}`);
+    console.log('   5. Check firewall settings');
+</pre><div class="sheet-footer">Page 47 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">  }
+  
+  return results;
+}
+
+// Export for use as module
+if (typeof module !== 'undefined' &amp;&amp; module.exports) {
+  module.exports = { runAllTests, testHttpConnection, testWebSocketConnection, testNetworkConnectivity };
+}
+
+// Auto-run if executed directly in browser
+if (typeof window !== 'undefined') {
+  console.log('💡 To run the connection test, call: runAllTests()');
+  window.testRaspberryPiConnection = runAllTests;
+  window.testHttpConnection = testHttpConnection;
+  window.testWebSocketConnection = testWebSocketConnection;
+  window.testNetworkConnectivity = testNetworkConnectivity;
+}
+
+// Auto-run if executed as Node.js script
+if (typeof window === 'undefined' &amp;&amp; typeof require !== 'undefined') {
+  runAllTests().catch(console.error);
+}
+
+
+================================================================================
+FILE PATH: test-thermal-connection.js
+FILE NAME: test-thermal-connection.js
+================================================================================
+
+/**
+ * Test Thermal Bluetooth Connection Script
+ * This script helps diagnose Raspberry Pi thermal sensor Bluetooth connection issues
+ * Run: node test-thermal-connection.js [COM_PORT]
+ */
+
+const { SerialPort } = require('serialport');
+const { ReadlineParser } = require('@serialport/parser-readline');
+
+const TEST_PORT = process.argv[2];
+
+console.log('');
+console.log('========================================');
+console.log('Raspberry Pi Thermal Sensor Bluetooth Test');
+console.log('========================================');
+console.log('');
+
+async function testConnection() {
+  // Step 1: List all ports
+  console.log('📋 Step 1: Scanning for available ports...');
+  console.log('');
+  
+  try {
+    const ports = await SerialPort.list();
+</pre><div class="sheet-footer">Page 48 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">    
+    if (ports.length === 0) {
+      console.error('❌ No serial ports found!');
+      console.log('');
+      console.log('💡 Troubleshooting:');
+      console.log('   1. Make sure Raspberry Pi is powered on');
+      console.log('   2. Connect Raspberry Pi via USB or pair via Bluetooth');
+      console.log('   3. Check Device Manager → Ports (COM &amp; LPT)');
+      return;
+    }
+    
+    console.log(`✅ Found ${ports.length} port(s):`);
+    ports.forEach(port =&gt; {
+      console.log(`   - ${port.path}`);
+      console.log(`     Manufacturer: ${port.manufacturer || 'Unknown'}`);
+      console.log(`     Description: ${port.pnpId || 'N/A'}`);
+      console.log('');
+    });
+    
+    // Step 2: If port specified, test it
+    if (TEST_PORT) {
+      console.log(`🔌 Step 2: Testing specified port ${TEST_PORT}...`);
+      console.log('');
+      await testPort(TEST_PORT);
+    } else {
+      // Step 2: Try all ports
+      console.log('🔌 Step 2: Testing all ports for thermal sensor data...');
+      console.log('');
+      console.log('💡 This will try to connect to each port for 5 seconds');
+      console.log('   Make sure your Raspberry Pi is:');
+      console.log('   - Powered on and paired');
+      console.log('   - Running bluetooth-thermal-sender.py');
+      console.log('');
+      
+      let foundPort = null;
+      for (const portInfo of ports) {
+        const portName = portInfo.path;
+        console.log(`Testing ${portName}...`);
+        
+        const result = await testPort(portName);
+        if (result) {
+          foundPort = portName;
+          break;
+        }
+      }
+      
+      if (!foundPort) {
+        console.log('');
+        console.log('❌ Could not find Raspberry Pi thermal sensor on any port.');
+        console.log('');
+        console.log('💡 Troubleshooting:');
+        console.log('   1. Make sure Raspberry Pi is powered on');
+        console.log('   2. Pair Raspberry Pi in Windows: Settings → Bluetooth &amp; devices');
+        console.log('   3. Look for "raspberrypi" and pair it');
+</pre><div class="sheet-footer">Page 49 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">        console.log('   4. Make sure it shows as "Connected" (green checkmark)');
+        console.log('   5. Check Device Manager → Ports (COM &amp; LPT) for COM port number');
+        console.log('   6. Make sure bluetooth-thermal-sender.py is running on Raspberry Pi');
+        console.log('   7. Try manually: node test-thermal-connection.js COM9 (use your COM port)');
+      } else {
+        console.log('');
+        console.log(`✅ SUCCESS! Raspberry Pi thermal sensor found on ${foundPort}`);
+        console.log('');
+        console.log(`💡 To connect, run:`);
+        console.log(`   node bluetooth-thermal-receiver.js ${foundPort}`);
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    console.log('');
+    console.log('💡 Make sure serialport is installed: npm install');
+  }
+}
+
+function testPort(portName) {
+  return new Promise((resolve) =&gt; {
+    console.log(`   Attempting to open ${portName}...`);
+    
+    const port = new SerialPort({
+      path: portName,
+      baudRate: 115200,
+      autoOpen: false
+    });
+    
+    const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
+    let receivedData = false;
+    let timeout;
+    let errorOccurred = false;
+    
+    port.on('open', () =&gt; {
+      console.log(`   ✅ Port ${portName} opened successfully`);
+      console.log(`   ⏳ Waiting for data (5 seconds)...`);
+      
+      timeout = setTimeout(() =&gt; {
+        if (!receivedData &amp;&amp; !errorOccurred) {
+          console.log(`   ⚠️  No data received from ${portName}`);
+          console.log(`   (This port might not be the Raspberry Pi)`);
+          console.log('');
+          port.close(() =&gt; resolve(false));
+        }
+      }, 5000);
+    });
+    
+    parser.on('data', (line) =&gt; {
+      if (!receivedData) {
+        receivedData = true;
+        clearTimeout(timeout);
+        
+</pre><div class="sheet-footer">Page 50 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">        console.log(`   ✅ RECEIVED DATA from ${portName}!`);
+        console.log(`   📥 First message: ${line.toString().substring(0, 100)}`);
+        
+        // Try to parse as JSON
+        try {
+          const data = JSON.parse(line.trim());
+          if (data.type === 'thermal_data' || data.thermal_data !== undefined) {
+            console.log(`   🎯 THIS IS YOUR RASPBERRY PI THERMAL SENSOR!`);
+            console.log(`   Data type: ${data.type || 'thermal_data'}`);
+            if (data.thermal_data) {
+              const avgTemp = data.thermal_data.flat().reduce((a, b) =&gt; a + b, 0) / data.thermal_data.flat().length;
+              console.log(`   Average temperature: ${avgTemp.toFixed(1)}°C`);
+            }
+          }
+        } catch (e) {
+          console.log(`   📄 Data format: ${line.trim().substring(0, 50)}...`);
+        }
+        
+        port.close(() =&gt; resolve(true));
+      }
+    });
+    
+    port.on('error', (err) =&gt; {
+      if (!errorOccurred) {
+        errorOccurred = true;
+        clearTimeout(timeout);
+        
+        if (err.message.includes('Access is denied') || err.message.includes('being used')) {
+          console.log(`   ⚠️  Port ${portName} is busy (might be in use by another program)`);
+        } else if (err.message.includes('cannot find') || err.message.includes('does not exist')) {
+          console.log(`   ⚠️  Port ${portName} does not exist`);
+        } else {
+          console.log(`   ❌ Error: ${err.message}`);
+        }
+        console.log('');
+        
+        port.close(() =&gt; resolve(false));
+      }
+    });
+    
+    // Try to open the port
+    port.open((err) =&gt; {
+      if (err &amp;&amp; !errorOccurred) {
+        errorOccurred = true;
+        clearTimeout(timeout);
+        console.log(`   ❌ Cannot open ${portName}: ${err.message}`);
+        console.log('');
+        resolve(false);
+      }
+    });
+  });
+}
+
+// Run the test
+</pre><div class="sheet-footer">Page 51 of 52</div></div>
+<div class="sheet code-sheet"><pre class="code">testConnection().catch(err =&gt; {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
+
+</pre><div class="sheet-footer">Page 52 of 52</div></div>
+</body>
+</html>

@@ -1,84 +1,7 @@
 "use client";
 
 import { useState, Fragment } from "react";
-
-type Stage = {
-  id: number;
-  title: string;
-  summary: string;
-  bulletins: string[];
-};
-
-const STAGES: Stage[] = [
-  {
-    id: 1,
-    title: "Stage 1 – No Cognitive Decline",
-    summary: "Healthy baseline; no noticeable memory issues.",
-    bulletins: [
-      "Set up profiles and gather baseline data from EMG workouts, sleep behaviors, and daily reminders.",
-      "Invite caregivers to explore the dashboard tabs together to build routine familiarity early.",
-    ],
-  },
-  {
-    id: 2,
-    title: "Stage 2 – Very Mild Cognitive Decline",
-    summary: "Occasional forgetfulness that is within normal limits.",
-    bulletins: [
-      "Use the Reminders hub to schedule hydration, meals, and medicine prompts before lapses increase.",
-      "Capture caregiver notes in the assessment modules so trends are easy to spot later.",
-    ],
-  },
-  {
-    id: 3,
-    title: "Stage 3 – Mild Cognitive Decline",
-    summary: "Memory lapses become more noticeable to close friends and family.",
-    bulletins: [
-      "Turn on smart reminders for repetitive tasks—switch to visual countdown mode for clarity.",
-      "Pair EMG exercise videos with guided instructions to reinforce movement patterns through muscle memory.",
-      "Log sleep behaviors nightly to ensure restlessness or wandering is flagged early.",
-    ],
-  },
-  {
-    id: 4,
-    title: "Stage 4 – Moderate Cognitive Decline",
-    summary: "Clear challenges with complex tasks and recent events.",
-    bulletins: [
-      "Use the Sleep Behaviors thermal alerts to notify caregivers when the participant leaves bed.",
-      "Enable caregiver summaries so the app emails or exports alerts after each session.",
-      "Simplify dashboards by starring the three most-used tiles (Sleep, Reminders, EMG).",
-    ],
-  },
-  {
-    id: 5,
-    title: "Stage 5 – Moderately Severe Cognitive Decline",
-    summary: "Assistance needed with daily activities; noticeable gaps in memory.",
-    bulletins: [
-      "Leverage routine-based reminder packs (hygiene, meals, meds) to maintain independence cues.",
-      "Record personalized audio prompts in the Reminders module for comforting guidance.",
-      "Share EMG session summaries with clinicians to adjust mobility plans.",
-    ],
-  },
-  {
-    id: 6,
-    title: "Stage 6 – Severe Cognitive Decline",
-    summary: "Personality changes, disrupted sleep, and increased caregiver load.",
-    bulletins: [
-      "Activate automated alert routing via the mail icon so every high-temp, restlessness, or motion warning reaches caregivers instantly.",
-      "Use the Sleep Behaviors dashboard to document wandering patterns for safety planning.",
-      "Export daily recap PDFs for care teams to synchronize interventions.",
-    ],
-  },
-  {
-    id: 7,
-    title: "Stage 7 – Very Severe Cognitive Decline",
-    summary: "Loss of verbal abilities and motor control; extensive care required.",
-    bulletins: [
-      "Track EMG activity for passive range-of-motion exercises to reduce muscle stiffness.",
-      "Log every alert event to inform hospice or long-term care teams of comfort needs.",
-      "Focus on sensory cues—use calm music and thermal monitoring to maintain comfort.",
-    ],
-  },
-];
+import { DEMENTIA_STAGES } from "@/constants/dementia-education";
 
 export default function DementiaStagesButton() {
   const [open, setOpen] = useState(false);
@@ -128,7 +51,7 @@ export default function DementiaStagesButton() {
             </header>
 
             <div className="max-h-[70vh] overflow-y-auto px-6 py-4 space-y-4">
-              {STAGES.map((stage) => (
+              {DEMENTIA_STAGES.map((stage) => (
                 <article
                   key={stage.id}
                   className="rounded-2xl border border-white/12 bg-white/6 p-5 backdrop-blur"

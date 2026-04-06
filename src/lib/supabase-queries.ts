@@ -54,6 +54,15 @@ export interface DailyCheckSession {
   created_at: string;
 }
 
+/** Standalone album upload (photo album drop-off), stored in album_photos. */
+export interface AlbumPhoto {
+  id: string;
+  user_id: string;
+  photo_url: string;
+  photo_type: string;
+  created_at: string;
+}
+
 /**
  * Fetches EMG sessions for a user
  */
@@ -190,6 +199,30 @@ export async function fetchDailyChecks(
       error: isNetworkError
         ? 'Network error: could not reach the server. Check that the app is running and you are signed in.'
         : msg
+    };
+  }
+}
+
+/**
+ * Fetches standalone album photos (drop-off uploads) for a user.
+ */
+export async function fetchAlbumPhotos(
+  userId: string
+): Promise<{ data: AlbumPhoto[] | null; error: string | null }> {
+  try {
+    const response = await fetch(`/api/album-photos?userId=${encodeURIComponent(userId)}`);
+    const result = await response.json();
+    if (response.ok && Array.isArray(result.data)) {
+      return { data: result.data, error: null };
+    }
+    return {
+      data: null,
+      error: result.error || `Failed to fetch album photos (${response.status})`,
+    };
+  } catch (error) {
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : "Unknown error fetching album photos",
     };
   }
 }
