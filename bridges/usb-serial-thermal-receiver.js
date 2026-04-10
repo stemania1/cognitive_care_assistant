@@ -243,7 +243,11 @@ async function autoDetectPort() {
     console.error("[thermal-usb] no serial ports found.");
     return null;
   }
-  const sorted = sortPortsUsbLikelyFirst(ports);
+  const isEsp32Adapter = (p) => {
+    const desc = [p.manufacturer || "", p.friendlyName || "", p.pnpId || ""].join(" ").toLowerCase();
+    return /ch340|ch341|cp210|ftdi|silicon.lab|esp32|wch/i.test(desc) && !(p.vendorId === "0525" && p.productId === "A4A7");
+  };
+  const sorted = sortPortsUsbLikelyFirst(ports).filter((p) => !isEsp32Adapter(p));
 
   const tryProbe = async (p, baud, delim, label) => {
     console.log(`[thermal-usb] probing ${p.path} @ ${baud} (${PROBE_MS}ms, ${label}, delim=${JSON.stringify(delim)})…`);

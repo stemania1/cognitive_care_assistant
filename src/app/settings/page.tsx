@@ -6,7 +6,10 @@ import { readThemeIsDark, setThemeIsDark } from "@/lib/themePreference";
 import { SENSOR_CONFIG, type ConnectionMode } from "@/app/config/sensor-config";
 
 const CONNECTION_MODE_KEY = "thermal-connection-mode";
+const EMG_CONNECTION_MODE_KEY = "emg-connection-mode";
 const TEMP_UNIT_KEY = "cca-temp-unit";
+
+type EmgConnectionMode = "wifi" | "usb_serial";
 
 type PortInfo = {
   path: string;
@@ -30,6 +33,7 @@ export default function SettingsPage() {
 
         <DisplayPreferencesSection />
         <SensorConfigSection />
+        <EmgConfigSection />
         <WifiProvisioningSection />
 
         <div className="pt-4">
@@ -113,8 +117,11 @@ function SensorConfigSection() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(CONNECTION_MODE_KEY) as ConnectionMode | null;
-      if (stored && ["wifi", "usb", "bluetooth", "usb_serial"].includes(stored)) {
+      if (stored === "wifi" || stored === "usb_serial") {
         setConnectionMode(stored);
+      } else if (stored === "bluetooth" || stored === "usb") {
+        setConnectionMode("usb_serial");
+        localStorage.setItem(CONNECTION_MODE_KEY, "usb_serial");
       } else {
         setConnectionMode(SENSOR_CONFIG.CONNECTION_MODE);
       }
@@ -157,16 +164,15 @@ function SensorConfigSection() {
       const res = await fetch("/api/thermal");
       const json = await res.json();
       const connected = json && (json.thermal_data || json.data) && !json.error;
-      const bridge = connectionMode === "bluetooth" || connectionMode === "usb_serial";
       setTestResult({
         ok: connected,
         msg: connected
-          ? bridge
+          ? connectionMode === "usb_serial"
             ? "Bridge data detected — thermal frames arriving."
             : "Connected — receiving thermal data from Pi."
-          : bridge
-            ? "No bridge data yet. Make sure the receiver script is running."
-            : "Cannot reach Raspberry Pi. Check the IP, port, and that the Pi server is running.",
+          : connectionMode === "usb_serial"
+            ? "No bridge data yet. Make sure the Pi is plugged in via USB and npm run dev is running."
+            : "Cannot reach Raspberry Pi. Check that the Pi is on WiFi and the thermal server is running.",
       });
     } catch (e: unknown) {
       setTestResult({
@@ -178,17 +184,15 @@ function SensorConfigSection() {
     }
   }
 
-  const isBridgeMode = connectionMode === "bluetooth" || connectionMode === "usb_serial";
+  const isBridgeMode = connectionMode === "usb_serial";
 
   return (
-    <Section title="Sensor Configuration" icon={<CpuIcon />}>
+    <Section title="Thermal Sensor (AMG8833)" icon={<CpuIcon />}>
       <SettingRow label="Thermal connection mode">
         <SegmentedControl
           options={[
             { value: "wifi", label: "Wi-Fi" },
-            { value: "usb", label: "USB (Pi)" },
-            { value: "bluetooth", label: "Bluetooth" },
-            { value: "usb_serial", label: "USB Serial" },
+            { value: "usb_serial", label: "USB" },
           ]}
           value={connectionMode}
           onChange={(v) => changeMode(v as ConnectionMode)}
@@ -198,12 +202,6 @@ function SensorConfigSection() {
       <div className="rounded-lg border border-slate-200/60 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
         {connectionMode === "wifi" && (
           <p>Connects to Raspberry Pi over WiFi (HTTP + WebSocket). The Pi must be running the thermal server on the same network.</p>
-        )}
-        {connectionMode === "usb" && (
-          <p>Connects to Raspberry Pi over USB (RNDIS / USB gadget mode). Same protocol as WiFi but uses the USB network interface.</p>
-        )}
-        {connectionMode === "bluetooth" && (
-          <p>Data arrives from the Bluetooth serial bridge script (<code className="text-[11px]">bluetooth-thermal-receiver.js</code>). The bridge reads a COM port and POSTs frames to <code className="text-[11px]">/api/thermal/bt</code>.</p>
         )}
         {connectionMode === "usb_serial" && (
           <p>Data arrives from the USB serial bridge script (<code className="text-[11px]">usb-serial-thermal-receiver.js</code>). The bridge auto-detects COM ports and POSTs frames to <code className="text-[11px]">/api/thermal/bt</code>.</p>
@@ -282,6 +280,106 @@ function SensorConfigSection() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  EMG Sensor Configuration                                           */
+/* ------------------------------------------------------------------ */
+
+function EmgConfigSection() {
+  const [emgMode, setEmgMode] = useState<EmgConnectionMode>("wifi");
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(EMG_CONNECTION_MODE_KEY) as EmgConnectionMode | null;
+      if (stored === "wifi" || stored === "usb_serial") {
+        setEmgMode(stored);
+      } else if (stored === "bluetooth") {
+        setEmgMode("usb_serial");
+        localStorage.setItem(EMG_CONNECTION_MODE_KEY, "usb_serial");
+      }
+    } catch {}
+  }, []);
+
+  function changeMode(mode: EmgConnectionMode) {
+    setEmgMode(mode);
+    setTestResult(null);
+    try {
+      localStorage.setItem(EMG_CONNECTION_MODE_KEY, mode);
+    } catch {}
+  }
+
+  async function testEmgConnection() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/emg/data");
+      const json = await res.json();
+      const hasData = json && json.dataCount > 0 && json.isConnected;
+      setTestResult({
+        ok: hasData,
+        msg: hasData
+          ? `EMG data flowing — ${json.dataCount} samples received.`
+          : emgMode === "usb_serial"
+            ? "No EMG data yet. Make sure the ESP32 is plugged in and npm run dev is running."
+            : "No EMG data. Check that the ESP32 is connected to WiFi and sending data to the emg-server.",
+      });
+    } catch (e: unknown) {
+      setTestResult({
+        ok: false,
+        msg: e instanceof Error ? e.message : "Connection test failed",
+      });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  return (
+    <Section title="EMG Sensor (MyoWare)" icon={<BoltIcon />}>
+      <SettingRow label="EMG connection mode">
+        <SegmentedControl
+          options={[
+            { value: "wifi", label: "Wi-Fi" },
+            { value: "usb_serial", label: "USB" },
+          ]}
+          value={emgMode}
+          onChange={(v) => changeMode(v as EmgConnectionMode)}
+        />
+      </SettingRow>
+
+      <div className="rounded-lg border border-slate-200/60 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
+        {emgMode === "wifi" && (
+          <p>ESP32 connects to WiFi and POSTs data to <code className="text-[11px]">emg-server.js</code> (port 3001). Run <code className="text-[11px]">npm run emg-server</code> or <code className="text-[11px]">npm run dev:all</code>.</p>
+        )}
+        {emgMode === "usb_serial" && (
+          <p>ESP32 plugged in via USB. The bridge starts automatically with <code className="text-[11px]">npm run dev</code> and forwards data to <code className="text-[11px]">/api/emg/ws</code>.</p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={testEmgConnection}
+          disabled={testing}
+          className="rounded-lg border border-slate-200/80 bg-white/80 px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-white disabled:opacity-50 dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/15"
+        >
+          {testing ? "Testing..." : "Test EMG Connection"}
+        </button>
+        {testResult && (
+          <span className={`text-xs font-medium ${testResult.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+            {testResult.ok ? "Connected" : "Not connected"}
+          </span>
+        )}
+      </div>
+      {testResult && (
+        <p className={`text-xs ${testResult.ok ? "text-emerald-600/80 dark:text-emerald-400/80" : "text-red-500/80 dark:text-red-400/80"}`}>
+          {testResult.msg}
+        </p>
+      )}
+    </Section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  WiFi Provisioning                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -292,14 +390,39 @@ function WifiProvisioningSection() {
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<WifiProvisionStatus>("idle");
   const [statusMsg, setStatusMsg] = useState("");
+  const [detectedPort, setDetectedPort] = useState<string | null>(null);
+  const [portsScanned, setPortsScanned] = useState(false);
+  const [isLocalhost, setIsLocalhost] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
   useEffect(() => {
+    setIsLocalhost(
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    );
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isLocalhost || portsScanned) return;
+    setPortsScanned(true);
+    fetch("/api/thermal/ports")
+      .then((r) => r.json())
+      .then((json) => {
+        const ports: PortInfo[] = json.ports || [];
+        const piPort = ports.find(
+          (p) => p.manufacturer?.toLowerCase().includes("linux") || p.path === "COM3"
+        );
+        const espPort = ports.find((p) =>
+          /cp210|ch340|ftdi|silicon|esp|wch/i.test(p.manufacturer || "")
+        );
+        if (device === "pi" && piPort) setDetectedPort(piPort.path);
+        else if (device === "esp32" && espPort) setDetectedPort(espPort.path);
+        else if (ports.length > 0) setDetectedPort(ports[0].path);
+      })
+      .catch(() => {});
+  }, [isLocalhost, portsScanned, device]);
 
   async function sendWifiConfig() {
     if (!ssid.trim()) return;
@@ -315,46 +438,38 @@ function WifiProvisioningSection() {
       return;
     }
 
+    if (!detectedPort) {
+      setStatus("error");
+      setStatusMsg("No serial port detected. Plug in the device via USB and reload the page.");
+      timeoutRef.current = setTimeout(() => setStatus("idle"), 10000);
+      return;
+    }
+
     setStatus("sending");
-    setStatusMsg("");
+    setStatusMsg(`Sending WiFi config to ${detectedPort}...`);
 
     try {
-      if (device === "pi") {
-        const piIp = SENSOR_CONFIG.RASPBERRY_PI_IP_USB || "192.168.7.2";
-        const res = await fetch(`http://${piIp}:8091/wifi-config`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ssid: ssid.trim(), password }),
-        });
-        if (res.ok) {
-          setStatus("success");
-          setStatusMsg("WiFi credentials sent to Raspberry Pi. The Pi will attempt to connect.");
-        } else {
-          const text = await res.text().catch(() => "");
-          setStatus("error");
-          setStatusMsg(`Pi responded with HTTP ${res.status}. ${text}`);
-        }
+      const res = await fetch("/api/wifi-provision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          port: detectedPort,
+          ssid: ssid.trim(),
+          password,
+          baud: 115200,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setStatus("success");
+        setStatusMsg(json.msg || `WiFi credentials sent to ${device === "pi" ? "Raspberry Pi" : "ESP32"} on ${detectedPort}.`);
       } else {
-        const res = await fetch("/api/thermal/ports");
-        const json = await res.json();
-        if (!json.ports || json.ports.length === 0) {
-          setStatus("error");
-          setStatusMsg("No serial ports detected. Plug in the ESP32 via USB and try again.");
-          return;
-        }
         setStatus("error");
-        setStatusMsg(
-          `ESP32 WiFi provisioning requires the bridge script. Run: node bridges/usb-serial-thermal-receiver.js --wifi-config "${ssid.trim()}". ` +
-          `Detected ports: ${json.ports.map((p: PortInfo) => p.path).join(", ")}.`
-        );
+        setStatusMsg(json.msg || json.error || "Device did not confirm WiFi configuration.");
       }
     } catch (e: unknown) {
       setStatus("error");
-      setStatusMsg(
-        device === "pi"
-          ? "Cannot reach the Pi. Make sure it is connected via USB and the config server is running (pi-config-server.py)."
-          : e instanceof Error ? e.message : "Failed to send WiFi config."
-      );
+      setStatusMsg(e instanceof Error ? e.message : "Failed to send WiFi config.");
     }
 
     timeoutRef.current = setTimeout(() => setStatus("idle"), 15000);
@@ -425,13 +540,19 @@ function WifiProvisioningSection() {
           </div>
         </div>
 
+        {detectedPort && isLocalhost && (
+          <p className="text-xs opacity-60">
+            Detected device on <span className="font-mono font-medium">{detectedPort}</span>
+          </p>
+        )}
+
         <button
           type="button"
           onClick={sendWifiConfig}
           disabled={!ssid.trim() || status === "sending"}
           className="rounded-lg border border-violet-300/80 bg-violet-500/90 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-500 disabled:opacity-50 dark:border-violet-500/40"
         >
-          {status === "sending" ? "Sending..." : `Send to ${device === "pi" ? "Raspberry Pi" : "ESP32"}`}
+          {status === "sending" ? "Sending..." : `Send to ${device === "pi" ? "Raspberry Pi" : "ESP32"}${detectedPort ? ` (${detectedPort})` : ""}`}
         </button>
 
         {statusMsg && (
@@ -450,15 +571,19 @@ function WifiProvisioningSection() {
       <div className="rounded-lg border border-slate-200/60 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
         {device === "pi" ? (
           <p>
-            The Pi must be connected via USB and running <code className="text-[11px]">pi-config-server.py</code> (on port 8091).
+            The Pi must be connected via USB and running <code className="text-[11px]">serial-wifi-listener.py</code>.
+            Credentials are sent over the USB serial port ({detectedPort || "auto-detected"}).
             Once WiFi is configured, the Pi will connect wirelessly and you can unplug USB.
           </p>
         ) : (
           <p>
-            The ESP32 must be connected via USB. WiFi provisioning sends credentials over the serial connection.
+            The ESP32 must be connected via USB. Credentials are sent over the serial connection.
             The firmware must support the <code className="text-[11px]">wifi_config</code> serial command.
           </p>
         )}
+        <p className="mt-1.5">
+          You can also use the standalone setup tool: <code className="text-[11px]">python scripts/sensor-setup.py</code>
+        </p>
       </div>
     </Section>
   );
@@ -588,6 +713,14 @@ function WifiIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
       <path fillRule="evenodd" d="M.676 6.941A12.964 12.964 0 0 1 10 3.5c3.58 0 6.86 1.318 9.324 3.441a.75.75 0 0 1-.948 1.16A11.464 11.464 0 0 0 10 5a11.464 11.464 0 0 0-8.376 3.101.75.75 0 0 1-.948-1.16ZM3.545 10.03A9.462 9.462 0 0 1 10 7.5a9.462 9.462 0 0 1 6.455 2.53.75.75 0 1 1-1.01 1.11A7.962 7.962 0 0 0 10 9a7.962 7.962 0 0 0-5.445 2.14.75.75 0 0 1-1.01-1.11ZM6.413 13.12A5.96 5.96 0 0 1 10 11.5c1.378 0 2.644.476 3.587 1.62a.75.75 0 1 1-1.174.93A4.46 4.46 0 0 0 10 13a4.46 4.46 0 0 0-2.413 1.05.75.75 0 1 1-1.174-.93ZM10 14.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+function BoltIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+      <path d="M11.983 1.907a.75.75 0 0 0-1.292-.657l-8.5 9.5A.75.75 0 0 0 2.75 12h6.572l-1.305 6.093a.75.75 0 0 0 1.292.657l8.5-9.5A.75.75 0 0 0 17.25 8h-6.572l1.305-6.093Z" />
     </svg>
   );
 }

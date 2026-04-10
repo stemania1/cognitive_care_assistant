@@ -35,14 +35,12 @@ export default function Sensors() {
   // Apply saved preference after mount (client-only)
   useEffect(() => {
     const saved = localStorage.getItem(CONNECTION_MODE_KEY) as ConnectionMode | null;
-    if (
-      saved === "wifi" ||
-      saved === "usb" ||
-      saved === "bluetooth" ||
-      saved === "usb_serial"
-    ) {
+    if (saved === "wifi" || saved === "usb_serial") {
       setConnectionModeState(saved);
       SENSOR_CONFIG.CONNECTION_MODE = saved;
+    } else if (saved === "bluetooth" || saved === "usb") {
+      setConnectionModeState("usb_serial");
+      SENSOR_CONFIG.CONNECTION_MODE = "usb_serial";
     }
   }, []);
 
@@ -87,9 +85,7 @@ export default function Sensors() {
       wsRef.current = null;
 
       if (!isPiTcpConnection()) {
-        setConnectionStatus(
-          connectionMode === "usb_serial" ? "USB serial (polling)" : "Bluetooth (polling)"
-        );
+        setConnectionStatus("USB serial (polling)");
         startHttpPolling();
         return;
       }
@@ -221,11 +217,7 @@ export default function Sensors() {
             setThermalData({ timestamp: ts, data: grid });
             setIsConnected(true);
             if (!isPiTcpConnection()) {
-              setConnectionStatus(
-                connectionMode === "usb_serial"
-                  ? "Connected (USB serial)"
-                  : "Connected (Bluetooth)"
-              );
+              setConnectionStatus("Connected (USB serial)");
             } else if (data._connection) {
               const { host, isBackup } = data._connection;
               setConnectionStatus(
@@ -242,9 +234,7 @@ export default function Sensors() {
             setConnectionStatus("Disconnected");
             if (!isPiTcpConnection()) {
               setError(
-                connectionMode === "usb_serial"
-                  ? "USB serial: run node usb-serial-thermal-receiver.js (MCU sending JSON lines)."
-                  : "Bluetooth: Start the bridge (node bluetooth-thermal-receiver.js COMx) and Pi sender (python3 bluetooth-thermal-sender.py)."
+                "USB serial: make sure the Pi is plugged in via USB and npm run dev is running."
               );
             } else {
               setError("No thermal data received. On Pi run: python3 raspberry_pi_thermal_server.py");
@@ -256,13 +246,7 @@ export default function Sensors() {
       } catch (err) {
         if (!isPiTcpConnection()) {
           setError(
-            connectionMode === "usb_serial"
-              ? "USB serial: connect the MCU, set SERIAL_PORT if needed, run node usb-serial-thermal-receiver.js."
-              : "Bluetooth: Run on PC — node bluetooth-thermal-receiver.js COMx (add Outgoing COM port in Devices and Printers → raspberrypi). On Pi — python3 bluetooth-thermal-sender.py."
-          );
-        } else if (connectionMode === "usb") {
-          setError(
-            `USB: 1) Pi connected via USB cable (data port). 2) Windows: set USB Ethernet adapter to 192.168.7.1. 3) On Pi run: python3 raspberry_pi_thermal_server.py`
+            "USB serial: connect the Pi, set SERIAL_PORT if needed, and make sure npm run dev is running."
           );
         } else {
           setError(
@@ -399,16 +383,14 @@ export default function Sensors() {
 
   const getConnectionMethodLabel = (): string => {
     if (isConnected && connectionStatus === "Demo Mode") return "Demo";
-    if (connectionMode === "wifi") return "Wi‑Fi";
-    if (connectionMode === "usb") return "USB";
-    return "Bluetooth";
+    if (connectionMode === "wifi") return "Wi\u2011Fi";
+    return "USB";
   };
 
   const getConnectionMethodIcon = (): string => {
     if (isConnected && connectionStatus === "Demo Mode") return "🎮";
     if (connectionMode === "wifi") return "📶";
-    if (connectionMode === "usb") return "🔌";
-    return "📡";
+    return "🔌";
   };
 
   return (
@@ -460,9 +442,9 @@ export default function Sensors() {
                 <div className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
               )}
             </div>
-            {connectionMode === "bluetooth" && !isConnected && (
+            {connectionMode === "usb_serial" && !isConnected && (
               <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300">
-                Bluetooth mode active — waiting for data from <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code>.
+                USB mode active — waiting for data from <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code>.
               </div>
             )}
             {!isConnected && (
@@ -475,14 +457,9 @@ export default function Sensors() {
               </div>
             )}
           </div>
-          {(connectionMode === "wifi" || connectionMode === "usb") && (
+          {connectionMode === "wifi" && (
             <p className="text-sm text-gray-400 mt-2">
               Raspberry Pi: <code className="bg-white/10 px-1.5 py-0.5 rounded font-mono text-cyan-300/90">{getPiHost()}</code>
-            </p>
-          )}
-          {connectionMode === "bluetooth" && (
-            <p className="text-sm text-gray-400 mt-2">
-              Raspberry Pi: <span className="text-gray-500">— (data via Bluetooth bridge)</span>
             </p>
           )}
         </div>
@@ -630,7 +607,7 @@ export default function Sensors() {
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Connection</label>
                     <div className="flex rounded-lg overflow-hidden border border-white/10">
-                      {(["wifi", "usb", "bluetooth", "usb_serial"] as const).map((mode) => (
+                      {(["wifi", "usb_serial"] as const).map((mode) => (
                         <button
                           key={mode}
                           type="button"
@@ -638,28 +615,19 @@ export default function Sensors() {
                             setConnectionMode(mode);
                             connectWebSocket();
                           }}
-                          className={`flex-1 py-2 px-2 text-xs sm:text-sm font-medium capitalize transition-colors ${
+                          className={`flex-1 py-2 px-2 text-xs sm:text-sm font-medium transition-colors ${
                             connectionMode === mode
                               ? "bg-cyan-600 text-white"
                               : "bg-white/5 text-gray-400 hover:bg-white/10"
                           }`}
                         >
-                          {mode === "wifi"
-                            ? "Wi‑Fi"
-                            : mode === "usb"
-                              ? "USB (Pi)"
-                              : mode === "bluetooth"
-                                ? "BT"
-                                : "USB Ard"}
+                          {mode === "wifi" ? "Wi\u2011Fi" : "USB"}
                         </button>
                       ))}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      {connectionMode === "usb" && "Pi over USB cable (same server, no Pi code change)."}
-                      {connectionMode === "bluetooth" &&
-                        "Bluetooth bridge → /api/thermal/bt (node bluetooth-thermal-receiver.js)."}
                       {connectionMode === "usb_serial" &&
-                        "MCU USB serial → node usb-serial-thermal-receiver.js → /api/thermal/bt."}
+                        "Pi USB serial bridge — starts automatically with npm run dev."}
                     </p>
                   </div>
                   <button
@@ -693,9 +661,7 @@ export default function Sensors() {
                     <p className="mb-1">Demo Mode: Test the interface without hardware</p>
                     <p>
                       Real Sensor:{" "}
-                      {connectionMode === "bluetooth"
-                        ? "Bluetooth bridge → /api/thermal/bt"
-                        : connectionMode === "usb_serial"
+                      {connectionMode === "usb_serial"
                           ? "USB serial bridge → /api/thermal/bt"
                           : `Pi HTTP ${SENSOR_CONFIG.HTTP_PORT}, WS ${SENSOR_CONFIG.WEBSOCKET_PORT} at ${getPiHost()}`}
                     </p>

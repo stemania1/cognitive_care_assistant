@@ -31,7 +31,7 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
   const [calibrationData, setCalibrationData] = useState<{ min: number; max: number } | null>(null);
   const [discoveredDevices, setDiscoveredDevices] = useState<MyoWareDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<MyoWareDevice | null>(null);
-  const [connectionMode, setConnectionMode] = useState<'wifi' | 'bluetooth'>('wifi');
+  const [connectionMode] = useState<'wifi'>('wifi');
   const [commandStatus, setCommandStatus] = useState<string>('');
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [isTransmitting, setIsTransmitting] = useState(false);
@@ -383,28 +383,9 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
     <div className="p-4 rounded-lg bg-white/5 border border-white/10">
       <h3 className="text-lg font-medium text-white mb-4">MyoWare 2.0 Wireless Connection</h3>
       
-      {/* Connection Mode Toggle */}
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setConnectionMode('wifi')}
-          className={`px-3 py-1 rounded text-sm transition-colors ${
-            connectionMode === 'wifi' 
-              ? 'bg-blue-500 text-white' 
-              : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-          }`}
-        >
-          WiFi Direct
-        </button>
-        <button
-          onClick={() => setConnectionMode('bluetooth')}
-          className={`px-3 py-1 rounded text-sm transition-colors ${
-            connectionMode === 'bluetooth' 
-              ? 'bg-blue-500 text-white' 
-              : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-          }`}
-        >
-          Bluetooth
-        </button>
+      {/* Connection Mode Label */}
+      <div className="mb-4">
+        <span className="px-3 py-1 rounded text-sm bg-blue-500 text-white">WiFi Direct</span>
       </div>
       
       {/* Connection Status */}
@@ -429,25 +410,13 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
       {/* Connection Controls */}
       <div className="flex gap-2 mb-4">
         {!deviceOnline ? (
-          <>
-            {connectionMode === 'wifi' ? (
-              <button
-                onClick={discoverDevices}
-                disabled={connectionStatus === 'connecting'}
-                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {connectionStatus === 'connecting' ? 'Discovering...' : 'Discover Devices'}
-              </button>
-            ) : (
-              <button
-                onClick={connectToServer}
-                disabled={connectionStatus === 'connecting'}
-                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {connectionStatus === 'connecting' ? 'Connecting...' : 'Connect Bluetooth'}
-              </button>
-            )}
-          </>
+          <button
+            onClick={discoverDevices}
+            disabled={connectionStatus === 'connecting'}
+            className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {connectionStatus === 'connecting' ? 'Discovering...' : 'Discover Devices'}
+          </button>
         ) : (
           <button
             onClick={disconnectFromServer}
@@ -636,7 +605,7 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
           <li>1. Upload the MyoWare client code to your Arduino</li>
           <li>2. Connect MyoWare 2.0 sensor to analog pin A0</li>
           <li>3. Attach MyoWare Wireless Shield</li>
-          <li>4. Power on the Arduino and wait for Bluetooth pairing</li>
+          <li>4. Power on the ESP32 and wait for WiFi connection</li>
           <li>5. Click "Connect" above to establish WebSocket connection</li>
         </ol>
       </div>

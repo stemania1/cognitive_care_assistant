@@ -794,7 +794,7 @@ export default function EMGPage() {
               '1. Check wireless shield connection to MyoWare sensor',
               '2. Ensure sensor is properly attached to muscle with good contact',
               '3. Verify sensor wires (red=power, black=ground, white=signal) are secure',
-              '4. For wireless shield: check Bluetooth/WiFi connection',
+              '4. For wireless shield: check WiFi connection',
               '5. Try power cycling the wireless shield'
             ]
           });

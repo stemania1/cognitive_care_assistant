@@ -24,25 +24,23 @@ export async function GET() {
     return NextResponse.json({ ports: list }, { status: 200, headers: CORS_HEADERS });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    const isModuleMissing =
+    const isNativeUnavailable =
       message.includes("Cannot find module") ||
-      message.includes("not found") ||
-      message.includes("MODULE_NOT_FOUND");
+      message.includes("MODULE_NOT_FOUND") ||
+      message.includes("No native build") ||
+      message.includes("native build was found") ||
+      message.includes("bindings-cpp");
 
-    if (isModuleMissing) {
-      return NextResponse.json(
-        {
-          ports: [],
-          info: "Serial port scanning is only available when the app runs locally (localhost). The serialport native module is not available in this environment.",
-        },
-        { status: 200, headers: CORS_HEADERS }
-      );
-    }
+    console.warn("[API thermal/ports]", isNativeUnavailable ? "native module unavailable:" : "error:", message);
 
-    console.error("[API thermal/ports] failed:", message);
     return NextResponse.json(
-      { error: "Could not list serial ports", details: message, ports: [] },
-      { status: 500, headers: CORS_HEADERS }
+      {
+        ports: [],
+        info: isNativeUnavailable
+          ? "Serial port scanning requires the native serialport module. Run `npm rebuild @serialport/bindings-cpp` and restart the dev server."
+          : `Could not list serial ports: ${message}`,
+      },
+      { status: 200, headers: CORS_HEADERS }
     );
   }
 }

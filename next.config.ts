@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: [
+    "serialport",
+    "@serialport/bindings-cpp",
+    "@serialport/parser-readline",
+  ],
   images: {
     remotePatterns: [
       {

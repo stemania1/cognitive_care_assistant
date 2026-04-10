@@ -20,7 +20,7 @@ export function CongressionalAppChallengeButton() {
               alt="Congressional App Challenge"
               width={32}
               height={32}
-              className="object-contain"
+              className="h-auto w-auto object-contain"
             />
           </div>
           

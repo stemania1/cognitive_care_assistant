@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { SENSOR_CONFIG, getWebSocketUrl, getThermalDataUrl, findRaspberryPi, getPiHost, isPiTcpConnection } from '../config/sensor-config';
 
-const BLUETOOTH_SENTINEL = '__bluetooth__';
+const BRIDGE_SENTINEL = '__bridge__';
 
 interface ThermalData {
   type: string;
@@ -155,20 +155,14 @@ export default function ThermalVisualization({
     }
   }, [connectionStatus, onConnectionStatusChange]);
 
-  // Auto-discover Raspberry Pi when component becomes active
-  // Set connection target: Bluetooth (poll /api/thermal), USB (use getPiHost()), or Wi‑Fi (discover)
+  // Set connection target: USB serial (poll /api/thermal) or Wi-Fi (discover Pi)
   useEffect(() => {
     if (!isActive) {
       setDiscoveredIP(null);
       return;
     }
     if (!isPiTcpConnection()) {
-      setDiscoveredIP(BLUETOOTH_SENTINEL);
-      setConnectionStatus('connecting');
-      return;
-    }
-    if (SENSOR_CONFIG.CONNECTION_MODE === 'usb') {
-      setDiscoveredIP(getPiHost());
+      setDiscoveredIP(BRIDGE_SENTINEL);
       setConnectionStatus('connecting');
       return;
     }
@@ -187,9 +181,9 @@ export default function ThermalVisualization({
     discoverPi();
   }, [isActive]);
 
-  // WebSocket connection (skip when Bluetooth — we only poll)
+  // WebSocket connection (skip in USB serial bridge mode — we only poll)
   useEffect(() => {
-    if (!isActive || !discoveredIP || discoveredIP === BLUETOOTH_SENTINEL) {
+    if (!isActive || !discoveredIP || discoveredIP === BRIDGE_SENTINEL) {
       if (websocketRef.current) {
         websocketRef.current.close();
         websocketRef.current = null;
@@ -324,8 +318,7 @@ export default function ThermalVisualization({
 
         ws.onerror = (error) => {
           clearTimeout(connectionTimeout);
-          // WebSocket errors are expected when using Bluetooth - HTTP polling will handle data
-          console.warn('⚠️ WebSocket connection failed (expected with Bluetooth mode) - falling back to HTTP polling');
+          console.warn('WebSocket connection failed - falling back to HTTP polling');
           // Handle WebSocket errors - HTTP polling will handle data retrieval
           if (lastConnectionStatus.current !== 'disconnected') {
             lastConnectionStatus.current = 'disconnected';
@@ -487,7 +480,7 @@ export default function ThermalVisualization({
     };
   }, [thermalData]);
 
-  // Fallback to HTTP polling (or Bluetooth: poll /api/thermal with no query).
+  // HTTP polling (USB serial bridge polls /api/thermal with no query; WiFi uses Pi IP).
   // Keep polling even when 'connected' so data keeps updating (no early return on connectionStatus).
   useEffect(() => {
     if (!isActive || !discoveredIP) return;
@@ -499,8 +492,8 @@ export default function ThermalVisualization({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-      const isBluetooth = discoveredIP === BLUETOOTH_SENTINEL;
-      const query = isBluetooth ? '' : `?ip=${encodeURIComponent(discoveredIP)}&port=${SENSOR_CONFIG.HTTP_PORT}`;
+      const isBridge = discoveredIP === BRIDGE_SENTINEL;
+      const query = isBridge ? '' : `?ip=${encodeURIComponent(discoveredIP)}&port=${SENSOR_CONFIG.HTTP_PORT}`;
 
       try {
         const response = await fetch(`/api/thermal${query}`, {
@@ -595,12 +588,8 @@ export default function ThermalVisualization({
   };
 
   const connectionMethodLabel =
-    SENSOR_CONFIG.CONNECTION_MODE === 'usb' ? 'USB (Pi)' :
-    SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? 'Bluetooth' :
-    SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial' ? 'USB serial (MCU bridge)' : 'Wi‑Fi';
+    SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial' ? 'USB' : 'Wi\u2011Fi';
   const connectionMethodIcon =
-    SENSOR_CONFIG.CONNECTION_MODE === 'usb' ? '🔌' :
-    SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? '📡' :
     SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial' ? '🔌' : '📶';
 
   const getStatusText = () => {
@@ -629,8 +618,7 @@ export default function ThermalVisualization({
             </span>
           )}
           {connectionStatus === 'connected' &&
-            SENSOR_CONFIG.CONNECTION_MODE !== 'bluetooth' &&
-            SENSOR_CONFIG.CONNECTION_MODE !== 'usb_serial' && (
+            SENSOR_CONFIG.CONNECTION_MODE === 'wifi' && (
             <span className="text-xs text-gray-400">
               {connectionSource ? (
                 <>
@@ -648,28 +636,14 @@ export default function ThermalVisualization({
           </span>
         )}
       </div>
-      {(SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' || SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial') &&
+      {SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial' &&
         connectionStatus !== 'connected' && (
-        <div className="text-xs text-gray-300 bg-white/5 border border-white/10 rounded-lg px-3 py-2 space-y-2">
+        <div className="text-xs text-gray-300 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
           <p>
-            <strong className="text-gray-200">Bridge mode (Bluetooth or USB serial).</strong>{' '}
-            Run the Node receiver so it POSTs frames to <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code>
-            — no Raspberry Pi IP.
+            <strong className="text-gray-200">USB mode.</strong>{' '}
+            The bridge starts automatically with <code className="bg-black/20 px-1 rounded">npm run dev</code>.
+            Make sure the Pi is plugged in via USB.
           </p>
-          {SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? (
-            <p className="text-gray-400">
-              <strong className="text-gray-300">Bluetooth:</strong> run <code className="bg-black/20 px-1 rounded">node bluetooth-thermal-receiver.js</code>{' '}
-              (or your project&apos;s Bluetooth bridge).
-            </p>
-          ) : (
-            <p className="text-gray-400">
-              <strong className="text-gray-300">USB serial:</strong> run <code className="bg-black/20 px-1 rounded">npm run thermal:usb</code> or{' '}
-              <code className="bg-black/20 px-1 rounded">node usb-serial-thermal-receiver.js</code> (MCU →{' '}
-              <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code>). Set <code className="bg-black/20 px-1 rounded">SERIAL_PORT</code> /{' '}
-              <code className="bg-black/20 px-1 rounded">BAUD_RATE</code> if auto-detect fails. See{' '}
-              <code className="bg-black/20 px-1 rounded">docs/USB_THERMAL_SERIAL.md</code>.
-            </p>
-          )}
         </div>
       )}
 
@@ -708,8 +682,7 @@ export default function ThermalVisualization({
 
       {/* Connection Instructions (Pi / discovery only — bridge help is in the box above) */}
       {connectionStatus === 'disconnected' &&
-        !(discoveredIP === BLUETOOTH_SENTINEL &&
-          (SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' || SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial')) && (
+        !(discoveredIP === BRIDGE_SENTINEL && SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial') && (
         <div className="text-xs text-yellow-400 bg-yellow-400/10 p-3 rounded-lg">
           {discoveredIP ? (
             <>
