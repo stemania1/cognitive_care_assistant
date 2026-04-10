@@ -293,6 +293,7 @@ function WifiProvisioningSection() {
   const [status, setStatus] = useState<WifiProvisionStatus>("idle");
   const [statusMsg, setStatusMsg] = useState("");
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
   useEffect(() => {
     return () => {
@@ -302,6 +303,18 @@ function WifiProvisioningSection() {
 
   async function sendWifiConfig() {
     if (!ssid.trim()) return;
+
+    if (!isLocalhost) {
+      setStatus("error");
+      setStatusMsg(
+        "WiFi provisioning requires the app to be running locally (localhost). " +
+        "Browsers block HTTP requests from HTTPS pages to local IP addresses. " +
+        "Run the app with `npm run dev` on the machine where the device is connected via USB."
+      );
+      timeoutRef.current = setTimeout(() => setStatus("idle"), 15000);
+      return;
+    }
+
     setStatus("sending");
     setStatusMsg("");
 
@@ -352,6 +365,12 @@ function WifiProvisioningSection() {
       <p className="text-xs leading-relaxed opacity-70">
         Configure your sensor device&apos;s WiFi credentials over USB so it can connect to the local network wirelessly.
       </p>
+
+      {!isLocalhost && (
+        <div className="rounded-lg border border-amber-200/60 bg-amber-50/60 px-3 py-2.5 text-xs leading-relaxed text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+          WiFi provisioning requires a localhost connection. Run <code className="text-[11px]">npm run dev</code> on the machine with the USB-connected device, then open <code className="text-[11px]">localhost:3000/settings</code>.
+        </div>
+      )}
 
       <SettingRow label="Target device">
         <SegmentedControl
