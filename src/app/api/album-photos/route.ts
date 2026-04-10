@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import {
+  ALBUM_TABLE_SETUP_MESSAGE,
+  isAlbumPhotosTableMissing,
+} from "@/lib/album-photos-table";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+
+const TABLE_MISSING_BODY = {
+  error: ALBUM_TABLE_SETUP_MESSAGE,
+  code: "ALBUM_TABLE_MISSING" as const,
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,8 +38,11 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      if (error.code === "42P01" || error.message?.includes("does not exist")) {
-        return NextResponse.json({ data: [], warning: "album_photos table not created yet" });
+      if (isAlbumPhotosTableMissing(error)) {
+        return NextResponse.json({
+          data: [],
+          warning: "album_photos table not created yet",
+        });
       }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -84,6 +96,9 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("album_photos insert:", error);
+      if (isAlbumPhotosTableMissing(error)) {
+        return NextResponse.json(TABLE_MISSING_BODY, { status: 503 });
+      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -125,6 +140,11 @@ export async function DELETE(request: NextRequest) {
       .eq("user_id", userId)
       .single();
 
+    if (fetchError) {
+      if (isAlbumPhotosTableMissing(fetchError)) {
+        return NextResponse.json(TABLE_MISSING_BODY, { status: 503 });
+      }
+    }
     if (fetchError || !row) {
       return NextResponse.json({ error: "Photo not found" }, { status: 404 });
     }
@@ -146,6 +166,9 @@ export async function DELETE(request: NextRequest) {
     const { error: delError } = await supabaseAdmin.from("album_photos").delete().eq("id", id).eq("user_id", userId);
 
     if (delError) {
+      if (isAlbumPhotosTableMissing(delError)) {
+        return NextResponse.json(TABLE_MISSING_BODY, { status: 503 });
+      }
       return NextResponse.json({ error: delError.message }, { status: 500 });
     }
 

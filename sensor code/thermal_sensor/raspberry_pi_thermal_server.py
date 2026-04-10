@@ -73,14 +73,19 @@ def get_frame():
 
 
 def build_payload(frame):
+    """JSON for HTTP + WebSocket. Must include `type` for legacy clients; `thermal_data` is the 8×8 grid."""
     return {
+        "type": "thermal_data",
         "timestamp": datetime.utcnow().isoformat(),
         "thermal_data": frame,
         "grid_size": {"width": GRID_WIDTH, "height": GRID_HEIGHT},
         "sensor_info": {
             "model": "AMG8833",
+            "type": "amg8833",
             "temperature_unit": "C",
             "data_source": "sensor",
+            "bus": "I2C",
+            "status": "active",
         },
         "status": "active",
     }

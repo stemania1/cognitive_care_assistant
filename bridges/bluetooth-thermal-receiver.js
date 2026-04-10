@@ -14,8 +14,15 @@
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 
-// Configuration
-const NEXTJS_API_URL = process.env.NEXTJS_API_URL || 'http://localhost:3000/api/thermal/bt';
+// Configuration — 127.0.0.1 avoids Windows IPv6 localhost / fetch issues with Next.js
+function resolveThermalApiUrl() {
+  const raw = process.env.NEXTJS_API_URL || 'http://127.0.0.1:3000/api/thermal/bt';
+  if (raw.includes('localhost')) {
+    return raw.replace(/localhost/g, '127.0.0.1');
+  }
+  return raw;
+}
+const NEXTJS_API_URL = resolveThermalApiUrl();
 let SERIAL_PORT = process.argv[2] || process.env.THERMAL_BLUETOOTH_PORT;
 const DEFAULT_BAUD = parseInt(process.env.THERMAL_SERIAL_BAUD || '115200', 10) || 115200;
 
@@ -142,7 +149,11 @@ function testPort(portName) {
     parser.on('data', (line) => {
       try {
         const data = JSON.parse(line.trim());
-        if (data.type === 'thermal_data' || data.thermal_data !== undefined) {
+        const ok =
+          data.type === 'thermal_data' ||
+          (Array.isArray(data.thermal_data) && data.thermal_data.length > 0) ||
+          (Array.isArray(data.pixels) && data.pixels.length === 64);
+        if (ok) {
           receivedData = true;
           clearTimeout(timeout);
           testPort.close(() => resolve(true));
@@ -175,20 +186,34 @@ function testPort(portName) {
 
 /** Wait for Next.js API to be ready (avoids "fetch failed" when started with npm run dev). */
 async function waitForApi() {
-  const baseUrl = NEXTJS_API_URL.replace(/\/api\/thermal\/bt.*$/, '') || 'http://localhost:3000';
-  const maxWait = 30000;
+  const baseUrl = NEXTJS_API_URL.replace(/\/api\/thermal\/bt.*$/, '') || 'http://127.0.0.1:3000';
+  const maxWait = 45000;
   const interval = 500;
   const start = Date.now();
   while (Date.now() - start < maxWait) {
     try {
       const c = new AbortController();
-      const t = setTimeout(() => c.abort(), 2000);
+      const t = setTimeout(() => c.abort(), 3000);
       const r = await fetch(baseUrl, { method: 'GET', signal: c.signal });
       clearTimeout(t);
-      if (r.status < 500) return;
+      if (r.status < 500) {
+        console.log('✅ Next.js reachable at', baseUrl);
+        return;
+      }
     } catch (_) {}
     await new Promise((r) => setTimeout(r, interval));
   }
+  console.warn('⚠️ Next.js not reachable yet — POSTs may fail until dev server is ready.');
+}
+
+function formatFetchError(e) {
+  const parts = [e && e.message];
+  if (e && e.cause) {
+    const c = e.cause;
+    parts.push(c.code || c.message || String(c));
+  }
+  if (e && e.code) parts.push(e.code);
+  return parts.filter(Boolean).join(' | ');
 }
 
 // Main execution
@@ -228,10 +253,77 @@ async function waitForApi() {
 
   let lastLog = 0;
 
+  const POST_TIMEOUT_MS = 8000;
+  let pendingPayload = null;
+  let flushRunning = false;
+
+  async function flushPostQueue() {
+    if (flushRunning) return;
+    flushRunning = true;
+    try {
+      while (pendingPayload !== null) {
+        const data = pendingPayload;
+        pendingPayload = null;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
+        try {
+          const res = await fetch(NEXTJS_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            forwardStats.success++;
+            forwardStats.lastSuccess = new Date().toISOString();
+            if (forwardStats.success % 10 === 0) {
+              console.log('✅ Forwarded to Next.js API (every 10th):', { successCount: forwardStats.success, status: res.status });
+            }
+          } else {
+            forwardStats.failures++;
+            forwardStats.lastError = { status: res.status, statusText: res.statusText, timestamp: new Date().toISOString() };
+            const text = await res.text().catch(() => '');
+            console.error('❌ API returned error:', res.status, res.statusText, text.slice(0, 200));
+          }
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          forwardStats.failures++;
+          forwardStats.lastError = { message: fetchError.message, timestamp: new Date().toISOString() };
+          if (fetchError.name !== 'AbortError') {
+            if (forwardStats.failures % 15 === 1) {
+              console.error('❌ Error forwarding to API:', formatFetchError(fetchError), '|', NEXTJS_API_URL);
+            }
+          } else if (forwardStats.failures % 30 === 1) {
+            console.error('❌ POST timed out — is Next.js running?', NEXTJS_API_URL);
+          }
+        }
+      }
+    } finally {
+      flushRunning = false;
+      if (pendingPayload !== null) {
+        setImmediate(() => flushPostQueue());
+      }
+    }
+  }
+
+  function queuePost(data) {
+    pendingPayload = data;
+    flushPostQueue();
+  }
+
+  function looksLikeThermalJson(data) {
+    if (!data || typeof data !== 'object') return false;
+    if (data.type === 'thermal_data') return true;
+    if (Array.isArray(data.thermal_data) && data.thermal_data.length === 8) return true;
+    if (Array.isArray(data.pixels) && data.pixels.length === 64) return true;
+    return false;
+  }
+
   function handleLine(line) {
     try {
       const data = JSON.parse(line.trim());
-      if (data.type === 'thermal_data') {
+      if (looksLikeThermalJson(data)) {
         const now = Date.now();
         if (now - lastLog > 5000) {
           const avgTemp = data.thermal_data
@@ -240,32 +332,9 @@ async function waitForApi() {
           console.log('📥 Received thermal data:', { avgTemp: `${avgTemp}°C`, gridSize: data.grid_size, timestamp: data.timestamp });
           lastLog = now;
         }
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        fetch(NEXTJS_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-          signal: controller.signal
-        }).then(res => {
-          clearTimeout(timeoutId);
-          if (res.ok) {
-            forwardStats.success++;
-            forwardStats.lastSuccess = new Date().toISOString();
-            if (forwardStats.success % 10 === 0) console.log('✅ Forwarded to Next.js API (every 10th):', { successCount: forwardStats.success, status: res.status });
-          } else {
-            forwardStats.failures++;
-            forwardStats.lastError = { status: res.status, statusText: res.statusText, timestamp: new Date().toISOString() };
-            console.error('❌ API returned error:', res.status, res.statusText);
-          }
-        }).catch(fetchError => {
-          clearTimeout(timeoutId);
-          forwardStats.failures++;
-          forwardStats.lastError = { message: fetchError.message, timestamp: new Date().toISOString() };
-          if (fetchError.name !== 'AbortError') console.error('❌ Error forwarding to API:', fetchError.message);
-        });
-      } else {
-        console.log('📥 Received:', data.type, data);
+        queuePost(data);
+      } else if (data.type) {
+        console.log('📥 Received (ignored):', data.type);
       }
     } catch (e) {
       if (line.trim().length > 0 && !line.trim().startsWith('✅') && !line.trim().startsWith('📡')) {

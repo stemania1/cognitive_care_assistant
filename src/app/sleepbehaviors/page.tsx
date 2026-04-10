@@ -300,7 +300,12 @@ export default function SleepBehaviors() {
   // Apply saved preference after mount (client-only)
   useEffect(() => {
     const saved = localStorage.getItem(THERMAL_CONNECTION_MODE_KEY) as ConnectionMode | null;
-    if (saved === "wifi" || saved === "usb" || saved === "bluetooth") {
+    if (
+      saved === "wifi" ||
+      saved === "usb" ||
+      saved === "bluetooth" ||
+      saved === "usb_serial"
+    ) {
       setThermalConnectionMode(saved);
       SENSOR_CONFIG.CONNECTION_MODE = saved;
     }
@@ -455,6 +460,13 @@ export default function SleepBehaviors() {
     setCurrentTemp(stats.average);
 
     totalFramesRef.current += 1;
+    if (totalFramesRef.current === 1 || totalFramesRef.current % 100 === 0) {
+      console.log("[SleepBehaviors] thermal pipeline", {
+        frame: totalFramesRef.current,
+        avgC: stats.average.toFixed(2),
+        rangeC: stats.range.toFixed(2),
+      });
+    }
     if (isRecording) {
       recordingTotalFramesRef.current += 1;
     }
@@ -1154,7 +1166,7 @@ export default function SleepBehaviors() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500">Connection:</span>
                       <div className="flex rounded-lg overflow-hidden border border-white/10">
-                        {(["wifi", "usb", "bluetooth"] as const).map((mode) => (
+                        {(["wifi", "usb", "bluetooth", "usb_serial"] as const).map((mode) => (
                           <button
                             key={mode}
                             type="button"
@@ -1171,7 +1183,13 @@ export default function SleepBehaviors() {
                                 : "bg-white/5 text-gray-400 hover:bg-white/10"
                             }`}
                           >
-                            {mode === "wifi" ? "Wi‑Fi" : mode === "usb" ? "USB" : "Bluetooth"}
+                            {mode === "wifi"
+                              ? "Wi‑Fi"
+                              : mode === "usb"
+                                ? "USB (Pi)"
+                                : mode === "bluetooth"
+                                  ? "Bluetooth"
+                                  : "USB serial"}
                           </button>
                         ))}
                       </div>

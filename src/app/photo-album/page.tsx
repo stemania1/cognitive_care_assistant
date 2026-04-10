@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
+import { ALBUM_TABLE_SETUP_MESSAGE } from "@/lib/album-photos-table";
 import { fetchDailyChecks, fetchAlbumPhotos } from "@/lib/supabase-queries";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
@@ -79,6 +80,7 @@ export default function PhotoAlbumPage() {
   const [albumType, setAlbumType] = useState<string>(ALBUM_PHOTO_TYPES[0].value);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [albumTableMissing, setAlbumTableMissing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
@@ -134,6 +136,8 @@ export default function PhotoAlbumPage() {
         }
       }
 
+      setAlbumTableMissing(Boolean(albumRes.tableMissing));
+
       merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setPhotos(merged);
     } catch (e) {
@@ -166,6 +170,7 @@ export default function PhotoAlbumPage() {
 
   const uploadFiles = async (files: FileList | File[]) => {
     if (!userId) return;
+    if (albumTableMissing) return;
     const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (list.length === 0) {
       alert("Please choose an image file.");
@@ -197,6 +202,9 @@ export default function PhotoAlbumPage() {
         });
         const saveJson = await save.json();
         if (!save.ok) {
+          if (saveJson.code === "ALBUM_TABLE_MISSING") {
+            setAlbumTableMissing(true);
+          }
           throw new Error(
             saveJson.error ||
               "Could not save photo to album. If this is the first time, create the database table (see supabase/migrations/015_create_album_photos_table.sql)."
@@ -298,32 +306,54 @@ export default function PhotoAlbumPage() {
 
           {!loading && userId && (
             <>
+              {albumTableMissing && (
+                <div
+                  className="mb-6 rounded-xl border border-amber-400/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100 sm:px-5"
+                  role="status"
+                >
+                  <p className="font-semibold text-amber-50">Album uploads need a database table</p>
+                  <p className="mt-2 leading-relaxed text-amber-100/90">{ALBUM_TABLE_SETUP_MESSAGE}</p>
+                  <p className="mt-2 font-mono text-xs text-amber-200/80">
+                    supabase/migrations/015_create_album_photos_table.sql
+                  </p>
+                </div>
+              )}
+
               <div
                 onDragEnter={(e) => {
                   e.preventDefault();
-                  setDragActive(true);
+                  if (!albumTableMissing) setDragActive(true);
                 }}
                 onDragLeave={(e) => {
                   e.preventDefault();
                   if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragActive(false);
                 }}
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={onDrop}
+                onDrop={albumTableMissing ? (e) => e.preventDefault() : onDrop}
                 className={`mb-8 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-colors sm:px-8 ${
-                  dragActive
-                    ? "border-cyan-400 bg-cyan-500/15"
-                    : "border-white/25 bg-white/5 hover:border-white/40"
+                  albumTableMissing
+                    ? "cursor-not-allowed border-white/15 bg-white/[0.03] opacity-75"
+                    : dragActive
+                      ? "border-cyan-400 bg-cyan-500/15"
+                      : "border-white/25 bg-white/5 hover:border-white/40"
                 }`}
               >
-                <p className="text-lg font-medium text-white mb-2">Drop photos here</p>
-                <p className="text-sm text-white/60 mb-4">or choose files — JPEG, PNG, WebP, etc. (max 5MB each)</p>
+                <p className="text-lg font-medium text-white mb-2">
+                  {albumTableMissing ? "Album drop-off paused" : "Drop photos here"}
+                </p>
+                <p className="text-sm text-white/60 mb-4">
+                  {albumTableMissing
+                    ? "Run the Supabase migration above to enable album saves. Daily question photos still appear below."
+                    : "or choose files — JPEG, PNG, WebP, etc. (max 5MB each)"}
+                </p>
                 <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
                   <label className="text-sm text-white/80">
                     <span className="mr-2">Type of photo</span>
                     <select
                       value={albumType}
                       onChange={(e) => setAlbumType(e.target.value)}
-                      className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-white outline-none focus:ring-2 focus:ring-cyan-500/50"
+                      disabled={albumTableMissing}
+                      className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-white outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {ALBUM_PHOTO_TYPES.map((t) => (
                         <option key={t.value} value={t.value} className="bg-slate-900">
@@ -342,7 +372,7 @@ export default function PhotoAlbumPage() {
                   />
                   <button
                     type="button"
-                    disabled={uploading}
+                    disabled={uploading || albumTableMissing}
                     onClick={() => fileInputRef.current?.click()}
                     className="rounded-full bg-cyan-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-cyan-600 disabled:opacity-50"
                   >

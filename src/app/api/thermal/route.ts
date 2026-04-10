@@ -5,50 +5,58 @@ import { getThermalData } from "@/lib/thermal-data-store";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  // First, check if we have Bluetooth data (more recent than 30 seconds)
-  const btData = getThermalData();
-  if (btData.data && btData.isConnected) {
-    // Convert timestamp to number if it's a string
-    const timestamp = typeof btData.data.timestamp === 'string'
-      ? new Date(btData.data.timestamp).getTime()
-      : btData.data.timestamp;
-    
-    return NextResponse.json({
-      ...btData.data,
-      timestamp: timestamp
-    }, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
-  }
-  
-  // Client requests "Bluetooth only" by not sending ip/port — never fall back to Pi (server doesn't know client's connection mode)
   const { searchParams } = new URL(request.url);
   const ipParam = searchParams.get("ip");
   const portParam = searchParams.get("port");
-  const wantsBluetoothOnly = ipParam == null && portParam == null;
 
-  if (wantsBluetoothOnly) {
-    return NextResponse.json({
-      status: 'no_data',
-      isConnected: false,
-      data: null,
-      timeSinceLastUpdate: btData.timeSinceLastUpdate
-    }, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+  /** Client is asking the server to proxy to a specific Pi (Wi‑Fi/USB). Must not be overridden by Bluetooth cache. */
+  const wantsPiProxy = ipParam != null && ipParam.length > 0;
+
+  // Bluetooth / in-memory store: only when the client did NOT ask for a specific Pi host
+  if (!wantsPiProxy) {
+    const btData = getThermalData();
+    if (btData.data && btData.isConnected) {
+      const timestamp =
+        typeof btData.data.timestamp === "string"
+          ? new Date(btData.data.timestamp).getTime()
+          : btData.data.timestamp;
+      console.log("[API Thermal] GET → serving bridge thermal store (BT/USB serial, no ip= in request)");
+      return NextResponse.json(
+        {
+          ...btData.data,
+          timestamp,
+        },
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        status: "no_data",
+        isConnected: false,
+        data: null,
+        timeSinceLastUpdate: btData.timeSinceLastUpdate,
       },
-    });
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
   }
 
-  // Fallback to WiFi/USB HTTP connection to Raspberry Pi (only when client sent ip/port)
+  // Proxy to Raspberry Pi HTTP (client sent ?ip=...&port=... or at least ip)
   const port = portParam ?? process.env.PI_PORT ?? String(SENSOR_CONFIG.HTTP_PORT);
   const primaryHost = ipParam ?? process.env.PI_HOST ?? getPiHost();
+  console.log(`[API Thermal] GET → proxying to Pi http://${primaryHost}:${port}/thermal-data`);
   const backupHost = SENSOR_CONFIG.RASPBERRY_PI_IP_BACKUP?.trim() || null;
   const hostsToTry = backupHost && backupHost !== primaryHost ? [primaryHost, backupHost] : [primaryHost];
 
@@ -77,6 +85,15 @@ export async function GET(request: Request) {
         }
 
         const data = await res.json();
+        const grid = data?.thermal_data;
+        const sample =
+          Array.isArray(grid) && Array.isArray(grid[0])
+            ? grid.flat().slice(0, 4)
+            : null;
+        console.log(`[API Thermal] Pi OK ${host}:${port}`, {
+          hasGrid: Boolean(grid),
+          sampleTemps: sample,
+        });
         if (isBackup) {
           console.log(`[API Thermal] Primary unreachable; using backup Pi at ${host}`);
         }
@@ -142,5 +159,3 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ error: 'No Pi host to try' }, { status: 500 });
 }
-
-

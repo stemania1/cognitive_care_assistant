@@ -1,80 +1,97 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { storeThermalData, getThermalData } from '@/lib/thermal-data-store';
+import { NextRequest, NextResponse } from "next/server";
+import { storeThermalData, getThermalData } from "@/lib/thermal-data-store";
+import {
+  normalizeIncomingThermalPayload,
+  validateMinMaxAgainstGrid,
+} from "@/lib/thermal-payload-normalize";
 
 export const runtime = "nodejs";
 
+const API_DEBUG =
+  process.env.THERMAL_API_DEBUG === "1" || process.env.THERMAL_API_DEBUG === "true";
+
 /**
- * POST endpoint to receive thermal data from Bluetooth receiver
- * Similar to /api/emg/ws for EMG data
+ * POST endpoint to receive thermal data from Bluetooth or USB serial bridge (MCU → PC → here).
+ * Raspberry Pi I2C path does not use this route; it uses GET /api/thermal?ip=... to proxy the Pi.
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    
-    // Validate required fields
-    if (!body.thermal_data || !Array.isArray(body.thermal_data)) {
-      return NextResponse.json(
-        { error: 'Invalid data: thermal_data is required and must be an array' },
-        { status: 400 }
-      );
+    const body = (await request.json()) as Record<string, unknown>;
+
+    if (API_DEBUG) {
+      const keys = Object.keys(body);
+      const preview =
+        typeof body.pixels === "object" && Array.isArray(body.pixels)
+          ? `[pixels:${(body.pixels as unknown[]).length}]`
+          : typeof body.thermal_data === "object"
+            ? `[thermal_data rows:${(body.thermal_data as unknown[]).length}]`
+            : "";
+      console.log("[API thermal/bt] POST received", { keys, preview });
     }
-    
-    // Convert ISO timestamp to number if needed
-    const timestamp = typeof body.timestamp === 'string' 
-      ? new Date(body.timestamp).getTime()
-      : (body.timestamp || Date.now());
-    
-    // Build thermal data object matching expected format
-    const thermalData = {
-      type: body.type || 'thermal_data',
-      timestamp: timestamp,
-      thermal_data: body.thermal_data,
-      sensor_info: body.sensor_info || {
-        model: 'AMG8833',
-        temperature_unit: 'C',
-        data_source: 'sensor'
-      },
-      grid_size: body.grid_size || { width: 8, height: 8 },
-      status: body.status || 'active'
-    };
-    
-    // Store in memory
+
+    const normalized = normalizeIncomingThermalPayload(body);
+    if (!normalized.ok) {
+      console.warn("[API thermal/bt] normalize failed:", normalized.error, {
+        keys: Object.keys(body),
+      });
+      return NextResponse.json({ error: normalized.error }, { status: 400 });
+    }
+
+    const thermalData = normalized.data;
+    if (
+      thermalData.min !== undefined &&
+      thermalData.max !== undefined &&
+      !validateMinMaxAgainstGrid(thermalData.thermal_data, thermalData.min, thermalData.max)
+    ) {
+      console.warn("[API thermal/bt] min/max mismatch vs grid (accepted frame)", {
+        reportedMin: thermalData.min,
+        reportedMax: thermalData.max,
+      });
+    }
+
     storeThermalData(thermalData);
-    
+
     const stored = getThermalData();
-    
-    console.log('✅ Thermal data stored via Bluetooth:', {
-      timestamp: new Date(timestamp).toISOString(),
-      gridSize: thermalData.grid_size,
+
+    const flat = thermalData.thermal_data.flat();
+    const avgTemp = flat.reduce((a, b) => a + b, 0) / flat.length;
+    console.log("[API thermal/bt] frame stored", {
+      source: "POST",
+      gridOk: true,
+      avgTemp,
+      min: Math.min(...flat),
+      max: Math.max(...flat),
       isConnected: stored.isConnected,
-      timeSinceLastUpdate: stored.timeSinceLastUpdate < Infinity 
-        ? `${(stored.timeSinceLastUpdate / 1000).toFixed(1)}s` 
-        : 'N/A'
+      ...(API_DEBUG ? { sensor_info: thermalData.sensor_info } : {}),
     });
-    
-    return NextResponse.json({
-      status: 'received',
-      timestamp: Date.now(),
-      isConnected: stored.isConnected
-    }, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
-  } catch (error: any) {
-    console.error('❌ Error processing thermal data:', error);
+
     return NextResponse.json(
-      { 
-        error: 'Invalid JSON or data format',
-        details: error.message 
+      {
+        status: "received",
+        timestamp: Date.now(),
+        isConnected: stored.isConnected,
       },
-      { 
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[API thermal/bt] Error processing thermal data:", message);
+    return NextResponse.json(
+      {
+        error: "Invalid JSON or data format",
+        details: message,
+      },
+      {
         status: 400,
         headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
         },
       }
     );
@@ -83,46 +100,51 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET endpoint to retrieve latest thermal data
- * Similar to /api/emg/data for EMG data
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const data = getThermalData();
-    
+
     if (!data.data) {
-      return NextResponse.json({
-        status: 'no_data',
-        isConnected: false,
-        data: null,
-        timeSinceLastUpdate: Infinity
-      }, {
+      return NextResponse.json(
+        {
+          status: "no_data",
+          isConnected: false,
+          data: null,
+          timeSinceLastUpdate: Infinity,
+        },
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        status: "success",
+        ...data.data,
+        isConnected: data.isConnected,
+        timeSinceLastUpdate: data.timeSinceLastUpdate,
+        lastUpdateTime: data.lastUpdateTime,
+      },
+      {
         status: 200,
         headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
         },
-      });
-    }
-    
-    return NextResponse.json({
-      status: 'success',
-      ...data.data,
-      isConnected: data.isConnected,
-      timeSinceLastUpdate: data.timeSinceLastUpdate,
-      lastUpdateTime: data.lastUpdateTime
-    }, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
-  } catch (error: any) {
-    console.error('❌ Error getting thermal data:', error);
+      }
+    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[API thermal/bt] GET error:", message);
     return NextResponse.json(
-      { error: 'Failed to get thermal data', details: error.message },
+      { error: "Failed to get thermal data", details: message },
       { status: 500 }
     );
   }
 }
-

@@ -56,6 +56,7 @@ export default function ThermalVisualization({
   const recentFramesRef = useRef<number[][][]>([]);
   const FRAMES_TO_AVERAGE = 5;
   const isPollingRef = useRef(false); // Guard to prevent concurrent polling requests
+  const frontendFrameCountRef = useRef(0);
 
   const applyCalibration = (frame: number[][]): number[][] => {
     if (!USE_BASELINE) return frame;
@@ -242,21 +243,53 @@ export default function ThermalVisualization({
             if (dataTimeout) {
               clearTimeout(dataTimeout);
             }
-            
-            console.log('📊 Received WebSocket data:', event.data.substring(0, 100) + '...');
-            
-            const data: ThermalData = JSON.parse(event.data);
-            if (data.type === 'thermal_data') {
-              const calibrated = applyCalibration(data.thermal_data);
+
+            const raw = JSON.parse(event.data) as ThermalData & {
+              thermal_data?: number[][];
+              data?: number[][];
+            };
+            // Pi server (raspberry_pi_thermal_server.py) omits `type`; accept any payload with an 8×8 grid
+            const grid = raw.thermal_data ?? raw.data;
+            const preview =
+              typeof event.data === "string"
+                ? `${event.data.slice(0, 120)}${event.data.length > 120 ? "…" : ""}`
+                : "";
+            console.log("[Thermal WS] frame:", preview);
+
+            if (
+              grid &&
+              Array.isArray(grid) &&
+              grid.length > 0 &&
+              Array.isArray(grid[0]) &&
+              grid[0].length > 0
+            ) {
+              const data: ThermalData = {
+                ...raw,
+                type: raw.type ?? "thermal_data",
+                thermal_data: grid,
+              };
+              const calibrated = applyCalibration(grid);
               const denoised = denoiseFrame(calibrated);
               const smoothedData = smoothThermalData(denoised);
               setThermalData(smoothedData);
-              setSensorInfo(data.sensor_info);
+              setSensorInfo(raw.sensor_info ?? null);
               setLastUpdate(new Date());
+              frontendFrameCountRef.current += 1;
+              if (
+                frontendFrameCountRef.current <= 3 ||
+                frontendFrameCountRef.current % 30 === 0
+              ) {
+                console.log("[ThermalViz] frame applied (ws)", {
+                  frame: frontendFrameCountRef.current,
+                  mode: SENSOR_CONFIG.CONNECTION_MODE,
+                });
+              }
               onDataReceivedRef.current(data);
+            } else {
+              console.warn("[Thermal WS] skipped message (no thermal_data grid):", raw);
             }
           } catch (error) {
-            console.error('Error parsing WebSocket data:', error);
+            console.error("Error parsing WebSocket data:", error);
           }
         };
 
@@ -501,6 +534,18 @@ export default function ThermalVisualization({
           setThermalData(smoothedData);
           setSensorInfo(data?.sensor_info ?? null);
           setLastUpdate(new Date());
+          frontendFrameCountRef.current += 1;
+          if (
+            frontendFrameCountRef.current <= 3 ||
+            frontendFrameCountRef.current % 30 === 0
+          ) {
+            console.log("[ThermalViz] frame applied (poll)", {
+              frame: frontendFrameCountRef.current,
+              mode: SENSOR_CONFIG.CONNECTION_MODE,
+              min: Math.min(...grid.flat()),
+              max: Math.max(...grid.flat()),
+            });
+          }
           onDataReceivedRef.current({ ...data, thermal_data: grid, type: data?.type ?? 'thermal_data' } as ThermalData);
         } else {
           if (lastConnectionStatus.current !== 'disconnected') {
@@ -550,11 +595,13 @@ export default function ThermalVisualization({
   };
 
   const connectionMethodLabel =
-    SENSOR_CONFIG.CONNECTION_MODE === 'usb' ? 'USB' :
-    SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? 'Bluetooth' : 'Wi‑Fi';
+    SENSOR_CONFIG.CONNECTION_MODE === 'usb' ? 'USB (Pi)' :
+    SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? 'Bluetooth' :
+    SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial' ? 'USB serial (MCU bridge)' : 'Wi‑Fi';
   const connectionMethodIcon =
     SENSOR_CONFIG.CONNECTION_MODE === 'usb' ? '🔌' :
-    SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? '📡' : '📶';
+    SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? '📡' :
+    SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial' ? '🔌' : '📶';
 
   const getStatusText = () => {
     switch (connectionStatus) {
@@ -581,7 +628,9 @@ export default function ThermalVisualization({
               <span>Via {connectionMethodLabel}</span>
             </span>
           )}
-          {connectionStatus === 'connected' && SENSOR_CONFIG.CONNECTION_MODE !== 'bluetooth' && (
+          {connectionStatus === 'connected' &&
+            SENSOR_CONFIG.CONNECTION_MODE !== 'bluetooth' &&
+            SENSOR_CONFIG.CONNECTION_MODE !== 'usb_serial' && (
             <span className="text-xs text-gray-400">
               {connectionSource ? (
                 <>
@@ -599,9 +648,28 @@ export default function ThermalVisualization({
           </span>
         )}
       </div>
-      {SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' && connectionStatus !== 'connected' && (
-        <div className="text-xs text-gray-400 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
-          Bluetooth mode active — waiting for data from <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code>.
+      {(SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' || SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial') &&
+        connectionStatus !== 'connected' && (
+        <div className="text-xs text-gray-300 bg-white/5 border border-white/10 rounded-lg px-3 py-2 space-y-2">
+          <p>
+            <strong className="text-gray-200">Bridge mode (Bluetooth or USB serial).</strong>{' '}
+            Run the Node receiver so it POSTs frames to <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code>
+            — no Raspberry Pi IP.
+          </p>
+          {SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' ? (
+            <p className="text-gray-400">
+              <strong className="text-gray-300">Bluetooth:</strong> run <code className="bg-black/20 px-1 rounded">node bluetooth-thermal-receiver.js</code>{' '}
+              (or your project&apos;s Bluetooth bridge).
+            </p>
+          ) : (
+            <p className="text-gray-400">
+              <strong className="text-gray-300">USB serial:</strong> run <code className="bg-black/20 px-1 rounded">npm run thermal:usb</code> or{' '}
+              <code className="bg-black/20 px-1 rounded">node usb-serial-thermal-receiver.js</code> (MCU →{' '}
+              <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code>). Set <code className="bg-black/20 px-1 rounded">SERIAL_PORT</code> /{' '}
+              <code className="bg-black/20 px-1 rounded">BAUD_RATE</code> if auto-detect fails. See{' '}
+              <code className="bg-black/20 px-1 rounded">docs/USB_THERMAL_SERIAL.md</code>.
+            </p>
+          )}
         </div>
       )}
 
@@ -638,14 +706,12 @@ export default function ThermalVisualization({
         </div>
       </div>
 
-      {/* Connection Instructions */}
-      {connectionStatus === 'disconnected' && (
+      {/* Connection Instructions (Pi / discovery only — bridge help is in the box above) */}
+      {connectionStatus === 'disconnected' &&
+        !(discoveredIP === BLUETOOTH_SENTINEL &&
+          (SENSOR_CONFIG.CONNECTION_MODE === 'bluetooth' || SENSOR_CONFIG.CONNECTION_MODE === 'usb_serial')) && (
         <div className="text-xs text-yellow-400 bg-yellow-400/10 p-3 rounded-lg">
-          {discoveredIP === BLUETOOTH_SENTINEL ? (
-            <>
-              <strong>Bluetooth or USB mode.</strong> Use a bridge that POSTs thermal data to <code className="bg-black/20 px-1 rounded">/api/thermal/bt</code> — no Pi IP needed.
-            </>
-          ) : discoveredIP ? (
+          {discoveredIP ? (
             <>
               <strong>Setup Required:</strong>{' '}
               Raspberry Pi found at: <code className="bg-black/20 px-1 rounded">{discoveredIP}</code>
@@ -655,7 +721,7 @@ export default function ThermalVisualization({
           ) : (
             <>
               <strong>Setup Required:</strong>{' '}
-              Update the IP address in <code className="bg-black/20 px-1 rounded">src/app/config/sensor-config.ts</code> to match your Raspberry Pi's IP address.
+              Update the IP address in <code className="bg-black/20 px-1 rounded">src/app/config/sensor-config.ts</code> to match your Raspberry Pi&apos;s IP address.
               <br />
               Current: <code className="bg-black/20 px-1 rounded">{SENSOR_CONFIG.RASPBERRY_PI_IP}</code>
             </>

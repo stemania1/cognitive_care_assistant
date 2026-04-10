@@ -208,12 +208,21 @@ export async function fetchDailyChecks(
  */
 export async function fetchAlbumPhotos(
   userId: string
-): Promise<{ data: AlbumPhoto[] | null; error: string | null }> {
+): Promise<{
+  data: AlbumPhoto[] | null;
+  error: string | null;
+  /** True when GET succeeded but album_photos is not created in Supabase yet */
+  tableMissing?: boolean;
+}> {
   try {
     const response = await fetch(`/api/album-photos?userId=${encodeURIComponent(userId)}`);
     const result = await response.json();
     if (response.ok && Array.isArray(result.data)) {
-      return { data: result.data, error: null };
+      return {
+        data: result.data,
+        error: null,
+        tableMissing: Boolean(result.warning?.includes?.("album_photos")),
+      };
     }
     return {
       data: null,

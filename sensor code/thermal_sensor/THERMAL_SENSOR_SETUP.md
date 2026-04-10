@@ -210,4 +210,8 @@ If you encounter issues:
 
 The system includes comprehensive error handling and will guide you through the setup process with helpful messages.
 
+## See also
+
+- **[AMG8833 troubleshooting checklist](../../docs/AMG8833_THERMAL_CHECKLIST.md)** — wiring, `i2cdetect`, standalone Python test, and common app integration issues.
+
 
