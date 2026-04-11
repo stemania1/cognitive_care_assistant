@@ -25,7 +25,7 @@
     "copyright-deposit": "node scripts/generate-copyright-deposit.js"
   },
   "dependencies": {
-    "@clerk/localizations": "^4.3.0",
+    "@clerk/localizations": "^4.4.0",
     "@clerk/nextjs": "^6.36.7",
     "@hcaptcha/react-hcaptcha": "^1.14.0",
     "@serialport/parser-readline": "^13.0.0",

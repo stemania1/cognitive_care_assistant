@@ -238,14 +238,41 @@ async function sniffRawBytes(portName, baud, ms) {
 /** @returns {Promise<{ path: string, baud: number, delim: string } | null>} */
 async function autoDetectPort() {
   console.log("[thermal-usb] auto-detect: scanning for valid thermal lines (JSON or 64-value CSV)…\n");
-  const ports = await printDetailedPorts();
+
+  const isPiGadget = (p) => p.vendorId === "0525" && p.productId === "A4A7";
+  const RETRY_INTERVAL_MS = 3000;
+  const MAX_RETRIES = parseInt(process.env.THERMAL_PORT_SCAN_RETRIES || "10", 10);
+
+  let ports = await printDetailedPorts();
+
+  if (ports.length === 0 && MAX_RETRIES > 0) {
+    console.log(`[thermal-usb] no ports yet — retrying up to ${MAX_RETRIES} times (every ${RETRY_INTERVAL_MS / 1000}s)…`);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      await new Promise((r) => setTimeout(r, RETRY_INTERVAL_MS));
+      ports = await SerialPort.list();
+      if (ports.length > 0) {
+        console.log(`[thermal-usb] found ${ports.length} port(s) on retry ${attempt}.`);
+        await printDetailedPorts();
+        break;
+      }
+      console.log(`[thermal-usb] retry ${attempt}/${MAX_RETRIES} — still 0 ports…`);
+    }
+  }
+
   if (ports.length === 0) {
     console.error("[thermal-usb] no serial ports found.");
     return null;
   }
+
+  const piPort = ports.find(isPiGadget);
+  if (piPort) {
+    console.log(`[thermal-usb] detected Raspberry Pi USB gadget on ${piPort.path} (VID 0525 / PID A4A7) — using directly.\n`);
+    return { path: piPort.path, baud: DEFAULT_BAUD, delim: READLINE_DELIM };
+  }
+
   const isEsp32Adapter = (p) => {
     const desc = [p.manufacturer || "", p.friendlyName || "", p.pnpId || ""].join(" ").toLowerCase();
-    return /ch340|ch341|cp210|ftdi|silicon.lab|esp32|wch/i.test(desc) && !(p.vendorId === "0525" && p.productId === "A4A7");
+    return /ch340|ch341|cp210|ftdi|silicon.lab|esp32|wch/i.test(desc);
   };
   const sorted = sortPortsUsbLikelyFirst(ports).filter((p) => !isEsp32Adapter(p));
 

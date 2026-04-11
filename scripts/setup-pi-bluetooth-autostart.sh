@@ -16,7 +16,7 @@ Requires=bluetooth.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'sleep 3; /usr/bin/bluetoothctl -- power on; sleep 2; /usr/bin/bluetoothctl -- discoverable on; /usr/bin/bluetoothctl -- pairable on'
+ExecStart=/bin/sh -c 'sleep 3; /usr/bin/bluetoothctl -- power on; sleep 2; /usr/bin/bluetoothctl -- discoverable-timeout 0; /usr/bin/bluetoothctl -- discoverable on; /usr/bin/bluetoothctl -- pairable on'
 RemainAfterExit=yes
 
 [Install]
