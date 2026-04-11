@@ -24,6 +24,9 @@ interface MyoWareDevice {
   lastSeen: number;
 }
 
+type EmgConnectionMode = 'wifi' | 'usb_serial';
+const EMG_CONNECTION_MODE_KEY = 'emg-connection-mode';
+
 export default function MyoWareClient({ onDataReceived, onConnectionChange, deviceConnected }: MyoWareClientProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
@@ -31,7 +34,7 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
   const [calibrationData, setCalibrationData] = useState<{ min: number; max: number } | null>(null);
   const [discoveredDevices, setDiscoveredDevices] = useState<MyoWareDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<MyoWareDevice | null>(null);
-  const [connectionMode] = useState<'wifi'>('wifi');
+  const [connectionMode, setConnectionMode] = useState<EmgConnectionMode>('wifi');
   const [commandStatus, setCommandStatus] = useState<string>('');
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [isTransmitting, setIsTransmitting] = useState(false);
@@ -42,6 +45,23 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
   const lastConnectionChange = useRef<number>(0);
   const connectionChangeCount = useRef<number>(0);
 
+  // Read persisted EMG connection mode
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(EMG_CONNECTION_MODE_KEY) as EmgConnectionMode | null;
+      if (stored === 'wifi' || stored === 'usb_serial') {
+        setConnectionMode(stored);
+      }
+    } catch {}
+  }, []);
+
+  function changeConnectionMode(mode: EmgConnectionMode) {
+    setConnectionMode(mode);
+    try {
+      localStorage.setItem(EMG_CONNECTION_MODE_KEY, mode);
+    } catch {}
+  }
+
   // Determine server URL based on environment
   useEffect(() => {
     const isProduction = window.location.hostname !== 'localhost';
@@ -50,9 +70,11 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
       : `http://localhost:${window.location.port}`;
     setServerUrl(url);
     
-    // Auto-discover devices on mount
-    discoverDevices();
-  }, []);
+    // Auto-discover devices on mount (WiFi mode only)
+    if (connectionMode === 'wifi') {
+      discoverDevices();
+    }
+  }, [connectionMode]);
 
   // Handle parent connection status changes
   useEffect(() => {
@@ -381,11 +403,31 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
 
   return (
     <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-      <h3 className="text-lg font-medium text-white mb-4">MyoWare 2.0 Wireless Connection</h3>
+      <h3 className="text-lg font-medium text-white mb-4">MyoWare 2.0 Connection</h3>
       
-      {/* Connection Mode Label */}
-      <div className="mb-4">
-        <span className="px-3 py-1 rounded text-sm bg-blue-500 text-white">WiFi Direct</span>
+      {/* Connection Mode Toggle */}
+      <div className="mb-4 flex items-center gap-2">
+        <span className="text-xs text-gray-400 mr-1">Mode:</span>
+        <button
+          onClick={() => changeConnectionMode('wifi')}
+          className={`px-3 py-1 rounded text-sm transition-colors ${
+            connectionMode === 'wifi'
+              ? 'bg-blue-500 text-white'
+              : 'bg-white/10 text-gray-400 hover:bg-white/15'
+          }`}
+        >
+          Wi-Fi
+        </button>
+        <button
+          onClick={() => changeConnectionMode('usb_serial')}
+          className={`px-3 py-1 rounded text-sm transition-colors ${
+            connectionMode === 'usb_serial'
+              ? 'bg-emerald-500 text-white'
+              : 'bg-white/10 text-gray-400 hover:bg-white/15'
+          }`}
+        >
+          USB
+        </button>
       </div>
       
       {/* Connection Status */}
@@ -396,11 +438,13 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
           'bg-red-400'
         }`} />
         <span className="text-sm text-gray-300">
-          {effectiveStatus === 'connected' ? 'Connected' :
-           effectiveStatus === 'connecting' ? 'Connecting...' :
-           'Disconnected'}
+          {effectiveStatus === 'connected'
+            ? `Connected via ${connectionMode === 'usb_serial' ? 'USB' : 'Wi-Fi'}`
+            : effectiveStatus === 'connecting'
+              ? 'Connecting...'
+              : 'Disconnected'}
         </span>
-        {selectedDevice && (
+        {connectionMode === 'wifi' && selectedDevice && (
           <span className="text-xs text-blue-300">
             ({selectedDevice.name} - {selectedDevice.ip})
           </span>
@@ -409,25 +453,38 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
 
       {/* Connection Controls */}
       <div className="flex gap-2 mb-4">
-        {!deviceOnline ? (
-          <button
-            onClick={discoverDevices}
-            disabled={connectionStatus === 'connecting'}
-            className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {connectionStatus === 'connecting' ? 'Discovering...' : 'Discover Devices'}
-          </button>
-        ) : (
-          <button
-            onClick={disconnectFromServer}
-            className="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-sm rounded-lg hover:from-red-600 hover:to-pink-600 transition-all duration-200"
-          >
-            Disconnect
-          </button>
+        {connectionMode === 'wifi' && (
+          !deviceOnline ? (
+            <button
+              onClick={discoverDevices}
+              disabled={connectionStatus === 'connecting'}
+              className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {connectionStatus === 'connecting' ? 'Discovering...' : 'Discover Devices'}
+            </button>
+          ) : (
+            <button
+              onClick={disconnectFromServer}
+              className="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-sm rounded-lg hover:from-red-600 hover:to-pink-600 transition-all duration-200"
+            >
+              Disconnect
+            </button>
+          )
         )}
       </div>
 
-      {/* Discovered Devices */}
+      {/* USB Mode Info */}
+      {connectionMode === 'usb_serial' && !deviceOnline && (
+        <div className="mb-4 text-xs text-gray-300 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+          <p>
+            <strong className="text-gray-200">USB mode.</strong>{' '}
+            The bridge starts automatically with <code className="bg-black/20 px-1 rounded">npm run dev</code>.
+            Make sure the ESP32 is plugged in via USB.
+          </p>
+        </div>
+      )}
+
+      {/* Discovered Devices (WiFi only) */}
       {connectionMode === 'wifi' && discoveredDevices.length > 0 && (
         <div className="mb-4">
           <h4 className="text-sm font-medium text-gray-300 mb-2">Discovered Devices:</h4>
@@ -601,13 +658,23 @@ export default function MyoWareClient({ onDataReceived, onConnectionChange, devi
       {/* Instructions */}
       <div className="mt-4 p-3 rounded-lg bg-gray-500/10 border border-gray-500/20">
         <h4 className="text-sm font-medium text-gray-200 mb-2">Setup Instructions:</h4>
-        <ol className="text-xs text-gray-300 space-y-1">
-          <li>1. Upload the MyoWare client code to your Arduino</li>
-          <li>2. Connect MyoWare 2.0 sensor to analog pin A0</li>
-          <li>3. Attach MyoWare Wireless Shield</li>
-          <li>4. Power on the ESP32 and wait for WiFi connection</li>
-          <li>5. Click "Connect" above to establish WebSocket connection</li>
-        </ol>
+        {connectionMode === 'usb_serial' ? (
+          <ol className="text-xs text-gray-300 space-y-1">
+            <li>1. Upload the MyoWare firmware to the ESP32</li>
+            <li>2. Connect MyoWare 2.0 sensor to analog pin A0</li>
+            <li>3. Plug the ESP32 into a USB port on this computer</li>
+            <li>4. Run <code className="bg-black/20 px-1 rounded">npm run dev</code> &mdash; the USB bridge auto-detects the COM port</li>
+            <li>5. Data will appear here automatically once the bridge connects</li>
+          </ol>
+        ) : (
+          <ol className="text-xs text-gray-300 space-y-1">
+            <li>1. Upload the MyoWare client code to your Arduino</li>
+            <li>2. Connect MyoWare 2.0 sensor to analog pin A0</li>
+            <li>3. Attach MyoWare Wireless Shield</li>
+            <li>4. Power on the ESP32 and wait for WiFi connection</li>
+            <li>5. Click &ldquo;Discover Devices&rdquo; above to find the sensor</li>
+          </ol>
+        )}
       </div>
     </div>
   );
