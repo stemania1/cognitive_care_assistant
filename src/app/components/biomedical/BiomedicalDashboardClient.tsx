@@ -18,6 +18,7 @@ import { useBiomedicalTelemetry } from "./useBiomedicalTelemetry";
 import { BrainRegionHoverTooltip } from "./brain/BrainRegionHoverTooltip";
 import { buildBrainTooltipModel } from "./brain/brainHoverTooltipModel";
 import type { BrainRegionId, CognitiveDomain } from "./brain/regionConfig";
+import { BiomarkerIntelligenceSection } from "./biomarker/BiomarkerIntelligenceSection";
 
 /** Single brain viewport: fixed height band so the WebGL canvas never drives layout overflow or full-viewport assumptions. */
 const BRAIN_PANEL_HEIGHT = "min(600px, 65vh)";
@@ -192,7 +193,12 @@ export function BiomedicalDashboardClient() {
       </header>
 
       <main className="mx-auto flex min-h-0 w-full max-w-[1920px] flex-1 flex-col gap-6 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-        <section className="grid min-h-0 grid-cols-1 gap-6 xl:grid-cols-12 xl:items-stretch xl:gap-8">
+        <BiomarkerIntelligenceSection />
+
+        <section
+          id="brain-region-mapping"
+          className="grid min-h-0 grid-cols-1 gap-6 xl:grid-cols-12 xl:items-stretch xl:gap-8"
+        >
           <div className="flex min-h-0 min-w-0 max-w-full flex-col gap-4 border-cyan-500/10 xl:col-span-9 xl:border-r xl:border-white/[0.06] xl:pr-8">
             <div className="space-y-1">
               <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-400/90">{BRAIN_HERO_TITLE}</p>
@@ -304,7 +310,7 @@ export function BiomedicalDashboardClient() {
             </div>
           </div>
 
-          <aside className="flex min-h-0 w-full min-w-0 flex-col gap-6 xl:col-span-3">
+          <aside id="clinical-intelligence" className="flex min-h-0 w-full min-w-0 flex-col gap-6 xl:col-span-3">
             <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/95 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.45)]">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
                 <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300">Clinical intelligence</h2>
@@ -378,7 +384,7 @@ export function BiomedicalDashboardClient() {
           </aside>
         </section>
 
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-stretch">
+        <section id="multimodal-telemetry" className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-stretch">
           <TelemetryPanel title="Surface EMG" subtitle="Envelope · sim" badge="Live sim">
             <EmgWaveformPanel series={emgSeries} />
           </TelemetryPanel>
