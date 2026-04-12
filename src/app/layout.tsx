@@ -179,14 +179,7 @@ export default function RootLayout({
 
   return (
     <ClerkProviderWithPathLocalization>
-      <html lang="en" suppressHydrationWarning>
-        <head>
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `!function(){try{var t=localStorage.getItem("cca-theme");if(t==="light")document.documentElement.classList.remove("dark");else document.documentElement.classList.add("dark");}catch(e){document.documentElement.classList.add("dark");}}();`,
-            }}
-          />
-        </head>
+      <html lang="en" suppressHydrationWarning className="dark">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >

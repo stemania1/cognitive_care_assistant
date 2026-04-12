@@ -3,11 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAlertCenter } from "./AlertCenter";
-import { readThemeIsDark, setThemeIsDark } from "@/lib/themePreference";
 
 export function DashboardSettingsMenu() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isDark, setIsDark] = useState(true);
   const { alerts, setAlertsPanelOpen } = useAlertCenter();
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -15,10 +13,6 @@ export function DashboardSettingsMenu() {
     () => alerts.filter((a) => !a.acknowledged).length,
     [alerts]
   );
-
-  useEffect(() => {
-    setIsDark(readThemeIsDark());
-  }, [menuOpen]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -30,12 +24,6 @@ export function DashboardSettingsMenu() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
-
-  const toggleDarkMode = useCallback(() => {
-    const next = !readThemeIsDark();
-    setThemeIsDark(next);
-    setIsDark(next);
-  }, []);
 
   const openAlerts = useCallback(() => {
     setMenuOpen(false);
@@ -75,26 +63,6 @@ export function DashboardSettingsMenu() {
             <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Settings
             </p>
-
-            <div className="light-ui-frame flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-white/5">
-              <span className="text-sm font-medium text-slate-800 dark:text-slate-100">Dark mode</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isDark}
-                onClick={toggleDarkMode}
-                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 ${
-                  isDark ? "bg-violet-600" : "bg-slate-300 dark:bg-slate-600"
-                }`}
-                aria-label={isDark ? "Dark mode on" : "Dark mode off"}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    isDark ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
 
             <button
               type="button"

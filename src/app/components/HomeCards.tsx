@@ -75,6 +75,23 @@ export default function HomeCards() {
         accent="from-green-500 to-emerald-500"
         emoji="🧠"
       />
+
+      {/* Row 4: Biomedical + BrainNet */}
+      <LinkCard
+        href="/dashboard/biomedical"
+        title="Biomedical Monitor"
+        description="Vitals, brain mapping, and multimodal telemetry"
+        accent="from-sky-500 to-cyan-600"
+        emoji="🩺"
+      />
+
+      <LinkCard
+        href="/brainnet"
+        title="BrainNet Diagram"
+        description="Sensors → AI → care flow overview"
+        accent="from-blue-500 to-indigo-600"
+        emoji="🕸️"
+      />
       </div>
 
       <Link href="/ai-synopsis" className="block">

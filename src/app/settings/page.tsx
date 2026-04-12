@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { readThemeIsDark, setThemeIsDark } from "@/lib/themePreference";
 import { SENSOR_CONFIG, type ConnectionMode } from "@/app/config/sensor-config";
 
 const CONNECTION_MODE_KEY = "thermal-connection-mode";
@@ -57,21 +56,13 @@ export default function SettingsPage() {
 /* ------------------------------------------------------------------ */
 
 function DisplayPreferencesSection() {
-  const [isDark, setIsDark] = useState(true);
   const [tempUnit, setTempUnit] = useState<"C" | "F">("C");
 
   useEffect(() => {
-    setIsDark(readThemeIsDark());
     try {
       const stored = localStorage.getItem(TEMP_UNIT_KEY);
       if (stored === "F") setTempUnit("F");
     } catch {}
-  }, []);
-
-  const toggleDarkMode = useCallback(() => {
-    const next = !readThemeIsDark();
-    setThemeIsDark(next);
-    setIsDark(next);
   }, []);
 
   function handleTempUnit(unit: "C" | "F") {
@@ -84,10 +75,6 @@ function DisplayPreferencesSection() {
 
   return (
     <Section title="Display Preferences" icon={<SunIcon />}>
-      <SettingRow label="Dark mode">
-        <Toggle checked={isDark} onChange={toggleDarkMode} label="Dark mode" />
-      </SettingRow>
-
       <SettingRow label="Temperature unit">
         <SegmentedControl
           options={[
@@ -627,35 +614,6 @@ function SettingRow({
       <span className="text-sm font-medium">{label}</span>
       {children}
     </div>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={onChange}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 ${
-        checked ? "bg-violet-600" : "bg-slate-300 dark:bg-slate-600"
-      }`}
-      aria-label={label}
-    >
-      <span
-        className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0"
-        }`}
-      />
-    </button>
   );
 }
 

@@ -121,8 +121,8 @@ export function DementiaCareSidebar({
   onLayoutChange?: (sidebarWidthPx: number) => void;
 }) {
   const [isMd, setIsMd] = useState(false);
-  /** Entire rail hidden (0 layout width); use Open guide to show again. */
-  const [desktopRailOpen, setDesktopRailOpen] = useState(true);
+  /** Desktop rail starts closed; opens only when the user taps “Open guide” / “Guide”. */
+  const [desktopRailOpen, setDesktopRailOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {

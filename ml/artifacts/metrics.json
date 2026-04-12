@@ -1,0 +1,27 @@
+{
+  "n_train": 450,
+  "n_test": 150,
+  "classification_report": "              precision    recall  f1-score   support\n\n      Normal      0.893     1.000     0.943        50\n   Mild Risk      0.935     0.860     0.896        50\n   High Risk      0.979     0.940     0.959        50\n\n    accuracy                          0.933       150\n   macro avg      0.936     0.933     0.933       150\nweighted avg      0.936     0.933     0.933       150\n",
+  "confusion_matrix": [
+    [
+      50,
+      0,
+      0
+    ],
+    [
+      6,
+      43,
+      1
+    ],
+    [
+      0,
+      3,
+      47
+    ]
+  ],
+  "feature_names": [
+    "emg_variability",
+    "hr_trend_slope",
+    "temp_anomaly"
+  ]
+}

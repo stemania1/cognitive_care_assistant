@@ -1,4 +1,9 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** Absolute project root (next.config lives here). Fixes Turbopack picking a parent folder when multiple lockfiles exist. */
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   serverExternalPackages: [
@@ -39,7 +44,9 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
-  turbopack: {},
+  turbopack: {
+    root: projectRoot,
+  },
 };
 
 export default nextConfig;
