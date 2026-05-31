@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { getAllUserIdsForQuery } from '@/lib/user-id-mapping';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,10 +18,11 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
+    const userIds = await getAllUserIdsForQuery(userId);
     const { data, error } = await supabaseAdmin
       .from('daily_check_sessions')
       .select('*')
-      .eq('user_id', userId)
+      .in('user_id', userIds)
       .order('created_at', { ascending: false })
       .limit(limit);
 

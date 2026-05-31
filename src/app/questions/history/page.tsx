@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useHistoricalData } from "@/hooks/useHistoricalData";
 import { isGuestUser, getGuestUserId } from "@/lib/guestDataManager";
-import { supabase, safeGetUser } from "@/lib/supabaseClient";
 import { ALL_QUESTIONS } from "@/constants/questions";
 import { DailyCheckSession, RecentAnswer } from "@/types/daily-questions";
 import { exportCSV } from "@/utils/csv-export";
 
 export default function QuestionsHistoryPage() {
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const [userId, setUserId] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -21,31 +22,30 @@ export default function QuestionsHistoryPage() {
   useEffect(() => {
     async function initializeUser() {
       try {
+        if (!clerkLoaded) {
+          return;
+        }
+
         const guestStatus = await isGuestUser();
         setIsGuest(guestStatus);
-        
+
         if (guestStatus) {
           const guestUserId = getGuestUserId();
           setUserId(guestUserId);
+        } else if (clerkUser?.id) {
+          setUserId(clerkUser.id);
         } else {
-          // For regular users, get the actual user ID from Supabase
-          const { user } = await safeGetUser();
-          if (user?.id) {
-            setUserId(user.id);
-          } else {
-            console.error('No user ID found for regular user');
-            setUserId(null);
-          }
+          setUserId(null);
         }
       } catch (error) {
-        console.error('Error initializing user:', error);
-    } finally {
-      setLoading(false);
+        console.error("Error initializing user:", error);
+      } finally {
+        setLoading(false);
+      }
     }
-  }
 
     initializeUser();
-  }, []);
+  }, [clerkUser, clerkLoaded]);
 
   useEffect(() => {
     if (userId) {

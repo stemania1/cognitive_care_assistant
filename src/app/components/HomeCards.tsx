@@ -21,6 +21,17 @@ function getTodayKey(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+type LinkCardProps = {
+  href: string;
+  title: string;
+  description: string;
+  accent: string;
+  iconGlow: string;
+  moduleTag: string;
+  emoji: string;
+  targetBlank?: boolean;
+};
+
 export default function HomeCards() {
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
@@ -30,7 +41,9 @@ export default function HomeCards() {
         href="/daily-questions"
         title="Daily Checks"
         description="Quick daily check-in questionnaires"
-        accent="from-emerald-500 to-teal-500"
+        accent="from-emerald-400/80 via-teal-500/60 to-transparent"
+        iconGlow="shadow-[0_0_20px_rgba(52,211,153,0.35)]"
+        moduleTag="ASSESSMENT"
         emoji="📝"
       />
 
@@ -38,7 +51,9 @@ export default function HomeCards() {
         href="/reminders"
         title="Medication & Nutrition"
         description="Hydration, meals, and medicine times"
-        accent="from-amber-500 to-orange-500"
+        accent="from-amber-400/80 via-orange-500/50 to-transparent"
+        iconGlow="shadow-[0_0_20px_rgba(251,191,36,0.3)]"
+        moduleTag="CARE PLAN"
         emoji="🥗"
       />
 
@@ -47,7 +62,9 @@ export default function HomeCards() {
         href="/emg"
         title="Exercise"
         description="Analyze muscle activation during workouts"
-        accent="from-fuchsia-500 to-purple-500"
+        accent="from-violet-400/80 via-purple-500/50 to-transparent"
+        iconGlow="shadow-[0_0_20px_rgba(167,139,250,0.35)]"
+        moduleTag="BIOMETRICS"
         emoji="💪"
       />
 
@@ -55,7 +72,9 @@ export default function HomeCards() {
         href="/sleepbehaviors"
         title="Sleep Behaviors"
         description="Monitor thermal patterns and sleep analysis"
-        accent="from-cyan-500 to-sky-500"
+        accent="from-cyan-400/80 via-sky-500/50 to-transparent"
+        iconGlow="shadow-[0_0_20px_rgba(34,211,238,0.35)]"
+        moduleTag="THERMAL"
         emoji="😴"
       />
 
@@ -64,7 +83,9 @@ export default function HomeCards() {
         href="/photo-album"
         title="Photo Album"
         description="View your memories and photos from daily questions"
-        accent="from-pink-500 to-rose-500"
+        accent="from-rose-400/70 via-pink-500/45 to-transparent"
+        iconGlow="shadow-[0_0_20px_rgba(244,114,182,0.3)]"
+        moduleTag="RECORDS"
         emoji="📸"
       />
 
@@ -72,7 +93,9 @@ export default function HomeCards() {
         href="/memory-games"
         title="Memory Games"
         description="Play cognitive exercises to train memory"
-        accent="from-green-500 to-emerald-500"
+        accent="from-emerald-400/70 via-green-500/45 to-transparent"
+        iconGlow="shadow-[0_0_20px_rgba(74,222,128,0.3)]"
+        moduleTag="COGNITIVE"
         emoji="🧠"
       />
 
@@ -81,7 +104,9 @@ export default function HomeCards() {
         href="/dashboard/biomedical"
         title="Biomedical Monitor"
         description="Vitals, brain mapping, and multimodal telemetry"
-        accent="from-sky-500 to-cyan-600"
+        accent="from-sky-400/80 via-cyan-500/55 to-transparent"
+        iconGlow="shadow-[0_0_20px_rgba(56,189,248,0.38)]"
+        moduleTag="VITALS"
         emoji="🩺"
       />
 
@@ -89,36 +114,35 @@ export default function HomeCards() {
         href="/brainnet"
         title="BrainNet Diagram"
         description="Sensors → AI → care flow overview"
-        accent="from-blue-500 to-indigo-600"
+        accent="from-blue-400/80 via-indigo-500/55 to-transparent"
+        iconGlow="shadow-[0_0_20px_rgba(96,165,250,0.35)]"
+        moduleTag="NETWORK"
         emoji="🕸️"
       />
       </div>
 
       <Link href="/ai-synopsis" className="block">
-        <CardShell accent="from-violet-500 to-indigo-600">
+        <CardShell accent="from-violet-400/80 via-indigo-500/55 to-transparent">
           <div className="flex min-h-[5rem] flex-col justify-between gap-3 sm:min-h-0 sm:flex-row sm:items-center">
             <div className="flex items-center justify-between gap-2 sm:justify-start">
-              <div className="flex min-w-0 items-center gap-2">
-                <EmojiIcon symbol="✨" />
+              <div className="flex min-w-0 items-center gap-3">
+                <EmojiIcon symbol="✨" glowClassName="shadow-[0_0_20px_rgba(129,140,248,0.38)]" />
                 <div className="min-w-0 leading-tight">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 dark:text-slate-100 sm:text-base">
-                    AI SYNOPSIS
-                  </h2>
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 sm:text-sm">
-                    (Last 90 Days)
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300/70">
+                    ANALYTICS
                   </p>
+                  <h2 className="text-sm font-semibold tracking-tight text-slate-50 sm:text-base">
+                    AI Synopsis
+                  </h2>
+                  <p className="text-xs font-medium text-slate-400 sm:text-sm">Last 90 days</p>
                 </div>
               </div>
-              <span className="text-base opacity-60 transition-transform group-hover:translate-x-0.5 sm:hidden">
-                →
-              </span>
+              <ModuleChevron className="sm:hidden" />
             </div>
-            <p className="text-sm opacity-70 sm:max-w-xl sm:flex-1 sm:pl-4">
+            <p className="text-sm text-slate-400 sm:max-w-xl sm:flex-1 sm:pl-4">
               CCA 2.0 provider view · risk score, multimodal metrics, biomarkers
             </p>
-            <span className="hidden text-base opacity-60 transition-transform group-hover:translate-x-0.5 sm:block sm:shrink-0">
-              →
-            </span>
+            <ModuleChevron className="hidden sm:block sm:shrink-0" />
           </div>
         </CardShell>
       </Link>
@@ -126,39 +150,104 @@ export default function HomeCards() {
   );
 }
 
-function CardShell({ accent, children }: { accent: string; children: React.ReactNode }) {
+function CardShell({
+  accent,
+  iconGlow,
+  moduleTag,
+  emoji,
+  children,
+}: {
+  accent: string;
+  iconGlow?: string;
+  moduleTag?: string;
+  emoji?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="light-ui-frame group relative block rounded-xl border border-slate-200/90 bg-white/75 shadow-sm backdrop-blur px-5 py-6 dark:border-white/15 dark:bg-white/5 dark:shadow-none">
-      <div className={`pointer-events-none absolute -inset-px rounded-xl bg-gradient-to-r ${accent} opacity-0 group-hover:opacity-30 transition-opacity`} />
-      <div className="relative flex flex-col gap-3">{children}</div>
+    <div className="cca-clinical-module group relative block">
+      <div
+        className="cca-clinical-module-halo pointer-events-none absolute -inset-2 rounded-2xl bg-[radial-gradient(ellipse_at_50%_55%,rgba(99,102,241,0.16)_0%,rgba(59,130,246,0.07)_45%,transparent_72%)] opacity-60 blur-xl"
+        aria-hidden
+      />
+      <div className="cca-clinical-glass light-ui-frame relative overflow-hidden rounded-xl border border-white/[0.14] bg-[#0f1a2e]/88 px-5 py-6 shadow-[0_8px_32px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.09),inset_0_0_40px_rgba(59,130,246,0.06)] backdrop-blur-md group-hover:border-sky-300/25 group-hover:bg-[#121f38]/92 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.42),0_0_28px_rgba(59,130,246,0.14),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_0_48px_rgba(99,102,241,0.1)]">
+        <div
+          className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r ${accent} opacity-50 transition-opacity duration-500 group-hover:opacity-90`}
+          aria-hidden
+        />
+        <div
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-[0.04] transition-opacity duration-500 group-hover:opacity-[0.1]`}
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[radial-gradient(circle,rgba(147,197,253,0.12)_0%,transparent_70%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+          aria-hidden
+        />
+        {moduleTag && emoji ? (
+          <div className="relative mb-3 flex items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <EmojiIcon symbol={emoji} glowClassName={iconGlow ?? ""} />
+              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300/65">
+                {moduleTag}
+              </p>
+            </div>
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-300/90">
+              <span className="cca-dashboard-live-dot h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+              Live
+            </span>
+          </div>
+        ) : null}
+        <div className="relative flex flex-col gap-3 text-slate-100">{children}</div>
+      </div>
     </div>
   );
 }
 
-function EmojiIcon({ symbol }: { symbol: string }) {
+function EmojiIcon({ symbol, glowClassName = "" }: { symbol: string; glowClassName?: string }) {
   return (
     <span
-      aria-hidden="true"
-      className="light-ui-frame inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200/90 text-base dark:bg-white/10"
+      aria-hidden
+      className={`cca-dashboard-emoji inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/14 bg-[#152238]/90 text-base backdrop-blur-sm transition-colors duration-500 group-hover:border-sky-300/30 group-hover:bg-[#1a2848]/95 ${glowClassName}`}
     >
       {symbol}
     </span>
   );
 }
 
-function LinkCard({ href, title, description, accent, targetBlank, emoji }: { href: string; title: string; description: string; accent: string; targetBlank?: boolean; emoji?: string }) {
+function ModuleChevron({ className = "" }: { className?: string }) {
   return (
-    <Link href={href} className="contents" target={targetBlank ? "_blank" : undefined} rel={targetBlank ? "noopener noreferrer" : undefined}>
-      <CardShell accent={accent}>
-        <div className="min-h-[7rem] flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {emoji ? <EmojiIcon symbol={emoji} /> : null}
-              <h2 className="text-lg sm:text-xl font-medium">{title}</h2>
-            </div>
-            <span className="text-base opacity-60 transition-transform group-hover:translate-x-0.5">→</span>
+    <span
+      className={`cca-dashboard-chevron text-base text-sky-300/50 ${className}`}
+      aria-hidden
+    >
+      →
+    </span>
+  );
+}
+
+function LinkCard({
+  href,
+  title,
+  description,
+  accent,
+  iconGlow,
+  moduleTag,
+  emoji,
+  targetBlank,
+}: LinkCardProps) {
+  return (
+    <Link
+      href={href}
+      className="contents"
+      target={targetBlank ? "_blank" : undefined}
+      rel={targetBlank ? "noopener noreferrer" : undefined}
+    >
+      <CardShell accent={accent} iconGlow={iconGlow} moduleTag={moduleTag} emoji={emoji}>
+        <div className="flex min-h-[7rem] flex-col justify-between gap-4">
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="text-lg font-semibold tracking-tight text-slate-50 sm:text-xl">{title}</h2>
+            <ModuleChevron />
           </div>
-          <p className="text-sm opacity-70">{description}</p>
+          <p className="text-sm leading-relaxed text-slate-400">{description}</p>
         </div>
       </CardShell>
     </Link>

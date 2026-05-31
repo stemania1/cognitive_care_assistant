@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
-import { validateUserId } from '@/lib/clerk-auth';
+import { getAllUserIdsForQuery } from '@/lib/user-id-mapping';
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,10 +31,11 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Building query for daily_checks table');
+    const userIds = await getAllUserIdsForQuery(userId);
     const query = supabaseAdmin
       .from('daily_checks')
       .select('*')
-      .eq('user_id', userId)
+      .in('user_id', userIds)
       .order('created_at', { ascending: true });
 
     if (date) {

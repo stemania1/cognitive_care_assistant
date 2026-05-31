@@ -55,6 +55,195 @@ body {
   color: transparent;
 }
 
+/* Clinical module cards: glass panel shimmer on hover */
+.cca-clinical-module .cca-clinical-glass::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.04) 50%,
+    transparent 60%
+  );
+  transition: opacity 0.5s ease;
+}
+
+.cca-clinical-module:hover .cca-clinical-glass::after {
+  opacity: 1;
+}
+
+/* Dashboard: calm motion (cards, icons, arrows, ambient glow) */
+.cca-dashboard .cca-dashboard-ambient {
+  animation: ccaDashboardAmbientBreath 14s ease-in-out infinite;
+}
+
+.cca-dashboard .cca-dashboard-glow-top {
+  animation: ccaDashboardGlowDriftTop 18s ease-in-out infinite;
+}
+
+.cca-dashboard .cca-dashboard-glow-bottom {
+  animation: ccaDashboardGlowDriftBottom 22s ease-in-out infinite;
+}
+
+.cca-dashboard .cca-dashboard-logo-glow {
+  animation: ccaDashboardLogoGlow 12s ease-in-out infinite;
+}
+
+.cca-clinical-module .cca-clinical-glass {
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.55s ease,
+    background-color 0.55s ease,
+    box-shadow 0.55s ease;
+}
+
+.cca-clinical-module:hover .cca-clinical-glass {
+  transform: translateY(-4px);
+}
+
+.cca-clinical-module .cca-clinical-module-halo {
+  transition: opacity 0.55s ease, filter 0.55s ease;
+}
+
+.cca-clinical-module:hover .cca-clinical-module-halo {
+  opacity: 1;
+  filter: blur(28px);
+}
+
+.cca-dashboard .cca-dashboard-emoji {
+  animation: ccaDashboardIconPulse 4.5s ease-in-out infinite;
+}
+
+.cca-clinical-module:hover .cca-dashboard-emoji {
+  animation-duration: 3.5s;
+}
+
+.cca-dashboard .cca-dashboard-chevron {
+  display: inline-block;
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.5s ease,
+    opacity 0.5s ease;
+}
+
+.cca-clinical-module:hover .cca-dashboard-chevron {
+  transform: translateX(6px);
+  color: rgb(186 230 253 / 0.85);
+}
+
+.cca-dashboard .cca-dashboard-live-dot {
+  animation: ccaDashboardLivePulse 3s ease-in-out infinite;
+}
+
+@keyframes ccaDashboardAmbientBreath {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
+
+@keyframes ccaDashboardGlowDriftTop {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: translate(-50%, 0) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -14px) scale(1.05);
+  }
+}
+
+@keyframes ccaDashboardGlowDriftBottom {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: translate(25%, 25%) scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translate(20%, 18%) scale(1.06);
+  }
+}
+
+@keyframes ccaDashboardLogoGlow {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1.35);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.42);
+  }
+}
+
+@keyframes ccaDashboardIconPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes ccaDashboardLivePulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(0.92);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cca-dashboard .cca-dashboard-ambient,
+  .cca-dashboard .cca-dashboard-glow-top,
+  .cca-dashboard .cca-dashboard-glow-bottom,
+  .cca-dashboard .cca-dashboard-logo-glow,
+  .cca-dashboard .cca-dashboard-emoji,
+  .cca-dashboard .cca-dashboard-live-dot,
+  .cca-dashboard .cca-dashboard-title {
+    animation: none !important;
+  }
+
+  .cca-clinical-module:hover .cca-clinical-glass {
+    transform: none;
+  }
+
+  .cca-clinical-module:hover .cca-dashboard-chevron {
+    transform: none;
+  }
+}
+
+/* Dashboard: calm healthcare-tech headline */
+.cca-dashboard .cca-dashboard-title {
+  background: linear-gradient(
+    135deg,
+    #f8fafc 0%,
+    #e0e7ff 28%,
+    #c7d2fe 48%,
+    #bae6fd 72%,
+    #93c5fd 100%
+  );
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradientFlowX 9s ease-in-out infinite alternate;
+}
+
 @keyframes gradientFlowX {
   0% { background-position: 0% 50%; }
   100% { background-position: 100% 50%; }
