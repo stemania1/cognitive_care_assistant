@@ -214,7 +214,8 @@ body {
   .cca-dashboard .cca-dashboard-logo-glow,
   .cca-dashboard .cca-dashboard-emoji,
   .cca-dashboard .cca-dashboard-live-dot,
-  .cca-dashboard .cca-dashboard-title {
+  .cca-dashboard .cca-dashboard-title-line,
+  .cca-dashboard .cca-dashboard-title-wrap::before {
     animation: none !important;
   }
 
@@ -227,21 +228,101 @@ body {
   }
 }
 
-/* Dashboard: calm healthcare-tech headline */
-.cca-dashboard .cca-dashboard-title {
+/* Dashboard: healthcare hero title + subtitle */
+.cca-dashboard .cca-dashboard-hero-text {
+  margin-top: 0.25rem;
+}
+
+.cca-dashboard .cca-dashboard-title-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 0.25rem 0;
+}
+
+.cca-dashboard .cca-dashboard-title-wrap::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  z-index: -1;
+  height: 140%;
+  width: 120%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(129, 140, 248, 0.28) 0%,
+    rgba(59, 130, 246, 0.12) 42%,
+    transparent 68%
+  );
+  filter: blur(18px);
+  opacity: 0.85;
+  animation: ccaDashboardTitleGlow 10s ease-in-out infinite;
+}
+
+.cca-dashboard .cca-dashboard-title-line {
+  display: block;
   background: linear-gradient(
     135deg,
     #f8fafc 0%,
-    #e0e7ff 28%,
-    #c7d2fe 48%,
-    #bae6fd 72%,
-    #93c5fd 100%
+    #e8eeff 22%,
+    #c7d2fe 42%,
+    #a5d8f7 68%,
+    #7dd3fc 100%
   );
-  background-size: 200% 200%;
+  background-size: 220% 220%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: gradientFlowX 9s ease-in-out infinite alternate;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+  animation: gradientFlowX 11s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 22px rgba(147, 197, 253, 0.22))
+    drop-shadow(0 2px 8px rgba(15, 23, 42, 0.35));
+}
+
+.cca-dashboard .cca-dashboard-title-line--primary {
+  font-size: clamp(1.75rem, 5vw, 3rem);
+}
+
+.cca-dashboard .cca-dashboard-title-line--secondary {
+  font-size: clamp(1.25rem, 3.5vw, 1.875rem);
+  letter-spacing: -0.02em;
+  margin-top: -0.15rem;
+}
+
+.cca-dashboard .cca-dashboard-subtitle {
+  margin-top: 0.875rem;
+  max-width: 28rem;
+  padding: 0 0.5rem;
+  font-size: clamp(0.8125rem, 2vw, 0.9375rem);
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+  color: rgb(148 163 184 / 0.92);
+  text-wrap: balance;
+}
+
+@media (min-width: 640px) {
+  .cca-dashboard .cca-dashboard-subtitle {
+    margin-top: 1.125rem;
+  }
+}
+
+@keyframes ccaDashboardTitleGlow {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1.04);
+  }
 }
 
 @keyframes gradientFlowX {

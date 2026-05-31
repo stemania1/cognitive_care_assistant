@@ -73,10 +73,19 @@ export default function Dashboard() {
             </div>
           </button>
 
-          <h1 className="font-extrabold tracking-tight text-center">
-            <span className="cca-dashboard-title block text-3xl sm:text-5xl leading-[1.15] pb-1">Cognitive Care</span>
-            <span className="cca-dashboard-title block text-lg sm:text-2xl -mt-1 opacity-95">Assistant</span>
-          </h1>
+          <div className="cca-dashboard-hero-text flex max-w-2xl flex-col items-center text-center">
+            <h1 className="cca-dashboard-title-wrap">
+              <span className="cca-dashboard-title-line cca-dashboard-title-line--primary">
+                Cognitive Care
+              </span>
+              <span className="cca-dashboard-title-line cca-dashboard-title-line--secondary">
+                Assistant
+              </span>
+            </h1>
+            <p className="cca-dashboard-subtitle">
+              AI-powered support for memory, wellness, and caregiver insights.
+            </p>
+          </div>
 
         </div>
 
