@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [sidebarOverlayWidthPx, setSidebarOverlayWidthPx] = useState(0);
 
   return (
-    <div className="cca-dashboard relative min-h-screen overflow-hidden bg-[#060d18] text-slate-100">
+    <div className="cca-dashboard cca-dashboard-saas relative min-h-screen overflow-hidden text-slate-100">
       <DementiaCareSidebar onLayoutChange={setSidebarOverlayWidthPx} />
       {/* Guest Account Indicator */}
       <GuestIndicator />
@@ -26,27 +26,16 @@ export default function Dashboard() {
       {/* Congressional App Challenge Button */}
       <CongressionalAppChallengeButton />
       
-      {/* Healthcare-tech ambient background */}
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-[#060d18] via-[#0b1424] to-[#0a1628]"
-        aria-hidden
-      />
-      <div
-        className="cca-dashboard-ambient pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1100px_520px_at_50%_-12%,rgba(99,102,241,0.22),transparent_58%),radial-gradient(900px_480px_at_88%_72%,rgba(59,130,246,0.14),transparent_55%),radial-gradient(760px_420px_at_8%_88%,rgba(139,92,246,0.12),transparent_52%),radial-gradient(600px_320px_at_50%_42%,rgba(56,189,248,0.06),transparent_70%)]"
-        aria-hidden
-      />
-      <div
-        className="cca-dashboard-glow-top pointer-events-none absolute -top-32 left-1/2 h-[480px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(129,140,248,0.18)_0%,rgba(59,130,246,0.08)_42%,transparent_68%)] blur-3xl -z-10"
-        aria-hidden
-      />
-      <div
-        className="cca-dashboard-glow-bottom pointer-events-none absolute bottom-0 right-0 h-[360px] w-[360px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,rgba(79,70,229,0.12)_0%,transparent_65%)] blur-3xl -z-10"
-        aria-hidden
-      />
+      {/* SaaS ambient background */}
+      <div className="cca-dashboard-bg-base pointer-events-none absolute inset-0 -z-10" aria-hidden />
+      <div className="cca-dashboard-ambient pointer-events-none absolute inset-0 -z-10" aria-hidden />
+      <div className="cca-dashboard-glow-top pointer-events-none absolute -z-10" aria-hidden />
+      <div className="cca-dashboard-glow-bottom pointer-events-none absolute -z-10" aria-hidden />
+      <div className="cca-dashboard-grid-glow pointer-events-none absolute inset-0 -z-10" aria-hidden />
 
-      <main className="relative mx-auto max-w-5xl px-6 sm:px-10 py-8 sm:py-12">
+      <main className="cca-dashboard-main relative mx-auto max-w-5xl">
         {/* Hero */}
-        <div className="flex flex-col items-center text-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <div className="cca-dashboard-hero flex flex-col items-center text-center">
           <button 
             onClick={() => setIsModalOpen(true)}
             className="relative cursor-pointer select-none group" 
@@ -61,7 +50,7 @@ export default function Dashboard() {
               className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_50%_40%,rgba(147,197,253,0.2)_0%,transparent_55%)] blur-xl opacity-90"
               aria-hidden
             />
-            <div className="light-ui-frame relative rounded-2xl border border-white/12 bg-[#0f1a2e]/75 p-4 shadow-[0_0_48px_rgba(59,130,246,0.18),0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:border-sky-400/25 group-hover:shadow-[0_0_56px_rgba(99,102,241,0.28),0_8px_36px_rgba(0,0,0,0.4)]">
+            <div className="cca-dashboard-logo-card light-ui-frame relative rounded-2xl p-4">
               <Image
                 src="/digital_brain.png"
                 alt="Cognitive Care Assistant logo"
@@ -104,7 +93,7 @@ export default function Dashboard() {
             aria-hidden="true"
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="light-ui-frame relative w-full max-w-2xl rounded-2xl border border-white/12 bg-gradient-to-br from-[#0f1a2e]/95 via-[#111d33]/95 to-[#0c1528]/95 p-6 shadow-[0_0_40px_rgba(59,130,246,0.12),0_24px_48px_rgba(0,0,0,0.45)] backdrop-blur-md sm:p-8">
+            <div className="cca-dashboard-modal light-ui-frame relative w-full max-w-2xl rounded-2xl p-6 sm:p-8">
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="absolute top-4 right-4 text-slate-400 transition-colors hover:text-slate-100"

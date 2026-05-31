@@ -34,8 +34,8 @@ type LinkCardProps = {
 
 export default function HomeCards() {
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+    <div className="cca-dashboard-cards flex flex-col">
+      <div className="grid grid-cols-1 sm:grid-cols-2">
       {/* Row 1: Daily Questions + Medication */}
       <LinkCard
         href="/daily-questions"
@@ -128,12 +128,8 @@ export default function HomeCards() {
               <div className="flex min-w-0 items-center gap-3">
                 <EmojiIcon symbol="✨" glowClassName="shadow-[0_0_20px_rgba(129,140,248,0.38)]" />
                 <div className="min-w-0 leading-tight">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300/70">
-                    ANALYTICS
-                  </p>
-                  <h2 className="text-sm font-semibold tracking-tight text-slate-50 sm:text-base">
-                    AI Synopsis
-                  </h2>
+                  <p className="cca-saas-module-label">ANALYTICS</p>
+                  <h2 className="cca-saas-card-title text-sm sm:text-base">AI Synopsis</h2>
                   <p className="text-xs font-medium text-slate-400 sm:text-sm">Last 90 days</p>
                 </div>
               </div>
@@ -164,36 +160,17 @@ function CardShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="cca-clinical-module group relative block">
-      <div
-        className="cca-clinical-module-halo pointer-events-none absolute -inset-2 rounded-2xl bg-[radial-gradient(ellipse_at_50%_55%,rgba(99,102,241,0.16)_0%,rgba(59,130,246,0.07)_45%,transparent_72%)] opacity-60 blur-xl"
-        aria-hidden
-      />
-      <div className="cca-clinical-glass light-ui-frame relative overflow-hidden rounded-xl border border-white/[0.14] bg-[#0f1a2e]/88 px-5 py-6 shadow-[0_8px_32px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.09),inset_0_0_40px_rgba(59,130,246,0.06)] backdrop-blur-md group-hover:border-sky-300/25 group-hover:bg-[#121f38]/92 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.42),0_0_28px_rgba(59,130,246,0.14),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_0_48px_rgba(99,102,241,0.1)]">
-        <div
-          className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r ${accent} opacity-50 transition-opacity duration-500 group-hover:opacity-90`}
-          aria-hidden
-        />
-        <div
-          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-[0.04] transition-opacity duration-500 group-hover:opacity-[0.1]`}
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[radial-gradient(circle,rgba(147,197,253,0.12)_0%,transparent_70%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-          aria-hidden
-        />
+    <div className="cca-saas-module group relative block">
+      <div className="cca-saas-module-halo" aria-hidden />
+      <div className="cca-saas-card light-ui-frame relative overflow-hidden rounded-xl px-5 py-6">
+        <div className="cca-saas-card-shine" aria-hidden />
+        <div className={`cca-saas-card-accent bg-gradient-to-r ${accent}`} aria-hidden />
+        <div className={`cca-saas-card-tint bg-gradient-to-br ${accent}`} aria-hidden />
+        <div className="cca-saas-card-gleam" aria-hidden />
         {moduleTag && emoji ? (
-          <div className="relative mb-3 flex items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <EmojiIcon symbol={emoji} glowClassName={iconGlow ?? ""} />
-              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300/65">
-                {moduleTag}
-              </p>
-            </div>
-            <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-300/90">
-              <span className="cca-dashboard-live-dot h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
-              Live
-            </span>
+          <div className="cca-saas-card-header relative flex items-center gap-3">
+            <EmojiIcon symbol={emoji} glowClassName={iconGlow ?? ""} />
+            <p className="cca-saas-module-label truncate">{moduleTag}</p>
           </div>
         ) : null}
         <div className="relative flex flex-col gap-3 text-slate-100">{children}</div>
@@ -206,7 +183,7 @@ function EmojiIcon({ symbol, glowClassName = "" }: { symbol: string; glowClassNa
   return (
     <span
       aria-hidden
-      className={`cca-dashboard-emoji inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/14 bg-[#152238]/90 text-base backdrop-blur-sm transition-colors duration-500 group-hover:border-sky-300/30 group-hover:bg-[#1a2848]/95 ${glowClassName}`}
+      className={`cca-dashboard-emoji cca-saas-emoji inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base ${glowClassName}`}
     >
       {symbol}
     </span>
@@ -244,10 +221,10 @@ function LinkCard({
       <CardShell accent={accent} iconGlow={iconGlow} moduleTag={moduleTag} emoji={emoji}>
         <div className="flex min-h-[7rem] flex-col justify-between gap-4">
           <div className="flex items-start justify-between gap-2">
-            <h2 className="text-lg font-semibold tracking-tight text-slate-50 sm:text-xl">{title}</h2>
+            <h2 className="cca-saas-card-title text-lg sm:text-xl">{title}</h2>
             <ModuleChevron />
           </div>
-          <p className="text-sm leading-relaxed text-slate-400">{description}</p>
+          <p className="cca-saas-card-desc text-sm">{description}</p>
         </div>
       </CardShell>
     </Link>

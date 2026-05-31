@@ -55,8 +55,313 @@ body {
   color: transparent;
 }
 
-/* Clinical module cards: glass panel shimmer on hover */
-.cca-clinical-module .cca-clinical-glass::after {
+/* Dashboard: healthcare SaaS design system */
+.cca-dashboard-saas {
+  --cca-saas-bg: #070b14;
+  --cca-saas-surface: #0f1729;
+  --cca-saas-surface-hover: #131f38;
+  --cca-saas-border: rgba(148, 163, 184, 0.14);
+  --cca-saas-border-hover: rgba(129, 140, 248, 0.38);
+  --cca-saas-accent-blue: rgba(59, 130, 246, 0.55);
+  --cca-saas-accent-purple: rgba(129, 140, 248, 0.45);
+  --cca-saas-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 4px 16px rgba(0, 0, 0, 0.28),
+    0 12px 32px -8px rgba(0, 0, 0, 0.42);
+  --cca-saas-shadow-hover:
+    0 1px 0 rgba(255, 255, 255, 0.09) inset,
+    0 8px 24px rgba(0, 0, 0, 0.32),
+    0 20px 44px -12px rgba(15, 23, 42, 0.55),
+    0 0 36px rgba(99, 102, 241, 0.14);
+  background-color: var(--cca-saas-bg);
+}
+
+.cca-dashboard .cca-dashboard-bg-base {
+  background: linear-gradient(
+    165deg,
+    #070b14 0%,
+    #0b1222 38%,
+    #0a1528 72%,
+    #080f1c 100%
+  );
+}
+
+.cca-dashboard .cca-dashboard-ambient {
+  background:
+    radial-gradient(1100px 520px at 50% -12%, rgba(99, 102, 241, 0.18), transparent 58%),
+    radial-gradient(900px 480px at 88% 72%, rgba(59, 130, 246, 0.11), transparent 55%),
+    radial-gradient(760px 420px at 8% 88%, rgba(139, 92, 246, 0.1), transparent 52%),
+    radial-gradient(600px 320px at 50% 42%, rgba(56, 189, 248, 0.05), transparent 70%);
+}
+
+.cca-dashboard .cca-dashboard-glow-top {
+  top: -8rem;
+  left: 50%;
+  height: 30rem;
+  width: 34rem;
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(129, 140, 248, 0.16) 0%,
+    rgba(59, 130, 246, 0.07) 42%,
+    transparent 68%
+  );
+  filter: blur(64px);
+}
+
+.cca-dashboard .cca-dashboard-glow-bottom {
+  bottom: 0;
+  right: 0;
+  height: 22rem;
+  width: 22rem;
+  transform: translate(25%, 25%);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.1) 0%, transparent 65%);
+  filter: blur(64px);
+}
+
+.cca-dashboard .cca-dashboard-grid-glow {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 10%, transparent 72%);
+  opacity: 0.35;
+  animation: ccaDashboardGridFade 16s ease-in-out infinite;
+}
+
+.cca-dashboard .cca-dashboard-main {
+  padding: 2.25rem 1.5rem 3rem;
+}
+
+@media (min-width: 640px) {
+  .cca-dashboard .cca-dashboard-main {
+    padding: 3rem 2.5rem 3.5rem;
+  }
+}
+
+.cca-dashboard .cca-dashboard-hero {
+  gap: 1.125rem;
+  margin-bottom: 2.25rem;
+}
+
+@media (min-width: 640px) {
+  .cca-dashboard .cca-dashboard-hero {
+    gap: 1.375rem;
+    margin-bottom: 2.75rem;
+  }
+}
+
+.cca-dashboard .cca-dashboard-logo-card {
+  border: 1px solid var(--cca-saas-border);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.92) 0%, rgba(16, 28, 52, 0.88) 100%);
+  box-shadow: var(--cca-saas-shadow), 0 0 40px rgba(59, 130, 246, 0.12);
+  backdrop-filter: blur(12px);
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.5s ease,
+    box-shadow 0.5s ease;
+}
+
+.cca-dashboard .group:hover .cca-dashboard-logo-card {
+  transform: translateY(-4px);
+  border-color: var(--cca-saas-border-hover);
+  box-shadow: var(--cca-saas-shadow-hover), 0 0 48px rgba(99, 102, 241, 0.2);
+}
+
+.cca-dashboard .cca-dashboard-modal {
+  border: 1px solid var(--cca-saas-border);
+  background: linear-gradient(155deg, rgba(15, 23, 42, 0.97) 0%, rgba(17, 29, 51, 0.96) 50%, rgba(12, 21, 40, 0.98) 100%);
+  box-shadow: var(--cca-saas-shadow-hover);
+  backdrop-filter: blur(16px);
+}
+
+.cca-dashboard .cca-dashboard-cards {
+  gap: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .cca-dashboard .cca-dashboard-cards {
+    gap: 1.5rem;
+  }
+
+  .cca-dashboard .cca-dashboard-cards > .grid {
+    gap: 1.5rem;
+  }
+}
+
+.cca-dashboard .cca-dashboard-cards > .grid {
+  gap: 1.125rem;
+}
+
+/* SaaS module cards */
+.cca-saas-module .cca-saas-module-halo {
+  pointer-events: none;
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: 1rem;
+  background: radial-gradient(
+    ellipse at 50% 55%,
+    rgba(99, 102, 241, 0.14) 0%,
+    rgba(59, 130, 246, 0.06) 45%,
+    transparent 72%
+  );
+  opacity: 0.55;
+  filter: blur(20px);
+  transition: opacity 0.55s ease, filter 0.55s ease;
+}
+
+.cca-saas-module:hover .cca-saas-module-halo {
+  opacity: 1;
+  filter: blur(26px);
+}
+
+.cca-saas-module .cca-saas-card {
+  border: 1px solid var(--cca-saas-border);
+  background: linear-gradient(
+    155deg,
+    rgba(15, 23, 42, 0.94) 0%,
+    rgba(14, 22, 40, 0.9) 48%,
+    rgba(12, 20, 38, 0.92) 100%
+  );
+  box-shadow: var(--cca-saas-shadow);
+  backdrop-filter: blur(14px);
+}
+
+.cca-saas-module .cca-saas-card-accent {
+  pointer-events: none;
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  opacity: 0.55;
+  transition: opacity 0.5s ease;
+  animation: ccaSaasAccentPulse 5s ease-in-out infinite;
+}
+
+.cca-saas-module:hover .cca-saas-card-accent {
+  opacity: 1;
+}
+
+.cca-saas-module .cca-saas-card-tint {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  transition: opacity 0.5s ease;
+}
+
+.cca-saas-module:hover .cca-saas-card-tint {
+  opacity: 0.09;
+}
+
+.cca-saas-module .cca-saas-card-gleam {
+  pointer-events: none;
+  position: absolute;
+  right: -2rem;
+  top: -2rem;
+  height: 7rem;
+  width: 7rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(147, 197, 253, 0.14) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.55s ease;
+}
+
+.cca-saas-module:hover .cca-saas-card-gleam {
+  opacity: 1;
+}
+
+.cca-saas-module .cca-saas-card-shine {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 62%
+  );
+  transition: opacity 0.55s ease;
+}
+
+.cca-saas-module:hover .cca-saas-card-shine {
+  opacity: 1;
+  animation: ccaSaasCardShimmer 2.8s ease-in-out infinite;
+}
+
+.cca-saas-module .cca-saas-card-header {
+  margin-bottom: 0.875rem;
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.cca-saas-module .cca-saas-module-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(165, 180, 252, 0.75);
+}
+
+.cca-saas-module .cca-saas-status-pill {
+  border-radius: 9999px;
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.14) 0%, rgba(99, 102, 241, 0.12) 100%);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(191, 219, 254, 0.92);
+  transition: border-color 0.45s ease, box-shadow 0.45s ease;
+}
+
+.cca-saas-module:hover .cca-saas-status-pill {
+  border-color: rgba(129, 140, 248, 0.45);
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.2);
+}
+
+.cca-saas-module .cca-saas-status-dot {
+  height: 0.375rem;
+  width: 0.375rem;
+  border-radius: 9999px;
+  background: rgb(96, 165, 250);
+}
+
+.cca-saas-module .cca-saas-emoji {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(145deg, rgba(21, 34, 56, 0.95) 0%, rgba(16, 26, 46, 0.92) 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  transition:
+    border-color 0.45s ease,
+    background-color 0.45s ease,
+    box-shadow 0.45s ease,
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cca-saas-module:hover .cca-saas-emoji {
+  border-color: rgba(129, 140, 248, 0.35);
+  box-shadow: 0 0 18px rgba(99, 102, 241, 0.18);
+}
+
+.cca-saas-module .cca-saas-card-title {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: rgb(248 250 252 / 0.98);
+}
+
+.cca-saas-module .cca-saas-card-desc {
+  line-height: 1.55;
+  color: rgb(148 163 184 / 0.92);
+}
+
+/* Clinical module cards: glass panel shimmer on hover (legacy alias) */
+.cca-clinical-module .cca-clinical-glass::after,
+.cca-saas-module .cca-clinical-glass::after {
   content: "";
   pointer-events: none;
   position: absolute;
@@ -72,8 +377,39 @@ body {
   transition: opacity 0.5s ease;
 }
 
-.cca-clinical-module:hover .cca-clinical-glass::after {
+.cca-clinical-module:hover .cca-clinical-glass::after,
+.cca-saas-module:hover .cca-clinical-glass::after {
   opacity: 1;
+}
+
+@keyframes ccaSaasCardShimmer {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes ccaSaasAccentPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes ccaDashboardGridFade {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+  50% {
+    opacity: 0.42;
+  }
 }
 
 /* Dashboard: calm motion (cards, icons, arrows, ambient glow) */
@@ -93,7 +429,8 @@ body {
   animation: ccaDashboardLogoGlow 12s ease-in-out infinite;
 }
 
-.cca-clinical-module .cca-clinical-glass {
+.cca-clinical-module .cca-clinical-glass,
+.cca-saas-module .cca-saas-card {
   transition:
     transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.55s ease,
@@ -101,24 +438,25 @@ body {
     box-shadow 0.55s ease;
 }
 
-.cca-clinical-module:hover .cca-clinical-glass {
+.cca-clinical-module:hover .cca-clinical-glass,
+.cca-saas-module:hover .cca-saas-card {
   transform: translateY(-4px);
-}
-
-.cca-clinical-module .cca-clinical-module-halo {
-  transition: opacity 0.55s ease, filter 0.55s ease;
-}
-
-.cca-clinical-module:hover .cca-clinical-module-halo {
-  opacity: 1;
-  filter: blur(28px);
+  border-color: var(--cca-saas-border-hover);
+  background: linear-gradient(
+    155deg,
+    rgba(17, 26, 48, 0.96) 0%,
+    rgba(16, 25, 46, 0.94) 48%,
+    rgba(14, 23, 42, 0.96) 100%
+  );
+  box-shadow: var(--cca-saas-shadow-hover);
 }
 
 .cca-dashboard .cca-dashboard-emoji {
   animation: ccaDashboardIconPulse 4.5s ease-in-out infinite;
 }
 
-.cca-clinical-module:hover .cca-dashboard-emoji {
+.cca-clinical-module:hover .cca-dashboard-emoji,
+.cca-saas-module:hover .cca-dashboard-emoji {
   animation-duration: 3.5s;
 }
 
@@ -130,7 +468,8 @@ body {
     opacity 0.5s ease;
 }
 
-.cca-clinical-module:hover .cca-dashboard-chevron {
+.cca-clinical-module:hover .cca-dashboard-chevron,
+.cca-saas-module:hover .cca-dashboard-chevron {
   transform: translateX(6px);
   color: rgb(186 230 253 / 0.85);
 }
@@ -215,16 +554,24 @@ body {
   .cca-dashboard .cca-dashboard-emoji,
   .cca-dashboard .cca-dashboard-live-dot,
   .cca-dashboard .cca-dashboard-title-line,
-  .cca-dashboard .cca-dashboard-title-wrap::before {
+  .cca-dashboard .cca-dashboard-title-wrap::before,
+  .cca-dashboard .cca-dashboard-grid-glow,
+  .cca-saas-module .cca-saas-card-accent {
     animation: none !important;
   }
 
-  .cca-clinical-module:hover .cca-clinical-glass {
+  .cca-clinical-module:hover .cca-clinical-glass,
+  .cca-saas-module:hover .cca-saas-card {
     transform: none;
   }
 
-  .cca-clinical-module:hover .cca-dashboard-chevron {
+  .cca-clinical-module:hover .cca-dashboard-chevron,
+  .cca-saas-module:hover .cca-dashboard-chevron {
     transform: none;
+  }
+
+  .cca-saas-module:hover .cca-saas-card-shine {
+    animation: none;
   }
 }
 
@@ -297,14 +644,15 @@ body {
 
 .cca-dashboard .cca-dashboard-subtitle {
   margin-top: 0.875rem;
-  max-width: 28rem;
-  padding: 0 0.5rem;
+  max-width: 30rem;
+  padding: 0 0.75rem;
   font-size: clamp(0.8125rem, 2vw, 0.9375rem);
   font-weight: 400;
-  line-height: 1.55;
-  letter-spacing: 0.02em;
-  color: rgb(148 163 184 / 0.92);
+  line-height: 1.6;
+  letter-spacing: 0.015em;
+  color: rgb(148 163 184 / 0.88);
   text-wrap: balance;
+  transition: color 0.45s ease;
 }
 
 @media (min-width: 640px) {
