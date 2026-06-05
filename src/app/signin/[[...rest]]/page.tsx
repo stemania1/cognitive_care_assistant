@@ -7,8 +7,9 @@ import Link from "next/link";
 import { SignInTopBar } from "../../components/SignInTopBar";
 import { SignInUserInsights } from "../../components/SignInUserInsights";
 
-const YOUTUBE_WATCH_URL = "https://youtu.be/pIXN4iN-VQA";
-const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed/pIXN4iN-VQA";
+const YOUTUBE_VIDEO_ID = "pIXN4iN-VQA";
+const YOUTUBE_WATCH_URL = `https://youtu.be/${YOUTUBE_VIDEO_ID}`;
+const YOUTUBE_EMBED_URL = `https://www.youtube.com/embed/${YOUTUBE_VIDEO_ID}`;
 
 /** Hero headline → sign-in; sign-in band in view → insights; otherwise nudge toward the next section down or back to sign-in. */
 function resolveSigninPageFabTarget(): "signin" | "insights" {
@@ -40,6 +41,14 @@ function resolveSigninPageFabTarget(): "signin" | "insights" {
 
 export default function SignInPage() {
   const [fabTarget, setFabTarget] = useState<"signin" | "insights">("signin");
+  const [continuousPlay, setContinuousPlay] = useState(false);
+
+  // YouTube embeds loop only when given loop=1 *and* a playlist of the same
+  // video id; autoplay restarts playback immediately when the option is toggled
+  // on (the click counts as the user gesture browsers require).
+  const overviewVideoSrc = continuousPlay
+    ? `${YOUTUBE_EMBED_URL}?rel=0&autoplay=1&loop=1&playlist=${YOUTUBE_VIDEO_ID}`
+    : `${YOUTUBE_EMBED_URL}?rel=0`;
 
   useEffect(() => {
     const sync = () => setFabTarget(resolveSigninPageFabTarget());
@@ -269,7 +278,8 @@ export default function SignInPage() {
             <div className="light-ui-frame relative overflow-hidden rounded-lg border border-blue-700/50 bg-[#f4f6fc] shadow-md dark:border-blue-600/40 dark:bg-[#1a2d4a]">
               <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
                 <iframe
-                  src={`${YOUTUBE_EMBED_URL}?rel=0`}
+                  key={overviewVideoSrc}
+                  src={overviewVideoSrc}
                   title="Cognitive Care Assistant – Overview & Behind the Scenes"
                   className="absolute inset-0 h-full w-full"
                   frameBorder="0"
@@ -277,6 +287,17 @@ export default function SignInPage() {
                   allowFullScreen
                 />
               </div>
+            </div>
+            <div className="mt-3 flex items-center justify-center">
+              <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-sky-100/95 sm:text-sm">
+                <input
+                  type="checkbox"
+                  checked={continuousPlay}
+                  onChange={(event) => setContinuousPlay(event.target.checked)}
+                  className="h-4 w-4 cursor-pointer rounded border-sky-400/60 bg-transparent text-sky-500 accent-sky-500 focus:ring-sky-400"
+                />
+                <span>Continuous play (loop video)</span>
+              </label>
             </div>
             <p className="mx-auto mt-3 max-w-lg px-2 text-center text-xs font-medium leading-relaxed text-sky-100/95 sm:mt-3.5 sm:text-sm md:text-base">
               2-minute overview of how AI supports safer, more confident caregiving
