@@ -1,22 +1,13 @@
-"use client";
+import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redirect to sign-in page immediately
-    router.replace("/signin");
-  }, [router]);
-
-  // Show a minimal loading state while redirecting
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-violet-50 to-sky-100 text-slate-900 dark:from-black dark:via-[#0b0520] dark:to-[#0b1a3a] dark:text-white flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-slate-600 dark:text-gray-300">Redirecting to sign in...</p>
-      </div>
-    </div>
-  );
+/**
+ * Root route. Redirect on the server so it works even when client-side
+ * JavaScript is slow or stalls (e.g. iPad Safari during the intro animation),
+ * which previously left the page stuck on "Redirecting to sign in…".
+ * Signed-in users go straight to the dashboard; everyone else to sign-in.
+ */
+export default async function Home() {
+  const { userId } = await auth();
+  redirect(userId ? "/dashboard" : "/signin");
 }
