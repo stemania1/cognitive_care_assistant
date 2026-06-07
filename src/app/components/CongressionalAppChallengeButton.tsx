@@ -8,7 +8,7 @@ export function CongressionalAppChallengeButton() {
       href="https://www.congressionalappchallenge.us/25-FL17/"
       target="_blank"
       rel="noopener noreferrer"
-      className="fixed top-4 right-4 z-50 group"
+      className="group"
     >
       <div className="relative">
         <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-fuchsia-500/20 via-purple-500/15 to-cyan-500/20 blur-lg group-hover:blur-xl transition-all duration-300" />

@@ -5,7 +5,7 @@ import Image from "next/image";
 import HomeCards from "../components/HomeCards";
 import { GuestIndicator } from "../components/GuestIndicator";
 import { DementiaCareSidebar } from "../components/DementiaCareSidebar";
-import { CongressionalAppChallengeButton } from "../components/CongressionalAppChallengeButton";
+import { DashboardTopRight } from "../components/DashboardTopRight";
 import { UserProfileTopLeft } from "../components/UserProfileTopLeft";
 import { DashboardSettingsMenu } from "../components/DashboardSettingsMenu";
 
@@ -23,8 +23,8 @@ export default function Dashboard() {
       {/* User Profile Top Left */}
       <UserProfileTopLeft sidebarInsetPx={sidebarOverlayWidthPx} />
       
-      {/* Congressional App Challenge Button */}
-      <CongressionalAppChallengeButton />
+      {/* Congressional App Challenge + Messenger */}
+      <DashboardTopRight />
       
       {/* SaaS ambient background */}
       <div className="cca-dashboard-bg-base pointer-events-none absolute inset-0 -z-10" aria-hidden />
