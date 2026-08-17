@@ -99,7 +99,7 @@ export default function HomeCards() {
         emoji="🧠"
       />
 
-      {/* Row 4: Biomedical + BrainNet */}
+      {/* Row 4: Biomedical + AI Synopsis */}
       <LinkCard
         href="/dashboard/biomedical"
         title="Biomedical Monitor"
@@ -111,37 +111,15 @@ export default function HomeCards() {
       />
 
       <LinkCard
-        href="/brainnet"
-        title="BrainNet Diagram"
-        description="Sensors → AI → care flow overview"
-        accent="from-blue-400/80 via-indigo-500/55 to-transparent"
-        iconGlow="shadow-[0_0_20px_rgba(96,165,250,0.35)]"
-        moduleTag="NETWORK"
-        emoji="🕸️"
+        href="/ai-synopsis"
+        title="AI Synopsis"
+        description="CCA 2.0 provider view · risk score, multimodal metrics, biomarkers"
+        accent="from-violet-400/80 via-indigo-500/55 to-transparent"
+        iconGlow="shadow-[0_0_20px_rgba(129,140,248,0.38)]"
+        moduleTag="ANALYTICS"
+        emoji="✨"
       />
       </div>
-
-      <Link href="/ai-synopsis" className="block">
-        <CardShell accent="from-violet-400/80 via-indigo-500/55 to-transparent">
-          <div className="flex min-h-[5rem] flex-col justify-between gap-3 sm:min-h-0 sm:flex-row sm:items-center">
-            <div className="flex items-center justify-between gap-2 sm:justify-start">
-              <div className="flex min-w-0 items-center gap-3">
-                <EmojiIcon symbol="✨" glowClassName="shadow-[0_0_20px_rgba(129,140,248,0.38)]" />
-                <div className="min-w-0 leading-tight">
-                  <p className="cca-saas-module-label">ANALYTICS</p>
-                  <h2 className="cca-saas-card-title text-sm sm:text-base">AI Synopsis</h2>
-                  <p className="text-xs font-medium text-slate-400 sm:text-sm">Last 90 days</p>
-                </div>
-              </div>
-              <ModuleChevron className="sm:hidden" />
-            </div>
-            <p className="text-sm text-slate-400 sm:max-w-xl sm:flex-1 sm:pl-4">
-              CCA 2.0 provider view · risk score, multimodal metrics, biomarkers
-            </p>
-            <ModuleChevron className="hidden sm:block sm:shrink-0" />
-          </div>
-        </CardShell>
-      </Link>
     </div>
   );
 }
@@ -160,9 +138,9 @@ function CardShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="cca-saas-module group relative block">
+    <div className="cca-saas-module group relative block h-full">
       <div className="cca-saas-module-halo" aria-hidden />
-      <div className="cca-saas-card light-ui-frame relative overflow-hidden rounded-xl px-5 py-6">
+      <div className="cca-saas-card light-ui-frame relative flex h-full flex-col overflow-hidden rounded-xl px-5 py-6">
         <div className="cca-saas-card-shine" aria-hidden />
         <div className={`cca-saas-card-accent bg-gradient-to-r ${accent}`} aria-hidden />
         <div className={`cca-saas-card-tint bg-gradient-to-br ${accent}`} aria-hidden />
@@ -173,7 +151,7 @@ function CardShell({
             <p className="cca-saas-module-label truncate">{moduleTag}</p>
           </div>
         ) : null}
-        <div className="relative flex flex-col gap-3 text-slate-100">{children}</div>
+        <div className="relative flex flex-1 flex-col gap-3 text-slate-100">{children}</div>
       </div>
     </div>
   );
@@ -219,7 +197,7 @@ function LinkCard({
       rel={targetBlank ? "noopener noreferrer" : undefined}
     >
       <CardShell accent={accent} iconGlow={iconGlow} moduleTag={moduleTag} emoji={emoji}>
-        <div className="flex min-h-[7rem] flex-col justify-between gap-4">
+        <div className="flex min-h-[7rem] flex-1 flex-col justify-between gap-4">
           <div className="flex items-start justify-between gap-2">
             <h2 className="cca-saas-card-title text-lg sm:text-xl">{title}</h2>
             <ModuleChevron />

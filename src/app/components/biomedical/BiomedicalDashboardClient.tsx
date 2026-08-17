@@ -363,6 +363,12 @@ export function BiomedicalDashboardClient() {
                 <section className="rounded-xl border border-cyan-400/30 bg-gradient-to-b from-cyan-500/[0.14] to-cyan-500/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
                   <h3 className="text-[13px] font-bold uppercase tracking-[0.12em] text-cyan-100">What this means</h3>
                   <p className="mt-2.5 text-[13px] leading-relaxed text-slate-50">{clinical.whatThisMeans}</p>
+                  <Link
+                    href={`/dashboard/pathology?region=${encodeURIComponent(selectedRegionId ?? "memory networks")}&signal=${encodeURIComponent("cognitive change pattern")}`}
+                    className="mt-3 inline-flex items-center gap-1 rounded-lg border border-fuchsia-400/35 bg-fuchsia-500/10 px-3 py-2 text-[11px] font-medium text-fuchsia-100 transition hover:bg-fuchsia-500/15"
+                  >
+                    Explore biological context →
+                  </Link>
                 </section>
 
                 <section className="rounded-xl border border-white/[0.08] bg-[#080c14] p-4">
