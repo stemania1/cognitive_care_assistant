@@ -8,6 +8,7 @@ import { DementiaCareSidebar } from "../components/DementiaCareSidebar";
 import { DashboardTopRight } from "../components/DashboardTopRight";
 import { UserProfileTopLeft } from "../components/UserProfileTopLeft";
 import { DashboardSettingsMenu } from "../components/DashboardSettingsMenu";
+import GradientWaves from "../components/GradientWaves";
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,14 +27,38 @@ export default function Dashboard() {
       {/* Congressional App Challenge + Messenger */}
       <DashboardTopRight />
       
-      {/* SaaS ambient background */}
-      <div className="cca-dashboard-bg-base pointer-events-none absolute inset-0 -z-10" aria-hidden />
-      <div className="cca-dashboard-ambient pointer-events-none absolute inset-0 -z-10" aria-hidden />
-      <div className="cca-dashboard-glow-top pointer-events-none absolute -z-10" aria-hidden />
-      <div className="cca-dashboard-glow-bottom pointer-events-none absolute -z-10" aria-hidden />
-      <div className="cca-dashboard-grid-glow pointer-events-none absolute inset-0 -z-10" aria-hidden />
+      {/* SaaS ambient background — z-0 so it stays above the page fill, under UI */}
+      <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
+        <div className="cca-dashboard-bg-base absolute inset-0" />
+        <div className="cca-dashboard-gradient-waves absolute inset-0">
+          <GradientWaves
+            horizonColor="#07101f"
+            waveColor="#1d4ed8"
+            crestColor="#93c5fd"
+            speed={0.22}
+            amplitude={2.2}
+            waveScale={0.55}
+            waveRatio={0.85}
+            swell={28}
+            turbulence={16}
+            tilt={1.08}
+            zoom={1.05}
+            height={5.2}
+            fogDepth={18}
+            detail="medium"
+            brightness={0.85}
+            opacity={0.9}
+            mouseInteraction
+            parallaxStrength={0.35}
+            grain
+            grainIntensity={0.03}
+          />
+        </div>
+        <div className="cca-dashboard-vignette absolute inset-0" />
+        <div className="cca-dashboard-grid-glow absolute inset-0" />
+      </div>
 
-      <main className="cca-dashboard-main relative mx-auto max-w-5xl">
+      <main className="cca-dashboard-main relative z-10 mx-auto max-w-5xl">
         {/* Hero */}
         <div className="cca-dashboard-hero flex flex-col items-center text-center">
           <button 

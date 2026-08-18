@@ -400,38 +400,9 @@ export function buildRegionInsights(
   });
 }
 
-function buildWhatThisMeans(
-  domain: CognitiveDomain,
-  signals: CognitiveSignals | null,
-  insights: RegionInsight[]
-): string {
-  const top = [...insights].sort((a, b) => b.concern - a.concern)[0];
-  if (!top) {
-    return "No regional emphasis is available in this snapshot — capture memory, language, or assessment activity to refine mapping.";
-  }
-
-  if (domain === "memory") {
-    return top.concern >= 0.34
-      ? "Strongest signal in memory pathways (recall/retention). Not a diagnosis — track over time."
-      : "Memory mapping is mild on this snapshot; keep using in-app tasks.";
-  }
-  if (domain === "speech") {
-    return top.concern >= 0.34
-      ? "Language variability may reflect expressive or receptive load in app responses — not formal speech testing."
-      : "Language networks look relatively balanced here.";
-  }
-  if (domain === "cognitive") {
-    return top.concern >= 0.34
-      ? "Executive-style load from cross-module activity — attention/planning/speed (heuristic only)."
-      : "Executive networks look stable in this fused view.";
-  }
-  return `${top.regionName} shows the highest concern (${top.severity.toLowerCase()}) in this multimodal blend.`;
-}
-
 export type ClinicalPanelSections = {
   activeRegionMappingTitle: string;
   regionInsights: RegionInsight[];
-  whatThisMeans: string;
   /** Short merged narrative for the Interpretation card. */
   interpretationSummary: string;
   functionalInterpretation: string;
@@ -478,7 +449,6 @@ export function buildClinicalPanelSections(
     speechClaritySim,
     executiveSim
   );
-  const whatThisMeans = buildWhatThisMeans(domain, signals, regionInsights);
 
   let activeRegionMappingTitle: string;
   if (domain === "idle") {
@@ -538,7 +508,6 @@ export function buildClinicalPanelSections(
   return {
     activeRegionMappingTitle,
     regionInsights,
-    whatThisMeans,
     interpretationSummary,
     functionalInterpretation,
     cognitiveCorrelation,

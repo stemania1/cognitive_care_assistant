@@ -33,6 +33,9 @@ type LinkCardProps = {
 };
 
 export default function HomeCards() {
+  const accent = "from-sky-400/80 via-cyan-500/55 to-transparent";
+  const iconGlow = "shadow-[0_0_20px_rgba(56,189,248,0.38)]";
+
   return (
     <div className="cca-dashboard-cards flex flex-col">
       <div className="grid grid-cols-1 sm:grid-cols-2">
@@ -41,8 +44,8 @@ export default function HomeCards() {
         href="/daily-questions"
         title="Daily Checks"
         description="Quick daily check-in questionnaires"
-        accent="from-emerald-400/80 via-teal-500/60 to-transparent"
-        iconGlow="shadow-[0_0_20px_rgba(52,211,153,0.35)]"
+        accent={accent}
+        iconGlow={iconGlow}
         moduleTag="ASSESSMENT"
         emoji="📝"
       />
@@ -51,8 +54,8 @@ export default function HomeCards() {
         href="/reminders"
         title="Medication & Nutrition"
         description="Hydration, meals, and medicine times"
-        accent="from-amber-400/80 via-orange-500/50 to-transparent"
-        iconGlow="shadow-[0_0_20px_rgba(251,191,36,0.3)]"
+        accent={accent}
+        iconGlow={iconGlow}
         moduleTag="CARE PLAN"
         emoji="🥗"
       />
@@ -62,8 +65,8 @@ export default function HomeCards() {
         href="/emg"
         title="Exercise"
         description="Analyze muscle activation during workouts"
-        accent="from-violet-400/80 via-purple-500/50 to-transparent"
-        iconGlow="shadow-[0_0_20px_rgba(167,139,250,0.35)]"
+        accent={accent}
+        iconGlow={iconGlow}
         moduleTag="BIOMETRICS"
         emoji="💪"
       />
@@ -72,8 +75,8 @@ export default function HomeCards() {
         href="/sleepbehaviors"
         title="Sleep Behaviors"
         description="Monitor thermal patterns and sleep analysis"
-        accent="from-cyan-400/80 via-sky-500/50 to-transparent"
-        iconGlow="shadow-[0_0_20px_rgba(34,211,238,0.35)]"
+        accent={accent}
+        iconGlow={iconGlow}
         moduleTag="THERMAL"
         emoji="😴"
       />
@@ -83,8 +86,8 @@ export default function HomeCards() {
         href="/photo-album"
         title="Photo Album"
         description="View your memories and photos from daily questions"
-        accent="from-rose-400/70 via-pink-500/45 to-transparent"
-        iconGlow="shadow-[0_0_20px_rgba(244,114,182,0.3)]"
+        accent={accent}
+        iconGlow={iconGlow}
         moduleTag="RECORDS"
         emoji="📸"
       />
@@ -93,8 +96,8 @@ export default function HomeCards() {
         href="/memory-games"
         title="Memory Games"
         description="Play cognitive exercises to train memory"
-        accent="from-emerald-400/70 via-green-500/45 to-transparent"
-        iconGlow="shadow-[0_0_20px_rgba(74,222,128,0.3)]"
+        accent={accent}
+        iconGlow={iconGlow}
         moduleTag="COGNITIVE"
         emoji="🧠"
       />
@@ -104,8 +107,8 @@ export default function HomeCards() {
         href="/dashboard/biomedical"
         title="Biomedical Monitor"
         description="Vitals, brain mapping, and multimodal telemetry"
-        accent="from-sky-400/80 via-cyan-500/55 to-transparent"
-        iconGlow="shadow-[0_0_20px_rgba(56,189,248,0.38)]"
+        accent={accent}
+        iconGlow={iconGlow}
         moduleTag="VITALS"
         emoji="🩺"
       />
@@ -114,8 +117,8 @@ export default function HomeCards() {
         href="/ai-synopsis"
         title="AI Synopsis"
         description="CCA 2.0 provider view · risk score, multimodal metrics, biomarkers"
-        accent="from-violet-400/80 via-indigo-500/55 to-transparent"
-        iconGlow="shadow-[0_0_20px_rgba(129,140,248,0.38)]"
+        accent={accent}
+        iconGlow={iconGlow}
         moduleTag="ANALYTICS"
         emoji="✨"
       />

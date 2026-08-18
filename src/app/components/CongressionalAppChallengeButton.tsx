@@ -1,35 +1,43 @@
 'use client';
 
 import Image from 'next/image';
+import SpecularButton from './SpecularButton';
 
 export function CongressionalAppChallengeButton() {
   return (
-    <a
-      href="https://www.congressionalappchallenge.us/25-FL17/"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group"
+    <SpecularButton
+      size="md"
+      radius={12}
+      tint="#ffffff"
+      tintOpacity={0.1}
+      blur={12}
+      textColor="#f1f5f9"
+      lineColor="#c4b5fd"
+      baseColor="#334155"
+      intensity={1.1}
+      shineSize={12}
+      shineFade={36}
+      thickness={1.25}
+      followMouse
+      proximity={280}
+      className="cca-dashboard-specular-btn"
+      onClick={() =>
+        window.open('https://www.congressionalappchallenge.us/25-FL17/', '_blank', 'noopener,noreferrer')
+      }
     >
-      <div className="relative">
-        <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-fuchsia-500/20 via-purple-500/15 to-cyan-500/20 blur-lg group-hover:blur-xl transition-all duration-300" />
-        <div className="light-ui-frame relative flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200/90 bg-white/90 px-4 py-2.5 text-base text-slate-800 shadow-sm backdrop-blur-sm transition-all hover:bg-white group-hover:border-violet-300/70 group-hover:shadow-md dark:border-white/20 dark:bg-white/10 dark:text-white/90 dark:shadow-none dark:hover:bg-white/20 dark:group-hover:border-white/40 dark:group-hover:shadow-lg">
-          {/* Dome Logo */}
-          <div className="relative w-8 h-8 flex-shrink-0">
-            <Image
-              src="/images/CAClogo-dome-only-color.png"
-              alt="Congressional App Challenge"
-              width={32}
-              height={32}
-              className="h-auto w-auto object-contain"
-            />
-          </div>
-          
-          {/* Text */}
-          <span className="font-medium text-slate-800 whitespace-nowrap dark:text-white">
-            Winners of Congressional App Challenge
-          </span>
-        </div>
-      </div>
-    </a>
+      <span className="inline-flex items-center gap-3">
+        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center">
+          <Image
+            src="/images/CAClogo-dome-only-color.png"
+            alt=""
+            width={32}
+            height={32}
+            className="h-auto w-auto object-contain"
+            aria-hidden
+          />
+        </span>
+        <span className="whitespace-nowrap font-medium">Winners of Congressional App Challenge</span>
+      </span>
+    </SpecularButton>
   );
 }

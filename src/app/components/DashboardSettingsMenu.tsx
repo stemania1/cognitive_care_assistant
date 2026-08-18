@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAlertCenter } from "./AlertCenter";
+import { LogoutButton } from "./LogoutButton";
 
 export function DashboardSettingsMenu() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -94,28 +95,9 @@ export function DashboardSettingsMenu() {
               All Settings
             </Link>
 
-            <Link
-              href="/signout"
-              onClick={() => setMenuOpen(false)}
-              className="light-ui-frame mt-2 flex w-full items-center gap-2 rounded-xl border border-red-200/80 bg-red-50/80 px-3 py-2.5 text-sm font-medium text-red-800 transition-colors hover:bg-red-100/80 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/20"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="h-5 w-5 shrink-0 opacity-90"
-                aria-hidden
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
-                />
-              </svg>
-              Sign out
-            </Link>
+            <div className="mt-3 px-1">
+              <LogoutButton onClick={() => setMenuOpen(false)} />
+            </div>
           </div>
         </>
       )}

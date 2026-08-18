@@ -2,6 +2,7 @@
 
 import { useUser } from '@clerk/nextjs';
 import Image from 'next/image';
+import SpecularButton from './SpecularButton';
 
 type UserProfileTopLeftProps = {
   /** Extra horizontal offset (px) so the chip clears a left sidebar. */
@@ -27,35 +28,47 @@ export function UserProfileTopLeft({ sidebarInsetPx = 0 }: UserProfileTopLeftPro
       className="fixed top-4 z-50 transition-[left] duration-200 ease-out"
       style={{ left: `calc(1rem + ${sidebarInsetPx}px)` }}
     >
-      <div className="relative">
-        <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-fuchsia-500/20 via-purple-500/15 to-cyan-500/20 blur-lg" />
-        <button className="light-ui-frame relative flex cursor-pointer items-center gap-3 rounded-lg border-2 border-slate-200/90 bg-white/90 px-4 py-2.5 text-base text-slate-800 shadow-md backdrop-blur-sm transition-colors hover:bg-white dark:border-white/30 dark:bg-white/15 dark:text-white dark:shadow-lg dark:hover:bg-white/20">
-          {/* Profile Image */}
+      <SpecularButton
+        size="md"
+        radius={12}
+        tint="#ffffff"
+        tintOpacity={0.1}
+        blur={12}
+        textColor="#f1f5f9"
+        lineColor="#e879f9"
+        baseColor="#334155"
+        intensity={1.1}
+        shineSize={12}
+        shineFade={36}
+        thickness={1.25}
+        followMouse
+        proximity={280}
+        className="cca-dashboard-specular-btn"
+        type="button"
+      >
+        <span className="inline-flex items-center gap-3">
           {profileImageUrl ? (
-            <div className="relative w-10 h-10 flex-shrink-0 overflow-hidden rounded-full border-2 border-slate-300/80 shadow-md dark:border-white/40">
+            <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-white/30 shadow-md">
               <Image
                 src={profileImageUrl}
-                alt={userEmail}
+                alt=""
                 width={40}
                 height={40}
                 className="object-cover"
                 unoptimized
+                aria-hidden
               />
-            </div>
+            </span>
           ) : (
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-slate-300/80 bg-gradient-to-br from-purple-500 to-cyan-500 shadow-md dark:border-white/40">
-              <span className="text-sm font-bold text-white">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/30 bg-gradient-to-br from-purple-500 to-cyan-500 shadow-md">
+              <span className="text-sm font-bold text-white" aria-hidden>
                 {userEmail.charAt(0).toUpperCase()}
               </span>
-            </div>
+            </span>
           )}
-          
-          {/* User Email */}
-          <span className="font-semibold text-slate-800 dark:text-white">
-            {userEmail}
-          </span>
-        </button>
-      </div>
+          <span className="font-semibold">{userEmail}</span>
+        </span>
+      </SpecularButton>
     </div>
   );
 }
